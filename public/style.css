@@ -1596,3 +1596,41 @@ button { max-width:100%; }
   .reception-page-tab { font-size:9px; }
   .bar-page-tab { font-size:10px; }
 }
+
+/* v31: keep the top-page action buttons compact; do not inherit .btn full width. */
+.event-list-toolbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-width:0;
+}
+.event-list-toolbar > :first-child { flex:1 1 auto; min-width:0; }
+.event-list-actions {
+  display:flex;
+  flex:0 0 auto;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  min-width:0;
+}
+.event-list-actions > .btn {
+  display:inline-flex;
+  flex:0 0 auto;
+  align-items:center;
+  justify-content:center;
+  width:auto !important;
+  min-width:0;
+  max-width:none;
+  white-space:nowrap;
+}
+.event-list-actions .new-event-compact {
+  padding:12px 15px;
+  font-size:14px;
+}
+@media (max-width:520px) {
+  .event-list-toolbar { gap:8px; }
+  .event-list-actions { gap:6px; }
+  .event-list-actions > .btn { padding:9px 10px; font-size:12px; }
+  .event-list-actions .new-event-compact { padding:9px 11px; font-size:12px; }
+}
