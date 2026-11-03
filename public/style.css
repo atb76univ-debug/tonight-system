@@ -1658,3 +1658,26 @@ button { max-width:100%; }
 #backBtn:disabled{opacity:.45;cursor:default}
 .event-pulse{z-index:90}
 .navigation-error{margin:0 0 12px;padding:12px 14px;border:1px solid #e6b9b9;border-radius:12px;background:#fff4f4;color:#9f2424;font-size:13px;font-weight:700}
+
+
+/* 名簿：名前検索・学年絞り込み */
+.member-filter-toolbar{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(150px,220px);
+  gap:8px;
+  margin:14px 0;
+}
+.member-filter-toolbar input,
+.member-filter-toolbar select{
+  min-width:0;
+  width:100%;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+  font-size:14px;
+}
+.member-record[hidden]{display:none!important}
+@media(max-width:520px){
+  .member-filter-toolbar{grid-template-columns:1fr}
+}
