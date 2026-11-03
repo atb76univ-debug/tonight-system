@@ -1846,3 +1846,76 @@ button { max-width:100%; }
   .member-check-grid > .member-check { padding:9px; column-gap:7px; }
   .member-check-grid > .member-check > b { font-size:10px; }
 }
+
+
+/* 日付＋時刻の入力欄 */
+.date-time-field{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;color:var(--muted,#777);font-weight:600}
+.date-time-field input{width:100%;min-width:0;box-sizing:border-box}
+@media(max-width:520px){
+  .inline-form .date-time-field{grid-column:span 1}
+  .inline-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+
+/* 出番・シフトのヘッダーカードを同じ高さに揃える */
+#eventPulse #globalNowBox .schedule-overview-grid{align-items:stretch}
+#eventPulse #globalNowBox .schedule-section{display:flex;flex-direction:column;height:100%;box-sizing:border-box}
+#eventPulse #globalNowBox .schedule-columns{flex:1;align-items:stretch}
+#eventPulse #globalNowBox .schedule-column{height:100%;box-sizing:border-box}
+#eventPulse #globalNowBox .schedule-column-content{width:100%}
+
+/* 受付：TMPメンバー名簿の検索 */
+.tmp-member-search-wrap{position:relative;flex:1 1 220px;min-width:0}
+.member-pick-row .tmp-member-search{box-sizing:border-box;width:100%;min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:9px;background:#fff;font:inherit}
+.tmp-member-results{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px}
+.tmp-member-results[hidden]{display:none!important}
+.tmp-member-result{display:flex;align-items:center;gap:8px;width:100%;padding:10px;text-align:left;border:0;border-radius:7px;background:#fff;color:inherit;font:inherit;cursor:pointer}
+.tmp-member-result:hover,.tmp-member-result:focus{background:var(--surface,#f3f4f6);outline:none}
+.tmp-member-result strong{flex:1;min-width:0;overflow-wrap:anywhere}
+.tmp-member-result small{color:var(--muted,#777);white-space:nowrap}
+.tmp-member-no-result{padding:12px;color:var(--muted,#777);font-size:13px}
+@media(max-width:600px){.member-pick-row{align-items:stretch}.tmp-member-search-wrap{flex-basis:calc(100% - 52px)}.tmp-member-results{max-height: min(40vh,240px)}}
+
+
+/* 販売画面：直近3件の注文を常時確認 */
+.bar-latest-orders{margin-top:16px;padding:13px;border:1px solid #dfe7f2;border-radius:14px;background:#f7faff}
+.bar-latest-orders-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.bar-latest-orders-heading strong{font-size:14px;font-weight:900}
+.bar-latest-orders-heading span{font-size:10px;color:var(--sub);font-weight:750}
+.bar-latest-order{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid #e4eaf2}
+.bar-latest-order-main{display:flex;flex:1 1 auto;flex-direction:column;gap:4px;min-width:0}
+.bar-latest-order-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.bar-latest-order-meta strong{font-size:12px;font-variant-numeric:tabular-nums}
+.bar-order-payment{display:inline-flex;align-items:center;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:850}
+.bar-order-payment.is-cash{background:#e8f4eb;color:#287344}
+.bar-order-payment.is-ticket{background:#fff1dc;color:#986016}
+.bar-latest-order-items{font-size:13px;font-weight:750;line-height:1.45;overflow-wrap:anywhere}
+.bar-latest-order-amount{flex:0 0 auto;font-size:13px;font-weight:900;text-align:right;white-space:nowrap}
+.bar-latest-orders-empty{padding:12px 0 3px;color:var(--sub);font-size:12px}
+@media(max-width:420px){.bar-latest-orders{padding:11px}.bar-latest-order{align-items:flex-start;gap:7px}.bar-latest-order-items{font-size:12px}.bar-latest-order-amount{font-size:12px}}
+
+/* ドリチケ3段階照合 */
+.ticket-reconciliation{padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface,#fafafa);margin:10px 0 14px}
+.ticket-reconciliation-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.ticket-reconciliation-heading strong{font-size:14px}
+.ticket-reconciliation-heading span{font-size:11px;font-weight:700;color:var(--success,#16834a);white-space:nowrap}
+.ticket-reconciliation-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ticket-reconciliation-grid>div{min-width:0;padding:10px 8px;border-radius:10px;background:var(--card,#fff);border:1px solid var(--border)}
+.ticket-reconciliation-grid small{display:block;color:var(--sub);font-size:11px;line-height:1.4;min-height:2.8em}
+.ticket-reconciliation-grid strong{display:block;margin-top:5px;font-size:clamp(18px,4vw,24px);line-height:1.2;overflow-wrap:anywhere}
+.ticket-checklist{margin:12px 0}
+.ticket-checklist label{display:flex;align-items:center;gap:10px;margin:8px 0}
+.ticket-checklist input{flex:0 0 auto;width:20px;height:20px}
+.ticket-result-note{margin-top:10px;padding:12px;border-radius:10px;background:var(--surface,#f6f7f9);font-size:13px;line-height:1.6}
+.ticket-result-note.is-ok{background:#eaf8ef;color:#216b3b}
+.ticket-result-note.is-warning{background:#fff2e8;color:#8a421b}
+@media(max-width:520px){.ticket-reconciliation{padding:11px}.ticket-reconciliation-grid{gap:6px}.ticket-reconciliation-grid>div{padding:9px 6px}.ticket-reconciliation-grid small{font-size:10px}.ticket-reconciliation-grid strong{font-size:18px}}
+
+/* ドリチケ会計の最終確認 */
+.ticket-confirm-dialog{max-width:560px}
+.ticket-confirm-items{display:grid;gap:8px;margin:18px 0}
+.ticket-confirm-item{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 15px;border:1px solid #e1e6ee;border-radius:12px;background:#f8f9fb;font-size:16px;font-weight:750}
+.ticket-confirm-item span{min-width:0;overflow-wrap:anywhere}
+.ticket-confirm-item strong{flex:0 0 auto;font-variant-numeric:tabular-nums}
+.ticket-confirm-warning{min-height:74px;margin:16px 0 14px;border-color:#f0d28a;background:#fff8e7;color:#76520c;font-size:16px;line-height:1.55}
+@media(max-width:520px){.ticket-confirm-item{padding:11px 12px;font-size:15px}.ticket-confirm-warning{font-size:14px;min-height:66px}}

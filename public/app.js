@@ -1025,17 +1025,46 @@ function renderReceptionInput() {
     listContainer.innerHTML = tmpNames.map((item,index) => {
       const name = typeof item === "string" ? item : (item.name || "");
       const memberId = typeof item === "object" ? (item.memberId || "") : "";
-      return `<div class="member-pick-row"><select data-index="${index}" class="tmp-member-select"><option value="">名簿から選択</option>${(db.members||[]).map(m=>`<option value="${esc(m.id)}" ${memberId===m.id?"selected":""}>${esc(memberDisplayName(m))}${m.nickname?`（${esc(m.name)}）`:""}${m.grade?`・${esc(m.grade)}`:""}</option>`).join("")}</select><input type="text" value="${esc(name)}" placeholder="名簿にない場合は自由入力" data-index="${index}" class="tmp-name-input"><button class="tmp-name-delete" data-index="${index}">削</button></div>`;
+      return `<div class="member-pick-row"><div class="tmp-member-search-wrap"><input type="search" class="tmp-member-search" data-index="${index}" value="${esc(name)}" placeholder="TMPメンバーを名前で検索（ひらがな可）" autocomplete="off" aria-label="TMPメンバーを名前で検索"><div class="tmp-member-results" data-index="${index}" hidden></div></div><button class="tmp-name-delete" data-index="${index}" type="button">削</button></div>`;
     }).join("");
 
-    document.querySelectorAll(".tmp-name-input").forEach(input => input.addEventListener("change", e => {
-      const i=Number(e.target.dataset.index), old=tmpNames[i];
-      tmpNames[i]={name:e.target.value.trim(),memberId:typeof old==="object"?(old.memberId||""):""};
+    const normalizeMemberSearch = value => String(value || "").normalize("NFKC").toLocaleLowerCase("ja").replace(/[ァ-ン]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)).replace(/[　\s・ー‐‑–—]/g, "");
+    const showMemberResults = (index, query) => {
+      const resultBox = listContainer.querySelector(`.tmp-member-results[data-index="${index}"]`);
+      if (!resultBox) return;
+      const q = normalizeMemberSearch(query);
+      if (!q) { resultBox.hidden = true; resultBox.innerHTML = ""; return; }
+      const matches = (db.members || []).filter(m => {
+        const haystack = normalizeMemberSearch([m.name, m.nickname, memberDisplayName(m)].filter(Boolean).join(" "));
+        return haystack.includes(q);
+      }).slice(0, 12);
+      resultBox.innerHTML = matches.length ? matches.map(m => `<button type="button" class="tmp-member-result" data-member-id="${esc(m.id)}" data-index="${index}"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname ? `<small>${esc(m.name)}</small>` : ""}${m.grade ? `<small>${esc(m.grade)}</small>` : ""}</button>`).join("") : `<div class="tmp-member-no-result">該当するメンバーがいません。自由入力として登録できます。</div>`;
+      resultBox.hidden = false;
+    };
+
+    listContainer.querySelectorAll(".tmp-member-search").forEach(input => {
+      input.addEventListener("input", e => {
+        const i = Number(e.target.dataset.index), old = tmpNames[i];
+        tmpNames[i] = { name: e.target.value, memberId: "" };
+        showMemberResults(i, e.target.value);
+      });
+      input.addEventListener("focus", e => showMemberResults(Number(e.target.dataset.index), e.target.value));
+      input.addEventListener("keydown", e => { if (e.key === "Escape") { const box=listContainer.querySelector(`.tmp-member-results[data-index="${e.target.dataset.index}"]`); if(box) box.hidden=true; } });
+    });
+    listContainer.querySelectorAll(".tmp-member-result").forEach(btn => btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.index), m = (db.members || []).find(x => x.id === btn.dataset.memberId);
+      if (!m) return;
+      tmpNames[i] = { name: memberDisplayName(m), memberId: m.id };
+      const input = listContainer.querySelector(`.tmp-member-search[data-index="${i}"]`);
+      if (input) input.value = memberDisplayName(m);
+      const box = listContainer.querySelector(`.tmp-member-results[data-index="${i}"]`);
+      if (box) box.hidden = true;
     }));
-    document.querySelectorAll(".tmp-member-select").forEach(sel => sel.addEventListener("change", e => {
-      const i=Number(e.target.dataset.index), m=(db.members||[]).find(x=>x.id===e.target.value);
-      tmpNames[i]={name:m?memberDisplayName(m):(typeof tmpNames[i]==="object"?tmpNames[i].name:tmpNames[i]),memberId:m?.id||""};
-      const input=listContainer.querySelector(`.tmp-name-input[data-index="${i}"]`); if(input&&m) input.value=memberDisplayName(m);
+    listContainer.querySelectorAll(".tmp-name-delete").forEach(btn => btn.addEventListener("click", e => {
+      const index = Number(e.currentTarget.dataset.index);
+      tmpNames.splice(index, 1);
+      tmp--;
+      refresh();
     }));
 
     // 削除ボタンのイベント
@@ -2457,7 +2486,9 @@ function ensureBar(bar) {
   b.startBreakdown = b.startBreakdown || {};
   b.endBreakdown = b.endBreakdown || {};
   b.tally = Number(b.tally || 0);
-  b.tickets = Number(b.tickets || 0);
+  b.tickets = Number(b.tickets || 0); // 旧データ互換用
+  b.ticketCollected = b.ticketCollected ?? "";
+  b.ticketChecks = b.ticketChecks || {};
   b.remain = b.remain ?? "";
   b.checks = b.checks || {};
   if (!Array.isArray(b.products)) b.products = defaultBarProducts();
@@ -3110,6 +3141,14 @@ function barCashRows(kind, breakdown) {
     <div class="cash-entry-row"><label class="cash-denomination"><span class="cash-denom-value">${v.toLocaleString()}</span><span class="cash-denom-unit">円</span></label>
     <div class="cash-entry-input-wrap"><input type="number" min="0" step="1" inputmode="numeric" value="${Number(breakdown[v] || 0)}" data-bc="${kind}" data-v="${v}" aria-label="${v.toLocaleString()}円の枚数"><span>枚</span></div></div>`).join("") + `</div>`;
 }
+function getIssuedDrinkTicketCount(eventState) {
+  const history = Array.isArray(eventState?.receptionHistory) ? eventState.receptionHistory : [];
+  return history.reduce((sum, entry) => {
+    const guests = Array.isArray(entry.guests) ? entry.guests.length : Number(entry.general || 0) + Number(entry.tmp || 0);
+    return sum + Math.max(0, Number(guests || 0));
+  }, 0);
+}
+
 function renderBarHome() {
   const ev = ctx.ev, b = ensureBar(ctx.bar);
   if (!b.started) { renderBarSetup(); return; }
@@ -3122,9 +3161,30 @@ function renderBarHome() {
   const dt = new Date(ev.date + "T00:00:00"), md = `${dt.getMonth() + 1}/${dt.getDate()}`;
   const yen = n => "¥" + formatMoney(n);
   const sales = summarizeBarSales(b);
+  const issuedTickets = getIssuedDrinkTicketCount(ev.state || state);
+  const expectedUnusedTickets = issuedTickets - Number(sales.ticketUnits || 0);
+  // 受付履歴から配布枚数を自動集計。現物回収枚数だけを独立して手入力する。
+  b.tickets = issuedTickets;
   const productRows = Object.entries(sales.byProduct).map(([id, p]) => `
     <div class="sales-product-row"><strong>${esc(p.name)}</strong><span>${p.totalUnits}杯</span><span>現金 ${p.cashUnits}杯</span><span>チケ ${p.ticketUnits}杯</span><b>${yen(p.cashRevenue)}</b></div>
   `).join("");
+  const latestOrders = (b.sales || [])
+    .slice()
+    .sort((a, z) => Number(z.timestamp || 0) - Number(a.timestamp || 0))
+    .slice(0, 3);
+  const latestOrdersHtml = latestOrders.map((sale, index) => {
+    const details = (sale.items || []).map(item => `${esc(item.name)} ×${Number(item.qty || 0)}`).join("、");
+    const time = new Date(sale.timestamp || Date.now()).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    const method = sale.paymentMethod === "ticket" ? "ドリチケ" : "現金";
+    const amount = sale.paymentMethod === "ticket" ? "チケット払い" : yen(sale.totalAmount || 0);
+    return `<div class="bar-latest-order">
+      <div class="bar-latest-order-main">
+        <div class="bar-latest-order-meta"><strong>${index + 1}. ${time}</strong><span class="bar-order-payment ${sale.paymentMethod === "ticket" ? "is-ticket" : "is-cash"}">${method}</span></div>
+        <div class="bar-latest-order-items">${details || "商品情報なし"}</div>
+      </div>
+      <strong class="bar-latest-order-amount">${amount}</strong>
+    </div>`;
+  }).join("");
   const recent = (b.sales || []).slice(0, 12).map(s => {
     const detail = (s.items || []).map(i => `${esc(i.name)} ×${Number(i.qty || 0)}`).join("、");
     const time = new Date(s.timestamp || Date.now()).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
@@ -3160,6 +3220,10 @@ function renderBarHome() {
         <button class="btn btn-ticket" id="barTicketCheckout">ドリチケで会計</button>
       </div>
       <p class="sub-text">ドリチケ会計は商品1点につきチケット1枚として記録します。</p>
+    </div>
+    <div class="bar-latest-orders" aria-live="polite">
+      <div class="bar-latest-orders-heading"><strong>直近の注文</strong><span>最新3件</span></div>
+      ${latestOrdersHtml || `<div class="bar-latest-orders-empty">まだ注文はありません。</div>`}
     </div>
   </div>
 
@@ -3228,11 +3292,25 @@ function renderBarHome() {
   </div>
 
   <div class="card" data-bar-section="cash">
-    <div class="card-title">確認・チケット照合</div>
-    <div class="form-row"><label>カウンターで受け取ったドリチケ枚数</label>
-      <input id="bTickets" type="number" min="0" step="1" inputmode="numeric" value="${Number(b.tickets || 0)}"></div>
-    <div class="row"><span>販売で使用したドリチケ</span><strong id="bTicketSales"></strong></div>
-    <div class="row"><span>受取枚数との差</span><strong id="bTicketSt"></strong></div>
+    <div class="card-title">確認・ドリチケ照合</div>
+    <div class="ticket-reconciliation">
+      <div class="ticket-reconciliation-heading"><strong>受付・販売記録から自動集計</strong><span>クラウド同期</span></div>
+      <div class="ticket-reconciliation-grid">
+        <div><small>受付で配布した枚数</small><strong id="bTickets">${issuedTickets}枚</strong></div>
+        <div><small>販売記録上の使用枚数</small><strong id="bTicketSales">${sales.ticketUnits}枚</strong></div>
+        <div><small>未使用の可能性がある枚数</small><strong id="bTicketExpected">${expectedUnusedTickets}枚</strong></div>
+      </div>
+      <p class="sub-text">受付履歴の人数を配布枚数として自動集計します。受付履歴や販売履歴の追加・取消・復元は再集計に反映されます。</p>
+    </div>
+    <div class="form-row" style="margin-top:14px"><label>バーカウンターで実際に回収したドリチケ枚数</label>
+      <input id="bTicketCollected" type="number" min="0" step="1" inputmode="numeric" value="${esc(b.ticketCollected)}" placeholder="回収した現物を数えて入力"></div>
+    <div class="row"><span>販売記録と回収枚数の照合</span><strong id="bTicketSt"></strong></div>
+    <div class="ticket-checklist checklist">
+      <label><input type="checkbox" data-ticket-check="reception" ${b.ticketChecks.reception ? "checked" : ""}><span>受付の配布記録を確認した</span></label>
+      <label><input type="checkbox" data-ticket-check="sales" ${b.ticketChecks.sales ? "checked" : ""}><span>ドリチケの販売記録を確認した</span></label>
+      <label><input type="checkbox" data-ticket-check="physical" ${b.ticketChecks.physical ? "checked" : ""}><span>回収したドリチケの現物を数えた</span></label>
+    </div>
+    <div class="ticket-result-note" id="bTicketDiagnosis" aria-live="polite"></div>
     <div class="form-row" style="margin-top:14px"><label>（念のため）封筒を出した後、金庫に残った金額</label>
       <input id="bRemain" type="number" min="0" inputmode="numeric" value="${esc(b.remain)}" placeholder="数え直した金額"></div>
     <div class="row"><span>開始時の金額と一致</span><strong id="bRemainSt"></strong></div>
@@ -3323,8 +3401,29 @@ function renderBarHome() {
   $("barTicketCheckout").onclick = () => {
     if (!barCart.length) { alert("商品をカートに追加してください"); return; }
     const total = cartTotal();
-    b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "ticket", items: structuredClone(barCart), totalAmount: total, paidAmount: 0, change: 0 });
-    barCart = []; saveBar(); renderBarHome();
+    const ticketUnits = cartUnits();
+    const ticketItems = barCart.map(x => `<div class="ticket-confirm-item"><span>${esc(x.name)}</span><strong>× ${Number(x.qty)}</strong></div>`).join("");
+    screen.insertAdjacentHTML("beforeend", `
+      <div class="cashier-overlay" id="barTicketConfirmOverlay" role="dialog" aria-modal="true" aria-labelledby="barTicketConfirmTitle">
+        <div class="cashier-dialog ticket-confirm-dialog">
+          <div class="cashier-head"><h2 id="barTicketConfirmTitle">ドリチケで会計します。</h2><button type="button" class="cashier-cancel" id="barTicketConfirmCancel">戻る</button></div>
+          <div class="cashier-total-row"><span>使用するドリチケ</span><strong>${ticketUnits}枚</strong></div>
+          <div class="ticket-confirm-items">${ticketItems}</div>
+          <div class="cashier-status short ticket-confirm-warning">この内容でドリチケ会計を確定します。<br>確定後は販売履歴に記録されます。</div>
+          <button type="button" class="cashier-confirm" id="barTicketConfirmSubmit">ドリチケ会計を確定</button>
+        </div>
+      </div>`);
+    const overlay = $("barTicketConfirmOverlay");
+    $("barTicketConfirmCancel").onclick = () => overlay.remove();
+    overlay.addEventListener("click", event => { if (event.target === overlay) overlay.remove(); });
+    $("barTicketConfirmSubmit").onclick = event => {
+      const button = event.currentTarget;
+      if (button.disabled) return;
+      button.disabled = true;
+      button.textContent = "会計を記録しています…";
+      b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "ticket", items: structuredClone(barCart), totalAmount: total, paidAmount: 0, change: 0 });
+      barCart = []; saveBar(); renderBarHome();
+    };
   };
 
   screen.querySelectorAll("[data-save-product]").forEach(btn => btn.onclick = () => {
@@ -3399,24 +3498,39 @@ function renderBarHome() {
     $("bEnv").textContent = c.hasEnd ? `キャッシュドリンク：${formatMoney(s.cashRevenue)}円\nファーストドリンク(ドリチケ)：${s.ticketUnits}杯` : "（金庫内の金額を入力すると表示されます）";
     const rem = b.remain === "" ? null : Number(b.remain);
     $("bRemainSt").innerHTML = rem === null ? "-" : (rem === c.start ? `<span class="ok">一致 ✓</span>` : `<span class="ng">不一致（差 ${formatSignedMoney(rem - c.start)}）</span>`);
+    const issued = getIssuedDrinkTicketCount(ev.state || state);
+    const expectedUnused = issued - Number(s.ticketUnits || 0);
+    $("bTickets").textContent = `${issued}枚`;
     $("bTicketSales").textContent = `${s.ticketUnits}枚`;
-    if (hasSales) {
-      const ticketDiff = Number(b.tickets || 0) - s.ticketUnits;
-      $("bTicketSt").innerHTML = ticketDiff === 0 ? `<span class="ok">一致 ✓</span>` : `<span class="ng">差 ${ticketDiff}枚</span>`;
-      if (!c.hasEnd) $("bDiff").textContent = "-";
-      else {
-        const diff = c.revenue - s.cashRevenue;
-        $("bDiff").innerHTML = diff === 0 ? `<span class="ok">一致 ✓</span>` : `<span class="ng">差 ${formatSignedMoney(diff)}</span>`;
-      }
+    $("bTicketExpected").textContent = `${expectedUnused}枚`;
+    const collected = b.ticketCollected === "" ? null : Number(b.ticketCollected);
+    const diagnosis = $("bTicketDiagnosis");
+    if (collected === null) {
+      $("bTicketSt").innerHTML = `<span class="sub-text">現物の回収枚数を入力してください</span>`;
+      diagnosis.className = "ticket-result-note";
+      diagnosis.textContent = "回収したドリチケを数えて入力すると、販売記録と照合できます。";
+    } else if (collected !== Number(s.ticketUnits || 0)) {
+      const diff = collected - Number(s.ticketUnits || 0);
+      $("bTicketSt").innerHTML = `<span class="ng">不一致（${diff > 0 ? "+" : ""}${diff}枚）</span>`;
+      diagnosis.className = "ticket-result-note is-warning";
+      diagnosis.textContent = "記録上のミス、回収漏れ、数え間違いなどの可能性があります。受付・販売履歴と現物を再確認してください。";
+    } else if (issued > Number(s.ticketUnits || 0)) {
+      $("bTicketSt").innerHTML = `<span class="ok">一致 ✓</span>`;
+      diagnosis.className = "ticket-result-note is-ok";
+      diagnosis.textContent = `販売記録と回収枚数は一致しています。受付で配布した枚数との差 ${expectedUnused}枚は、ドリチケを使わなかった来場者がいる可能性があります。`;
+    } else if (issued === Number(s.ticketUnits || 0)) {
+      $("bTicketSt").innerHTML = `<span class="ok">一致 ✓</span>`;
+      diagnosis.className = "ticket-result-note is-ok";
+      diagnosis.textContent = "受付の配布枚数・販売記録・回収枚数が一致しています。";
     } else {
-      const people = state.totals.general + state.totals.tmp;
-      const ticketDiff = Number(b.tickets || 0) - people;
-      $("bTicketSt").innerHTML = ticketDiff === 0 ? `<span class="ok">一致 ✓（旧方式）</span>` : `<span class="ng">差 ${ticketDiff}枚（旧方式）</span>`;
-      if (!c.hasEnd) $("bDiff").textContent = "旧方式の正の字記録なし";
-      else {
-        const diff = c.revenue - Number(b.tally || 0) * BAR_CUP + Number(b.tickets || 0) * BAR_CUP;
-        $("bDiff").textContent = `販売記録なし（旧記録 ${Number(b.tally || 0)}杯）`;
-      }
+      $("bTicketSt").innerHTML = `<span class="ng">配布枚数を超過</span>`;
+      diagnosis.className = "ticket-result-note is-warning";
+      diagnosis.textContent = "ドリチケの販売記録が受付の配布枚数を上回っています。受付履歴や販売履歴を再確認してください。";
+    }
+    if (!c.hasEnd) $("bDiff").textContent = "-";
+    else {
+      const diff = c.revenue - s.cashRevenue;
+      $("bDiff").innerHTML = diff === 0 ? `<span class="ok">一致 ✓</span>` : `<span class="ng">差 ${formatSignedMoney(diff)}</span>`;
     }
   };
 
@@ -3427,7 +3541,8 @@ function renderBarHome() {
     saveBar(); recalc();
   });
   $("bRemain").onchange = e => { const n = e.target.value === "" ? "" : Number(e.target.value); if (n !== "" && (!Number.isInteger(n) || n < 0)) { alert("0以上の整数を入力してください"); e.target.value = ""; return; } b.remain = e.target.value; saveBar(); recalc(); };
-  $("bTickets").onchange = e => { const n = Number(e.target.value || 0); if (!Number.isInteger(n) || n < 0) { alert("0以上の整数を入力してください"); e.target.value = b.tickets; return; } b.tickets = n; saveBar(); recalc(); };
+  $("bTicketCollected").onchange = e => { const n = e.target.value === "" ? "" : Number(e.target.value); if (n !== "" && (!Number.isInteger(n) || n < 0)) { alert("0以上の整数を入力してください"); e.target.value = b.ticketCollected; return; } b.ticketCollected = n; saveBar(); recalc(); };
+  screen.querySelectorAll("[data-ticket-check]").forEach(cb => cb.onchange = () => { b.ticketChecks[cb.dataset.ticketCheck] = cb.checked; saveBar(); });
   screen.querySelectorAll("[data-ck]").forEach(cb => cb.onchange = () => { b.checks[cb.dataset.ck] = cb.checked; saveBar(); });
   $("bCopy").onclick = () => {
     const text = $("bEnv").textContent;
@@ -3435,7 +3550,7 @@ function renderBarHome() {
     else { alert("この環境ではコピーできませんでした"); }
   };
   $("clearBarAccounting").onclick = () => {
-    if (!confirm("この回のバーカウンター会計データを一括削除しますか？\n販売履歴・金庫の開始／終了額・受取チケット枚数・精算チェックをリセットします。\n商品名と価格の設定、受付データ、出番／シフトは残ります。")) return;
+    if (!confirm("この回のバーカウンター会計データを一括削除しますか？\n販売履歴・金庫の開始／終了額・回収チケット枚数・チケット照合チェックをリセットします。\n商品名と価格の設定、受付データ、出番／シフトは残ります。")) return;
     const products = structuredClone(b.products);
     const deletedSales = pruneDeletionLog(b.deletedSales || []);
     Object.assign(b, createBar(), { products, sales: [], resetAt: Date.now(), voidedSales: [], deletedSales });
@@ -3465,15 +3580,28 @@ function saveTt() {
   ctx.ev.u.tt = Date.now();
   persistDb();
 }
-// 0〜5時台は「その日の夜の続き（翌日扱い）」として並べる
-function toMin(t) { const [h, m] = String(t).split(":").map(Number); return (h < 6 ? h + 24 : h) * 60 + m; }
-function slotRange(s) { return [toMin(s.start),toMin(s.end)]; }
-function actSlotRange(s) { const off=Number(ctx?.tt?.offsetMinutes||0); return [toMin(s.start)+off,toMin(s.end)+off]; }
-function formatOffsetTime(min){min=((min%(24*60))+(24*60))%(24*60);return `${String(Math.floor(min/60)).padStart(2,"0")}:${String(min%60).padStart(2,"0")}`;}
-function adjustedTime(s){const off=Number(ctx?.tt?.offsetMinutes||0);return {start:formatOffsetTime(toMin(s.start)+off),end:formatOffsetTime(toMin(s.end)+off)};}
-function isValidTimeRange(start, end) {
+// 日付＋時刻をイベント開始日からの経過分に変換する。旧データは開催日を基準に補完。
+function toMin(t) { const [h, m] = String(t || "00:00").split(":").map(Number); return h * 60 + m; }
+function dateMin(date, time) {
+  const base = new Date((ctx?.ev?.date || date || "2000-01-01") + "T00:00:00").getTime();
+  const target = new Date((date || ctx?.ev?.date || "2000-01-01") + "T00:00:00").getTime();
+  return Math.round((target - base) / 60000) + toMin(time);
+}
+function slotRange(s) {
+  const startDate = s.startDate || ctx?.ev?.date || "2000-01-01";
+  const endDate = s.endDate || (toMin(s.end) < toMin(s.start) ? addDateDays(startDate, 1) : startDate);
+  return [dateMin(startDate, s.start), dateMin(endDate, s.end)];
+}
+function addDateDays(date, days) { const d = new Date(`${date}T00:00:00`); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function actSlotRange(s) { const off=Number(ctx?.tt?.offsetMinutes||0); const [a,b]=slotRange(s); return [a+off,b+off]; }
+function formatOffsetTime(min){ const day=Math.floor(min/(24*60)); const within=((min%(24*60))+(24*60))%(24*60); return `${String(Math.floor(within/60)).padStart(2,"0")}:${String(within%60).padStart(2,"0")}`; }
+function adjustedTime(s){const off=Number(ctx?.tt?.offsetMinutes||0);const [a,b]=slotRange(s);return {start:formatOffsetTime(a+off),end:formatOffsetTime(b+off),startDate:addDateDays(ctx?.ev?.date || s.startDate || "2000-01-01",Math.floor((a+off)/(24*60))),endDate:addDateDays(ctx?.ev?.date || s.startDate || "2000-01-01",Math.floor((b+off)/(24*60)))};}
+function shortDate(date){const d=new Date(`${date}T00:00:00`);return `${d.getMonth()+1}/${d.getDate()}`;}
+function scheduleRangeLabel(item, shifted=false){const x=shifted?adjustedTime(item):{start:item.start,end:item.end,startDate:item.startDate||ctx.ev.date,endDate:item.endDate||(toMin(item.end)<toMin(item.start)?addDateDays(item.startDate||ctx.ev.date,1):(item.startDate||ctx.ev.date))};const base=ctx.ev.date;const startLabel=x.startDate!==base?`${shortDate(x.startDate)} `:"";const endLabel=x.endDate!==x.startDate?`${shortDate(x.endDate)} `:"";return `${startLabel}${x.start}–${endLabel}${x.end}`;}
+function isValidTimeRange(start, end, startDate, endDate) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start || "") || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end || "")) return false;
-  return toMin(end) > toMin(start);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate || "") || !/^\d{4}-\d{2}-\d{2}$/.test(endDate || "")) return false;
+  return dateMin(endDate, end) > dateMin(startDate, start);
 }
 function recordMemberDisplay(item) {
   const ids = Array.isArray(item?.memberIds) ? item.memberIds : [];
@@ -3503,7 +3631,7 @@ function nowHtml(tt, ev) {
   const shiftNext = next(tt.shifts || []);
   const eventState = t < 0 ? "開催前" : (t > 30 * 60 ? "開催終了" : "LIVE");
   const actLabel = item => `${item.type === "その他" ? (item.customType || "その他") : (item.type || "DJ")}：${recordMemberDisplay(item)}`;
-  const showTime = item => {const x=adjustedTime(item);return `${x.start}–${x.end}`;};
+  const showTime = item => scheduleRangeLabel(item,true);
   let html = `<div class="schedule-status"><span class="live-orb"></span><span>${eventState}</span><small>${esc(ev.date)}</small></div>`;
   html += `<div class="schedule-overview-grid">`;
   html += `<div class="schedule-section"><div class="now-label">出番</div><div class="schedule-columns">`;
@@ -3511,7 +3639,7 @@ function nowHtml(tt, ev) {
   html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${actNext ? `<div class="schedule-item"><strong class="now-main">${esc(actLabel(actNext))}</strong><span class="sub-text">${esc(showTime(actNext))}</span></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `</div></div>`;
   html += `<div class="schedule-section"><div class="now-label">シフト</div><div class="schedule-columns">`;
-  html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${shiftNow.length ? shiftNow.map(item => `<div class="schedule-item"><strong>${esc(item.role)}：${esc(recordMemberDisplay(item))}</strong><small>${esc(item.start)}–${esc(item.end)}</small></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
+  html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${shiftNow.length ? shiftNow.map(item => `<div class="schedule-item"><strong>${esc(item.role)}：${esc(recordMemberDisplay(item))}</strong><small>${esc(scheduleRangeLabel(item))}</small></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(recordMemberDisplay(shiftNext))}</strong><small>${esc(shiftNext.start)}–${esc(shiftNext.end)}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `</div></div>`;
   html += `</div>`;
@@ -3559,9 +3687,9 @@ function renderTimetable() {
 
   <div class="card">
     <div class="card-title">タイムテーブル（出番）</div>
-    ${sorted(tt.acts).map(a => `<div class="tt-record" data-act-row="${esc(a.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(adjustedTime(a).start)}–${esc(adjustedTime(a).end)}</span><strong>${esc(a.type === "その他" ? (a.customType || "その他") : (a.type || "DJ"))}：${esc(recordMemberDisplay(a))}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-ea="${esc(a.id)}">編集</button><button type="button" class="x" data-da="${esc(a.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
+    ${sorted(tt.acts).map(a => `<div class="tt-record" data-act-row="${esc(a.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(scheduleRangeLabel(a,true))}</span><strong>${esc(a.type === "その他" ? (a.customType || "その他") : (a.type || "DJ"))}：${esc(recordMemberDisplay(a))}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-ea="${esc(a.id)}">編集</button><button type="button" class="x" data-da="${esc(a.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
     <div class="tt-form-panel" id="actFormPanel"><div class="tt-form-heading" id="actFormHeading">出番を追加</div><div class="inline-form">
-      <input type="time" id="aStart" value="20:00"><input type="time" id="aEnd" value="20:30">
+      <label class="date-time-field"><span>開始日</span><input type="date" id="aStartDate" value="${esc(ctx.ev.date)}"></label><label class="date-time-field"><span>開始時刻</span><input type="time" id="aStart" value="20:00"></label><label class="date-time-field"><span>終了日</span><input type="date" id="aEndDate" value="${esc(ctx.ev.date)}"></label><label class="date-time-field"><span>終了時刻</span><input type="time" id="aEnd" value="20:30"></label>
       <div class="full act-type-options" id="actTypeOptions">
         <label><input type="radio" name="actType" value="DJ" checked> DJ</label>
         <label><input type="radio" name="actType" value="VJ"> VJ</label>
@@ -3572,14 +3700,14 @@ function renderTimetable() {
       <div class="full member-picker"><label for="aMemberPick">出演メンバー（参加予定者から追加）</label><div class="member-picker-controls"><select id="aMemberPick" class="member-picker-select"><option value="">メンバーを選択</option>${(db.members||[]).filter(m=>(ctx.ev.participants||[]).includes(m.id)).sort((a,b)=>memberDisplayName(a).localeCompare(memberDisplayName(b),"ja")).map(m=>`<option value="${esc(m.id)}">${esc(memberDisplayName(m))}${m.nickname?`（${esc(m.name)}）`:""}${m.grade?`・${esc(m.grade)}`:""}</option>`).join("")}</select><button type="button" class="btn btn-secondary member-add-btn" id="aMemberAdd">追加</button></div><div id="aMemberChips" class="member-chips" aria-live="polite"></div><input class="full" id="aName" placeholder="名簿外の出演者名・グループ名（自由入力）"></div>
       <button class="btn btn-primary full" id="aAdd">出番を追加</button><button class="btn btn-secondary full" id="aCancel" hidden>編集をキャンセル</button>
     </div></div>
-    <p class="sub-text">編集ボタンから登録内容を変更できます。23:00〜翌1:00のような日付またぎにも対応しています。</p>
+    <p class="sub-text">開始日・開始時刻と終了日・終了時刻をそれぞれ指定してください。日付をまたぐ予定も、終了日を翌日に設定すれば登録できます。</p>
   </div>
 
   <div class="card">
     <div class="card-title">シフト</div>
-    ${sorted(tt.shifts).map(s => `<div class="tt-record" data-shift-row="${esc(s.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(s.start)}–${esc(s.end)}</span><strong>${esc(s.role)}：${esc(s.name)}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-es="${esc(s.id)}">編集</button><button type="button" class="x" data-ds="${esc(s.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
+    ${sorted(tt.shifts).map(s => `<div class="tt-record" data-shift-row="${esc(s.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(scheduleRangeLabel(s))}</span><strong>${esc(s.role)}：${esc(s.name)}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-es="${esc(s.id)}">編集</button><button type="button" class="x" data-ds="${esc(s.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
     <div class="tt-form-panel" id="shiftFormPanel"><div class="tt-form-heading" id="shiftFormHeading">シフトを追加</div><div class="inline-form">
-      <input type="time" id="sStart" value="19:00"><input type="time" id="sEnd" value="21:00">
+      <label class="date-time-field"><span>開始日</span><input type="date" id="sStartDate" value="${esc(ctx.ev.date)}"></label><label class="date-time-field"><span>開始時刻</span><input type="time" id="sStart" value="19:00"></label><label class="date-time-field"><span>終了日</span><input type="date" id="sEndDate" value="${esc(ctx.ev.date)}"></label><label class="date-time-field"><span>終了時刻</span><input type="time" id="sEnd" value="21:00"></label>
       <input id="sRole" list="roleList" placeholder="役割（受付・バーなど）"><div class="full member-picker"><label for="sMemberPick">担当メンバー（参加予定者から追加）</label><div class="member-picker-controls"><select id="sMemberPick" class="member-picker-select"><option value="">メンバーを選択</option>${(db.members||[]).filter(m=>(ctx.ev.participants||[]).includes(m.id)).sort((a,b)=>memberDisplayName(a).localeCompare(memberDisplayName(b),"ja")).map(m=>`<option value="${esc(m.id)}">${esc(memberDisplayName(m))}${m.nickname?`（${esc(m.name)}）`:""}${m.grade?`・${esc(m.grade)}`:""}</option>`).join("")}</select><button type="button" class="btn btn-secondary member-add-btn" id="sMemberAdd">追加</button></div><div id="sMemberChips" class="member-chips" aria-live="polite"></div><input id="sName" placeholder="名簿外の担当者名（自由入力）"></div>
       <datalist id="roleList"><option>受付</option><option>バーカウンター</option><option>音響</option><option>照明</option><option>物販</option></datalist>
       <button class="btn btn-primary full" id="sAdd">シフトを追加</button><button class="btn btn-secondary full" id="sCancel" hidden>編集をキャンセル</button>
@@ -3616,29 +3744,29 @@ function renderTimetable() {
   $("aAdd").onclick = () => {
     const type = screen.querySelector('input[name="actType"]:checked')?.value || "DJ";
     const customType = $("aCustomType").value.trim();
-    const chosen=actSelected.map(id=>({id,name:memberName(id)})); const free=$("aName").value.trim(); const o = { start: $("aStart").value, end: $("aEnd").value, type, customType: type === "その他" ? customType : "", name:[chosen.map(x=>x.name).join("、"),free].filter(Boolean).join("、"), memberIds:chosen.map(x=>x.id) };
+    const chosen=actSelected.map(id=>({id,name:memberName(id)})); const free=$("aName").value.trim(); const o = { startDate: $("aStartDate").value, start: $("aStart").value, endDate: $("aEndDate").value, end: $("aEnd").value, type, customType: type === "その他" ? customType : "", name:[chosen.map(x=>x.name).join("、"),free].filter(Boolean).join("、"), memberIds:chosen.map(x=>x.id) };
     if (!o.start || !o.end || !o.name || (type === "その他" && !customType)) { alert("開始・終了時刻、種別、出演者名を入力してください"); return; }
-    if (!isValidTimeRange(o.start, o.end)) { alert("終了時刻が開始時刻より前になっています。日付またぎの場合は、終了時刻を翌日0:00〜5:59で入力してください。"); return; }
+    if (!isValidTimeRange(o.start, o.end, o.startDate, o.endDate)) { alert("終了日時は開始日時より後に設定してください。"); return; }
     if (editA) Object.assign(tt.acts.find(x => x.id === editA), o); else tt.acts.push({ id: uid(), ...o });
     saveTt(); renderTimetable();
   };
   $("sAdd").onclick = () => {
-    const chosen=shiftSelected.map(id=>({id,name:memberName(id)})); const free=$("sName").value.trim(); const o = { start: $("sStart").value, end: $("sEnd").value, role: $("sRole").value.trim(), name:[chosen.map(x=>x.name).join("、"),free].filter(Boolean).join("、"), memberIds:chosen.map(x=>x.id) };
+    const chosen=shiftSelected.map(id=>({id,name:memberName(id)})); const free=$("sName").value.trim(); const o = { startDate: $("sStartDate").value, start: $("sStart").value, endDate: $("sEndDate").value, end: $("sEnd").value, role: $("sRole").value.trim(), name:[chosen.map(x=>x.name).join("、"),free].filter(Boolean).join("、"), memberIds:chosen.map(x=>x.id) };
     if (!o.start || !o.end || !o.role || !o.name) { alert("開始・終了時刻、役割、担当者名を入力してください"); return; }
-    if (!isValidTimeRange(o.start, o.end)) { alert("終了時刻が開始時刻より前になっています。日付またぎの場合は、終了時刻を翌日0:00〜5:59で入力してください。"); return; }
+    if (!isValidTimeRange(o.start, o.end, o.startDate, o.endDate)) { alert("終了日時は開始日時より後に設定してください。"); return; }
     if (editS) Object.assign(tt.shifts.find(x => x.id === editS), o); else tt.shifts.push({ id: uid(), ...o });
     saveTt(); renderTimetable();
   };
   screen.querySelectorAll("[data-ea]").forEach(el => el.onclick = () => {
     const a = tt.acts.find(x => x.id === el.dataset.ea); if (!a) return;
-    editA = a.id; $("aStart").value = a.start; $("aEnd").value = a.end; $("aName").value = a.memberIds?.length ? a.name.split("、").slice(a.memberIds.length).join("、") : a.name; actSelected=(a.memberIds||[]).slice(); drawChips("a",actSelected); const actType = a.type || "DJ"; screen.querySelectorAll('input[name="actType"]').forEach(r => r.checked = r.value === actType); $("aCustomType").hidden = actType !== "その他"; $("aCustomType").value = a.customType || ""; $("aAdd").textContent = "変更を保存"; $("aCancel").hidden = false; $("actFormHeading").textContent = "出番を編集中"; $("actFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.actRow === a.id)); $("actFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
+    editA = a.id; $("aStartDate").value = a.startDate || ctx.ev.date; $("aStart").value = a.start; $("aEndDate").value = a.endDate || (toMin(a.end) < toMin(a.start) ? addDateDays(a.startDate || ctx.ev.date,1) : (a.startDate || ctx.ev.date)); $("aEnd").value = a.end; $("aName").value = a.memberIds?.length ? a.name.split("、").slice(a.memberIds.length).join("、") : a.name; actSelected=(a.memberIds||[]).slice(); drawChips("a",actSelected); const actType = a.type || "DJ"; screen.querySelectorAll('input[name="actType"]').forEach(r => r.checked = r.value === actType); $("aCustomType").hidden = actType !== "その他"; $("aCustomType").value = a.customType || ""; $("aAdd").textContent = "変更を保存"; $("aCancel").hidden = false; $("actFormHeading").textContent = "出番を編集中"; $("actFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.actRow === a.id)); $("actFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
   });
   screen.querySelectorAll("[data-es]").forEach(el => el.onclick = () => {
     const s = tt.shifts.find(x => x.id === el.dataset.es); if (!s) return;
-    editS = s.id; $("sStart").value = s.start; $("sEnd").value = s.end; $("sRole").value = s.role; $("sName").value = s.memberIds?.length ? s.name.split("、").slice(s.memberIds.length).join("、") : s.name; shiftSelected=(s.memberIds||[]).slice(); drawChips("s",shiftSelected); $("sAdd").textContent = "変更を保存"; $("sCancel").hidden = false; $("shiftFormHeading").textContent = "シフトを編集中"; $("shiftFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.shiftRow === s.id)); $("shiftFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
+    editS = s.id; $("sStartDate").value = s.startDate || ctx.ev.date; $("sStart").value = s.start; $("sEndDate").value = s.endDate || (toMin(s.end) < toMin(s.start) ? addDateDays(s.startDate || ctx.ev.date,1) : (s.startDate || ctx.ev.date)); $("sEnd").value = s.end; $("sRole").value = s.role; $("sName").value = s.memberIds?.length ? s.name.split("、").slice(s.memberIds.length).join("、") : s.name; shiftSelected=(s.memberIds||[]).slice(); drawChips("s",shiftSelected); $("sAdd").textContent = "変更を保存"; $("sCancel").hidden = false; $("shiftFormHeading").textContent = "シフトを編集中"; $("shiftFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.shiftRow === s.id)); $("shiftFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
   });
-  $("aCancel").onclick = () => { editA = null; $("aStart").value = "20:00"; $("aEnd").value = "20:30"; $("aName").value = ""; actSelected=[]; drawChips("a",actSelected); screen.querySelector('input[name="actType"][value="DJ"]').checked = true; $("aCustomType").value = ""; $("aCustomType").hidden = true; $("aAdd").textContent = "出番を追加"; $("aCancel").hidden = true; $("actFormHeading").textContent = "出番を追加"; $("actFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.remove("is-selected")); };
-  $("sCancel").onclick = () => { editS = null; $("sStart").value = "19:00"; $("sEnd").value = "21:00"; $("sRole").value = ""; $("sName").value = ""; shiftSelected=[]; drawChips("s",shiftSelected); $("sAdd").textContent = "シフトを追加"; $("sCancel").hidden = true; $("shiftFormHeading").textContent = "シフトを追加"; $("shiftFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.remove("is-selected")); };
+  $("aCancel").onclick = () => { editA = null; $("aStartDate").value = ctx.ev.date; $("aEndDate").value = ctx.ev.date; $("aStart").value = "20:00"; $("aEnd").value = "20:30"; $("aName").value = ""; actSelected=[]; drawChips("a",actSelected); screen.querySelector('input[name="actType"][value="DJ"]').checked = true; $("aCustomType").value = ""; $("aCustomType").hidden = true; $("aAdd").textContent = "出番を追加"; $("aCancel").hidden = true; $("actFormHeading").textContent = "出番を追加"; $("actFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.remove("is-selected")); };
+  $("sCancel").onclick = () => { editS = null; $("sStartDate").value = ctx.ev.date; $("sEndDate").value = ctx.ev.date; $("sStart").value = "19:00"; $("sEnd").value = "21:00"; $("sRole").value = ""; $("sName").value = ""; shiftSelected=[]; drawChips("s",shiftSelected); $("sAdd").textContent = "シフトを追加"; $("sCancel").hidden = true; $("shiftFormHeading").textContent = "シフトを追加"; $("shiftFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.remove("is-selected")); };
   screen.querySelectorAll("[data-da]").forEach(btn => btn.onclick = () => {
     if (!confirm("この出番を削除しますか？")) return;
     tt.acts = tt.acts.filter(x => x.id !== btn.dataset.da); saveTt(); renderTimetable();
