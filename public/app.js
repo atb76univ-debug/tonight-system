@@ -117,12 +117,7 @@ function navigate(renderFunc) {
 }
 
 function back() {
-  // 画面遷移履歴が欠けている場合でも、イベント内画面からイベントホームへ戻れるようにする
-  if (!Array.isArray(pageHistory)) pageHistory = [];
   if (pageHistory.length <= 1) {
-    if (ctx && currentRender !== renderEventPage) {
-      goEventHome();
-    }
     return;
   }
 
@@ -132,14 +127,14 @@ function back() {
   }
 
   pageHistory.pop();
-  let previous = pageHistory[pageHistory.length - 1];
-  if (typeof previous !== "function") {
-    pageHistory = ctx ? [renderEventList, renderEventPage] : [renderEventList];
-    previous = ctx ? renderEventPage : renderEventList;
-  }
+
+  const previous =
+    pageHistory[pageHistory.length - 1];
+
   currentRender = previous;
   previous();
   renderReceptionTabs();
+
   updateBackButton();
 }
 
@@ -182,7 +177,7 @@ function getPageTitle(renderFunc) {
 }
 
 function updateBackButton() {
-  if (pageHistory.length <= 1 && (!ctx || currentRender === renderEventPage)) backBtn.classList.add("hidden");
+  if (pageHistory.length <= 1) backBtn.classList.add("hidden");
   else backBtn.classList.remove("hidden");
   if (pageTitleEl) pageTitleEl.textContent = getPageTitle(currentRender);
   if (eventHomeBtn) eventHomeBtn.classList.toggle("hidden", !ctx || currentRender === renderEventPage);
@@ -3319,6 +3314,19 @@ function isValidTimeRange(start, end) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start || "") || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end || "")) return false;
   return toMin(end) > toMin(start);
 }
+function recordMemberDisplay(item) {
+  const rawIds = item && item.memberIds;
+  const ids = Array.isArray(rawIds) ? rawIds : [];
+  const savedNames = String(item?.name || "").split("、");
+  if (!ids.length) return String(item?.name || "");
+  const names = ids.map((id, index) => {
+    const member = (db.members || []).find(m => m.id === id);
+    return member ? memberDisplayName(member) : (savedNames[index] || "登録外メンバー");
+  });
+  const freeNames = savedNames.slice(ids.length).filter(Boolean);
+  return [...names, ...freeNames].filter(Boolean).join("、");
+}
+
 function nowHtml(tt, ev) {
   const eventStart = new Date(ev.date + "T00:00:00").getTime();
   const t = (Date.now() - eventStart) / 60000;
@@ -3333,7 +3341,6 @@ function nowHtml(tt, ev) {
   const shiftNow = current(tt.shifts || []);
   const shiftNext = next(tt.shifts || []);
   const eventState = t < 0 ? "開催前" : (t > 30 * 60 ? "開催終了" : "LIVE");
-  const recordMemberDisplay = item => { const ids=item.memberIds||[]; if(!ids.length)return item.name||""; const free=(item.name||"").split("、").slice(ids.length).join("、"); return [ids.map(id=>memberDisplayName((db.members||[]).find(m=>m.id===id))).join("、"),free].filter(Boolean).join("、"); };
   const actLabel = item => `${item.type === "その他" ? (item.customType || "その他") : (item.type || "DJ")}：${recordMemberDisplay(item)}`;
   const showTime = item => {const x=adjustedTime(item);return `${x.start}–${x.end}`;};
   let html = `<div class="schedule-status"><span class="live-orb"></span><span>${eventState}</span><small>${esc(ev.date)}</small></div>`;
@@ -3344,7 +3351,7 @@ function nowHtml(tt, ev) {
   html += `</div></div>`;
   html += `<div class="schedule-section"><div class="now-label">シフト</div><div class="schedule-columns">`;
   html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${shiftNow.length ? shiftNow.map(item => `<div class="schedule-item"><strong>${esc(item.role)}：${esc(recordMemberDisplay(item))}</strong><small>${esc(item.start)}–${esc(item.end)}</small></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
-  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(shiftNext.name)}</strong><small>${esc(shiftNext.start)}–${esc(shiftNext.end)}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
+  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(recordMemberDisplay(shiftNext))}</strong><small>${esc(shiftNext.start)}–${esc(shiftNext.end)}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `</div></div>`;
   html += `</div>`;
   return html;
@@ -3363,7 +3370,7 @@ function renderEventTimeline(){
  if(!all.length){host.innerHTML='<p class="sub-text">出番を登録するとタイムラインが表示されます。</p>';return;}
  const now=(Date.now()-new Date(ctx.ev.date+"T00:00:00").getTime())/60000,starts=all.map(a=>actSlotRange(a)[0]),ends=all.map(a=>actSlotRange(a)[1]);const min=Math.min(...starts,Math.floor(now/60)*60),max=Math.max(...ends,min+60);const span=Math.max(60,max-min);
  const marker=Math.max(0,Math.min(100,(now-min)/span*100));
- host.innerHTML=`<div class="timeline-axis"><span>${formatOffsetTime(min)}</span><span>${formatOffsetTime(max)}</span></div><div class="timeline-track" style="height:${Math.max(380,Math.min(1200,span*1.2))}px"><div class="timeline-now-line" style="top:${marker}%"><span>NOW</span></div>${all.map(a=>{const [st,en]=actSlotRange(a),top=(st-min)/span*100,height=Math.max(3,(en-st)/span*100),active=now>=st&&now<en,x=adjustedTime(a);return `<div class="timeline-item ${active?"active":""}" style="top:${top}%;height:${height}%"><span class="timeline-time">${esc(x.start)}–${esc(x.end)}</span><strong>${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))}：${esc(a.name)}</strong></div>`}).join("")}</div>`;
+ host.innerHTML=`<div class="timeline-axis"><span>${formatOffsetTime(min)}</span><span>${formatOffsetTime(max)}</span></div><div class="timeline-track" style="height:${Math.max(380,Math.min(1200,span*1.2))}px"><div class="timeline-now-line" style="top:${marker}%"><span>NOW</span></div>${all.map(a=>{const [st,en]=actSlotRange(a),top=(st-min)/span*100,height=Math.max(3,(en-st)/span*100),active=now>=st&&now<en,x=adjustedTime(a);return `<div class="timeline-item ${active?"active":""}" style="top:${top}%;height:${height}%"><span class="timeline-time">${esc(x.start)}–${esc(x.end)}</span><strong>${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))}：${esc(recordMemberDisplay(a))}</strong></div>`}).join("")}</div>`;
 }
 
 function renderTimetable() {
