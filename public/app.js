@@ -1059,16 +1059,28 @@ function renderReceptionInput() {
       });
       input.addEventListener("keydown", e => { if (e.key === "Escape") { const box=listContainer.querySelector(`.tmp-member-results[data-index="${e.target.dataset.index}"]`); if(box) box.hidden=true; } });
     });
-    listContainer.querySelectorAll(".tmp-member-result").forEach(btn => btn.addEventListener("click", () => {
-      const i = Number(btn.dataset.index), m = (db.members || []).find(x => x.id === btn.dataset.memberId);
-      if (!m) return;
-      tmpNames[i] = { name: memberDisplayName(m), memberId: m.id };
-      const input = listContainer.querySelector(`.tmp-member-search[data-index="${i}"]`);
-      if (input) input.value = memberDisplayName(m);
-      const box = listContainer.querySelector(`.tmp-member-results[data-index="${i}"]`);
-      if (box) { box.hidden = true; box.classList.add("is-closed"); }
-      if (input) input.blur();
-    }));
+    // 候補ボタンは検索・フォーカス時に後から生成されるため、親要素でクリックを委譲する。
+    // これにより、動的に表示された候補を選択した際も確実に処理される。
+    if (!listContainer.dataset.memberResultClickBound) {
+      listContainer.dataset.memberResultClickBound = "1";
+      listContainer.addEventListener("click", e => {
+        const btn = e.target.closest(".tmp-member-result");
+        if (!btn || !listContainer.contains(btn)) return;
+        const i = Number(btn.dataset.index);
+        const m = (db.members || []).find(x => String(x.id) === String(btn.dataset.memberId));
+        if (!m) return;
+        tmpNames[i] = { name: memberDisplayName(m), memberId: m.id };
+        const input = listContainer.querySelector(`.tmp-member-search[data-index="${i}"]`);
+        if (input) input.value = memberDisplayName(m);
+        const box = listContainer.querySelector(`.tmp-member-results[data-index="${i}"]`);
+        if (box) {
+          box.hidden = true;
+          box.classList.add("is-closed");
+          box.innerHTML = "";
+        }
+        if (input) input.blur();
+      });
+    }
     listContainer.querySelectorAll(".tmp-name-delete").forEach(btn => btn.addEventListener("click", e => {
       const index = Number(e.currentTarget.dataset.index);
       tmpNames.splice(index, 1);
