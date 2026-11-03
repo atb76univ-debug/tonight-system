@@ -59,3 +59,9 @@ Cloudflare Workers & Pages で GitHub リポジトリを接続し、`wrangler.js
 - 既存メンバーの学年は、インポート側に値がある場合に更新します。空欄で既存学年を消さないようにしています。
 - 戻るボタンは画面遷移履歴が欠けた場合も、イベント内画面からイベントホームへ戻れるようにフォールバックを追加しました。
 - Cloudflare Worker名は `tonight-system` のまま維持しています。
+
+## v38 更新（デプロイ依存関係の固定）
+- Wranglerを `4.157.0` に固定する `package.json` を追加しました。
+- Cloudflareのビルド環境で依存関係を検出し、`npx wrangler deploy` がプロジェクト内の固定バージョンを利用できるようにしています。
+- `wrangler.jsonc` は変更していません。Worker名 `tonight-system`、Durable Object `STORE`、Assets設定を維持しています。
+- Initializingの待ち時間はCloudflare側の環境準備に属するため、この変更だけで短縮されるとは限りません。主にWranglerの毎回の一時取得を避け、デプロイ環境を再現しやすくする変更です。
