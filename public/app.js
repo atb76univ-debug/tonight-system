@@ -297,7 +297,7 @@ function renderCashBreakdown(breakdown) {
     `;
   }
 
-  return CASH_DENOMINATIONS
+  return `<div class="cash-entry-list">` + CASH_DENOMINATIONS
     .map(
       value => {
 
@@ -331,9 +331,10 @@ function renderSetup() {
       会計準備
     </div>
 
+    <div class="cash-entry-heading"><span>STARTING CASH</span><small>金種ごとの枚数を入力してください</small></div>
     ${renderCashInputs()}
 
-    <div class="row">
+    <div class="row setup-ticket-row">
       <label>
         ドリンクチケット枚数
       </label>
@@ -377,24 +378,14 @@ function renderCashInputs(breakdown = {}) {
           );
 
         return `
-      <div class="row">
-
-        <label>
-          ${value.toLocaleString()}円
-        </label>
-
-        <input
-          type="number"
-          min="0"
-          value="${count}"
-          data-cash="${value}"
-        >
-
+      <div class="cash-entry-row">
+        <label class="cash-denomination"><span class="cash-denom-value">${value.toLocaleString()}</span><span class="cash-denom-unit">円</span></label>
+        <div class="cash-entry-input-wrap"><input type="number" min="0" step="1" inputmode="numeric" value="${count}" data-cash="${value}" aria-label="${value.toLocaleString()}円の枚数"><span>枚</span></div>
       </div>
     `;
       }
     )
-    .join("");
+    .join("") + `</div>`;
 }
 
 function readCashInputState() {
@@ -2467,10 +2458,11 @@ function defaultBarProducts() {
   return [{ id: uid(), name: "ドリンク", price: 500 }];
 }
 function createBar() {
-  return { startBreakdown: {}, endBreakdown: {}, tally: 0, tickets: 0, remain: "", checks: {}, products: defaultBarProducts(), sales: [], resetAt: 0, voidedSales: [] };
+  return { started: false, startBreakdown: {}, endBreakdown: {}, tally: 0, tickets: 0, remain: "", checks: {}, products: defaultBarProducts(), sales: [], resetAt: 0, voidedSales: [] };
 }
 function ensureBar(bar) {
   const b = bar || createBar();
+  b.started = Boolean(b.started || Object.values(b.startBreakdown || {}).some(Number));
   b.startBreakdown = b.startBreakdown || {};
   b.endBreakdown = b.endBreakdown || {};
   b.tally = Number(b.tally || 0);
@@ -2799,7 +2791,7 @@ function renderEventPage() {
     <button class="btn btn-secondary" id="arcEv">${arc ? "アーカイブを解除（開催中に戻す）" : "この回をアーカイブする"}</button><div class="gap"></div>
     <button class="btn btn-danger" id="delEv">この回を削除</button>`;
   document.getElementById("goRec").onclick = () => navigate(state.initialized ? renderHome : renderSetup);
-  document.getElementById("goBar").onclick = () => navigate(renderBarHome);
+  document.getElementById("goBar").onclick = () => navigate(ensureBar(ctx.bar).started ? renderBarHome : renderBarSetup);
   document.getElementById("goTt").onclick = () => navigate(renderTimetable);
   document.getElementById("editEv").onclick = () => navigate(renderEventEdit);
   const sv = document.getElementById("saveEv");
@@ -2842,14 +2834,36 @@ function renderEventEdit() {
   };
 }
 
+/* ---------- バーカウンター初回準備 ---------- */
+function renderBarSetup() {
+  const b = ensureBar(ctx.bar);
+  screen.innerHTML = `<div class="card"><div class="eyebrow">BAR COUNTER / SETUP</div>
+    <div class="card-title">バーカウンター開始準備</div>
+    <p class="sub-text">営業開始前に、金庫に入っている現金を金種ごとに登録してください。登録後、販売画面へ進みます。</p>
+    <div class="cash-entry-heading"><span>STARTING CASH</span><small>金種ごとの枚数を入力してください</small></div>
+    ${barCashRows("start", b.startBreakdown)}
+    <div class="money-display"><div class="label">開始時の金庫額</div><div class="amount" id="barSetupTotal">¥${formatMoney(CASH_DENOMINATIONS.reduce((sum,v)=>sum+v*Number(b.startBreakdown[v]||0),0))}</div></div>
+    <button class="btn btn-primary btn-large" id="startBarBtn">金庫額を登録して開始</button>
+  </div>`;
+  const update = () => { const total = [...screen.querySelectorAll('[data-bc="start"]')].reduce((sum,x)=>sum+Number(x.dataset.v)*Number(x.value||0),0); document.getElementById("barSetupTotal").textContent = `¥${formatMoney(total)}`; };
+  screen.querySelectorAll('[data-bc="start"]').forEach(inp => inp.oninput = update);
+  document.getElementById("startBarBtn").onclick = () => {
+    let valid = true;
+    screen.querySelectorAll('[data-bc="start"]').forEach(inp => { const n=Number(inp.value||0); if(!Number.isInteger(n)||n<0) valid=false; else b.startBreakdown[inp.dataset.v]=n; });
+    if(!valid){alert("金種の枚数は0以上の整数で入力してください");return;}
+    b.started = true; b.startedAt = Date.now(); saveBar(); navigate(renderBarHome);
+  };
+}
+
 /* ---------- バーカウンター ---------- */
 function barCashRows(kind, breakdown) {
-  return CASH_DENOMINATIONS.map(v => `
-    <div class="row"><label>${v.toLocaleString()}円</label>
-    <input type="number" min="0" inputmode="numeric" value="${Number(breakdown[v] || 0)}" data-bc="${kind}" data-v="${v}"></div>`).join("");
+  return `<div class="cash-entry-list">` + CASH_DENOMINATIONS.map(v => `
+    <div class="cash-entry-row"><label class="cash-denomination"><span class="cash-denom-value">${v.toLocaleString()}</span><span class="cash-denom-unit">円</span></label>
+    <div class="cash-entry-input-wrap"><input type="number" min="0" step="1" inputmode="numeric" value="${Number(breakdown[v] || 0)}" data-bc="${kind}" data-v="${v}" aria-label="${v.toLocaleString()}円の枚数"><span>枚</span></div></div>`).join("") + `</div>`;
 }
 function renderBarHome() {
   const ev = ctx.ev, b = ensureBar(ctx.bar);
+  if (!b.started) { renderBarSetup(); return; }
   ctx.bar = b;
   if (barCartEventId !== ev.id) { barCart = []; barCartEventId = ev.id; }
   const dt = new Date(ev.date + "T00:00:00"), md = `${dt.getMonth() + 1}/${dt.getDate()}`;
@@ -2911,6 +2925,7 @@ function renderBarHome() {
           <input type="text" value="${esc(p.name)}" aria-label="商品名" data-product-name="${esc(p.id)}">
           <input type="number" min="1" step="1" value="${Number(p.price || 0)}" aria-label="価格" data-product-price="${esc(p.id)}">
           <button class="btn btn-secondary" data-save-product="${esc(p.id)}">更新</button>
+          <button class="btn ${p.soldOut ? "btn-primary" : "btn-secondary"}" data-toggle-soldout="${esc(p.id)}">${p.soldOut ? "販売再開" : "売切れ"}</button>
           <button class="mini-danger" data-delete-product="${esc(p.id)}">削除</button>
         </div>`).join("")}
       </div>
@@ -2991,7 +3006,7 @@ function renderBarHome() {
   };
 
   screen.querySelectorAll("[data-add-product]").forEach(btn => btn.onclick = () => {
-    const p = b.products.find(x => x.id === btn.dataset.addProduct); if (!p) return;
+    const p = b.products.find(x => x.id === btn.dataset.addProduct); if (!p || p.soldOut) return;
     let line = barCart.find(x => x.productId === p.id);
     if (!line) { line = { productId: p.id, name: p.name, price: Number(p.price || 0), qty: 0 }; barCart.push(line); }
     line.qty++;
@@ -3020,6 +3035,12 @@ function renderBarHome() {
     if (!p || !name || !Number.isInteger(price) || price <= 0) { alert("商品名と1円以上の整数価格を入力してください"); return; }
     p.name = name; p.price = price;
     barCart = barCart.map(x => x.productId === id ? { ...x, name, price } : x);
+    saveBar(); renderBarHome();
+  });
+  screen.querySelectorAll("[data-toggle-soldout]").forEach(btn => btn.onclick = () => {
+    const p = b.products.find(x => x.id === btn.dataset.toggleSoldout); if (!p) return;
+    p.soldOut = !p.soldOut;
+    if (p.soldOut) barCart = barCart.filter(x => x.productId !== p.id);
     saveBar(); renderBarHome();
   });
   screen.querySelectorAll("[data-delete-product]").forEach(btn => btn.onclick = () => {
