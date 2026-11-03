@@ -2814,7 +2814,7 @@ function renderEventPage() {
   };
 }
 
-function memberDisplayName(member) { return member?.nickname?.trim() || member?.name || "登録外メンバー"; }
+function memberDisplayName(member) { const nickname = String(member?.nickname ?? "").trim(); return nickname || String(member?.name ?? "登録外メンバー"); }
 
 function memberStats(memberId) {
   let attendance=0, dj=0, lastDate="";
