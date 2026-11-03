@@ -1634,10 +1634,3 @@ button { max-width:100%; }
   .event-list-actions > .btn { padding:9px 10px; font-size:12px; }
   .event-list-actions .new-event-compact { padding:9px 11px; font-size:12px; }
 }
-
-/* v33: member roster fields including optional nickname */
-#memberList .member-record-main strong { overflow-wrap:anywhere; }
-#memberList .member-record-main small { overflow-wrap:anywhere; }
-.member-import + .inline-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-.member-import + .inline-form #addMember { grid-column:1 / -1; width:100%; }
-@media(max-width:520px){ .member-import + .inline-form { grid-template-columns:1fr; } }
