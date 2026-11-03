@@ -117,7 +117,12 @@ function navigate(renderFunc) {
 }
 
 function back() {
+  // 画面遷移履歴が欠けている場合でも、イベント内画面からイベントホームへ戻れるようにする
+  if (!Array.isArray(pageHistory)) pageHistory = [];
   if (pageHistory.length <= 1) {
+    if (ctx && currentRender !== renderEventPage) {
+      goEventHome();
+    }
     return;
   }
 
@@ -127,14 +132,14 @@ function back() {
   }
 
   pageHistory.pop();
-
-  const previous =
-    pageHistory[pageHistory.length - 1];
-
+  let previous = pageHistory[pageHistory.length - 1];
+  if (typeof previous !== "function") {
+    pageHistory = ctx ? [renderEventList, renderEventPage] : [renderEventList];
+    previous = ctx ? renderEventPage : renderEventList;
+  }
   currentRender = previous;
   previous();
   renderReceptionTabs();
-
   updateBackButton();
 }
 
@@ -177,7 +182,7 @@ function getPageTitle(renderFunc) {
 }
 
 function updateBackButton() {
-  if (pageHistory.length <= 1) backBtn.classList.add("hidden");
+  if (pageHistory.length <= 1 && (!ctx || currentRender === renderEventPage)) backBtn.classList.add("hidden");
   else backBtn.classList.remove("hidden");
   if (pageTitleEl) pageTitleEl.textContent = getPageTitle(currentRender);
   if (eventHomeBtn) eventHomeBtn.classList.toggle("hidden", !ctx || currentRender === renderEventPage);
@@ -2843,11 +2848,67 @@ function renderMembers() {
   document.getElementById("addMember").onclick=()=>{const name=document.getElementById("memberName").value.trim(),grade=document.getElementById("memberGrade").value.trim(),nickname=document.getElementById("memberNickname").value.trim();if(!name){alert("名前を入力してください");return;}const found=(db.members||[]).find(m=>m.name.trim().toLowerCase()===name.toLowerCase());if(found){found.grade=grade;found.nickname=nickname;alert("登録済みメンバーの学年・ニックネームを更新しました。");}else{db.members.push({id:uid(),name,grade,nickname});}db.membersUpdated=Date.now();persistDb();renderMembers();};
   screen.querySelectorAll("[data-edit-member]").forEach(btn=>btn.onclick=()=>{const m=db.members.find(x=>x.id===btn.dataset.editMember);if(!m)return;const name=prompt("本名・氏名",m.name);if(name===null)return;const grade=prompt("学年",m.grade||"");if(grade===null)return;const nickname=prompt("ニックネーム／DJネーム（空欄なら本名表示）",m.nickname||"");if(nickname===null)return;if(!name.trim()){alert("名前を入力してください");return;}m.name=name.trim();m.grade=grade.trim();m.nickname=nickname.trim();db.membersUpdated=Date.now();persistDb();renderMembers();});
   screen.querySelectorAll("[data-delete-member]").forEach(btn=>btn.onclick=()=>{const m=db.members.find(x=>x.id===btn.dataset.deleteMember);if(!m||!confirm(`${m.name}を名簿から削除しますか？過去の履歴は保持されます。`))return;db.members=db.members.filter(x=>x.id!==m.id);db.membersUpdated=Date.now();persistDb();renderMembers();});
-  document.getElementById("memberFile").onchange=async e=>{const file=e.target.files[0];if(!file)return;try{let rows=[];if(/\.csv$/i.test(file.name)){const text=await file.text();rows=parseMemberCSV(text);}else{if(!window.XLSX)throw new Error("Excel読み込みライブラリを読み込めません。CSV形式で保存して取り込んでください。");const data=new Uint8Array(await file.arrayBuffer());const wb=XLSX.read(data,{type:"array"});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});}
-    let added=0,updated=0;for(const row of rows){const keys=Object.keys(row);const norm=x=>String(x).trim().toLowerCase().replace(/[\s　_*・:：()（）]/g,"");const pick=(aliases)=>{const normalizedAliases=aliases.map(norm);const k=keys.find(x=>normalizedAliases.includes(norm(x)));return k?String(row[k]??"").trim():""};const name=pick(["名前","氏名","name","メンバー","member","fullname","氏名（漢字）","名前（漢字）"]);const grade=pick(["学年","grade","year","学年(例:3年)","学年（例：3年）"]);const nickname=pick(["ニックネーム","DJネーム","DJ名","nickname","djname","artistname","活動名"]);if(!name)continue;const found=db.members.find(m=>m.name.trim().toLowerCase()===name.toLowerCase());if(found){let changed=false;if(found.grade!==grade){found.grade=grade;changed=true;}if(found.nickname!==(nickname||"")){found.nickname=nickname||"";changed=true;}if(changed)updated++;}else{db.members.push({id:uid(),name,grade,nickname:nickname||""});added++;}}
-    db.membersUpdated=Date.now();persistDb();alert(`取り込み完了：新規 ${added}名／学年更新 ${updated}名`);renderMembers();}catch(err){alert(`読み込みに失敗しました：${err.message}`);}e.target.value="";};
+  document.getElementById("memberFile").onchange=async e=>{
+    const file=e.target.files[0]; if(!file)return;
+    try {
+      let table=[];
+      if(/\.csv$/i.test(file.name)) {
+        table=parseMemberCSVRows(await file.text());
+      } else {
+        if(!window.XLSX) throw new Error("Excel読み込みライブラリを読み込めません。CSV形式で保存して取り込んでください。");
+        const data=new Uint8Array(await file.arrayBuffer());
+        const wb=XLSX.read(data,{type:"array",cellDates:false});
+        const sheet=wb.Sheets[wb.SheetNames[0]];
+        table=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false});
+      }
+      const norm=x=>String(x??"").normalize("NFKC").toLowerCase().replace(/[\s　_*・:：()（）「」【】\[\]\-]/g,"");
+      const findHeader=(headers, kind)=>{
+        const hs=headers.map(norm);
+        const exact = kind==="name"
+          ? ["名前","氏名","name","メンバー","member","fullname","氏名漢字","名前漢字"]
+          : kind==="grade" ? ["学年","grade","year","学年(例3年)","学年例3年"]
+          : ["ニックネーム","djネーム","dj名","nickname","djname","artistname","活動名"];
+        let i=hs.findIndex(h=>exact.map(norm).includes(h));
+        if(i>=0)return i;
+        if(kind==="grade") i=hs.findIndex(h=>h.includes("学年") || h==="学籍年次" || h.includes("grade"));
+        if(kind==="name") i=hs.findIndex(h=>h.includes("氏名") || h.includes("名前") || h==="name" || h.includes("fullname"));
+        if(kind==="nickname") i=hs.findIndex(h=>h.includes("ニックネーム") || h.includes("djネーム") || h.includes("dj名") || h.includes("nickname") || h.includes("活動名"));
+        return i;
+      };
+      // 先頭にタイトル行・空行があるExcelにも対応し、名前と学年の見出しが揃う行を探す
+      let headerIndex=-1, col={name:-1,grade:-1,nickname:-1};
+      const scanLimit=Math.min(table.length,30);
+      for(let r=0;r<scanLimit;r++){
+        const h=table[r]||[];
+        const candidate={name:findHeader(h,"name"),grade:findHeader(h,"grade"),nickname:findHeader(h,"nickname")};
+        if(candidate.name>=0 && (candidate.grade>=0 || candidate.nickname>=0)) {headerIndex=r;col=candidate;break;}
+      }
+      if(headerIndex<0) throw new Error("名前・氏名の列見出しを特定できませんでした。1行目などに「名前」「氏名」「学年」の見出しがあるか確認してください。");
+      const cleanCell=v=>String(v??"").trim();
+      let added=0,updated=0,skipped=0;
+      for(const row of table.slice(headerIndex+1)){
+        const name=cleanCell(row[col.name]);
+        const grade=col.grade>=0?cleanCell(row[col.grade]):"";
+        const nickname=col.nickname>=0?cleanCell(row[col.nickname]):"";
+        if(!name){skipped++;continue;}
+        const found=(db.members||[]).find(m=>norm(m.name)===norm(name));
+        if(found){let changed=false;if(grade && found.grade!==grade){found.grade=grade;changed=true;}if(col.nickname>=0 && found.nickname!==(nickname||"")){found.nickname=nickname||"";changed=true;}if(changed)updated++;}
+        else {db.members.push({id:uid(),name,grade,nickname});added++;}
+      }
+      db.membersUpdated=Date.now();persistDb();
+      alert(`取り込み完了：新規 ${added}名／更新 ${updated}名${skipped?`／名前なし等 ${skipped}行をスキップ`:""}`);
+      renderMembers();
+    } catch(err) { alert(`読み込みに失敗しました：${err.message}`); }
+    e.target.value="";
+  };
 }
-function parseMemberCSV(text){const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());if(!lines.length)return[];const delimiter=[",","\t",";"].sort((a,b)=>(lines[0].split(b).length-lines[0].split(a).length))[0];const parseLine=line=>{let a=[],v="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'&&q&&line[i+1]==='"'){v+='"';i++;}else if(c==='"')q=!q;else if(c===delimiter&&!q){a.push(v);v="";}else v+=c;}a.push(v);return a;};const head=parseLine(lines[0]);return lines.slice(1).map(line=>{const vals=parseLine(line),o={};head.forEach((h,i)=>o[h]=vals[i]||"");return o;});}
+function parseMemberCSVRows(text){
+  const lines=String(text||"").replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());
+  if(!lines.length)return [];
+  const delimiter=[",","\t",";"].sort((a,b)=>(lines[0].split(b).length-lines[0].split(a).length))[0];
+  return lines.map(line=>{const cells=[];let value="",quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'&&quoted&&line[i+1]==='"'){value+='"';i++;}else if(c==='"')quoted=!quoted;else if(c===delimiter&&!quoted){cells.push(value);value="";}else value+=c;}cells.push(value);return cells;});
+}
+function parseMemberCSV(text){const rows=parseMemberCSVRows(text);if(!rows.length)return[];const headers=rows[0];return rows.slice(1).map(row=>Object.fromEntries(headers.map((h,i)=>[h,row[i]||""]))); }
 
 function renderEventEdit() {
   const ev = ctx.ev;
