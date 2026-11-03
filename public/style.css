@@ -1681,3 +1681,168 @@ button { max-width:100%; }
 @media(max-width:520px){
   .member-filter-toolbar{grid-template-columns:1fr}
 }
+
+
+/* 参加予定メンバーの検索・学年フィルターで非表示にする行 */
+.member-check[hidden]{
+  display:none !important;
+}
+
+.member-record[hidden]{
+  display:none !important;
+}
+
+/* v36: mobile-first member controls and checkbox layout hardening */
+.member-filter-toolbar {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(150px,220px);
+  gap:10px;
+  width:100%;
+  min-width:0;
+}
+.member-filter-toolbar > * { min-width:0; width:100%; box-sizing:border-box; }
+
+/* Participant check cards: checkbox, name and status occupy separate grid cells. */
+.member-check-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));
+  align-items:stretch;
+  gap:9px;
+  width:100%;
+  min-width:0;
+}
+.member-check-grid > .member-check {
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr) auto;
+  align-items:center;
+  justify-items:stretch;
+  column-gap:10px;
+  row-gap:4px;
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  min-height:60px;
+  margin:0;
+  padding:10px 12px;
+  line-height:1.45;
+  white-space:normal;
+}
+.member-check-grid > .member-check > input[type="checkbox"] {
+  grid-column:1;
+  grid-row:1 / span 2;
+  align-self:center;
+  justify-self:center;
+  display:block;
+  width:20px !important;
+  min-width:20px !important;
+  max-width:20px !important;
+  height:20px;
+  min-height:20px;
+  margin:0;
+  padding:0 !important;
+  flex:none;
+}
+.member-check-grid > .member-check > span {
+  grid-column:2;
+  grid-row:1 / span 2;
+  display:block;
+  width:auto;
+  min-width:0;
+  margin:0;
+  overflow-wrap:anywhere;
+  word-break:normal;
+  line-height:1.45;
+}
+.member-check-grid > .member-check > span small {
+  display:inline;
+  margin:0 0 0 3px;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.member-check-grid > .member-check > b {
+  grid-column:3;
+  grid-row:1 / span 2;
+  justify-self:end;
+  align-self:center;
+  min-width:0;
+  white-space:nowrap;
+  font-size:11px;
+}
+
+/* Roster row has four explicit columns: select, details, edit, delete. */
+#memberList .member-record {
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr) auto 36px;
+  align-items:center;
+  gap:9px;
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+}
+#memberList .member-record > .member-row-select {
+  grid-column:1;
+  justify-self:center;
+  width:18px !important;
+  min-width:18px !important;
+  max-width:18px !important;
+  height:18px;
+  min-height:18px;
+  margin:0;
+  padding:0 !important;
+}
+#memberList .member-record > .member-record-main {
+  grid-column:2;
+  min-width:0;
+  width:100%;
+}
+#memberList .member-record > [data-edit-member] { grid-column:3; }
+#memberList .member-record > [data-delete-member] { grid-column:4; }
+#memberList .member-record-main strong,
+#memberList .member-record-main small { overflow-wrap:anywhere; }
+
+.member-bulk-toolbar { min-width:0; }
+.member-bulk-toolbar > * { min-width:0; }
+.member-bulk-toolbar label { white-space:normal; }
+
+@media (max-width:600px) {
+  .member-filter-toolbar { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .member-filter-toolbar input,
+  .member-filter-toolbar select { min-height:44px; font-size:16px; }
+  .member-check-grid { grid-template-columns:minmax(0,1fr); gap:7px; }
+  .member-check-grid > .member-check {
+    grid-template-columns:24px minmax(0,1fr) auto;
+    min-height:58px;
+    padding:10px 11px;
+    column-gap:9px;
+  }
+  .member-check-grid > .member-check > input[type="checkbox"] {
+    width:21px !important;
+    min-width:21px !important;
+    max-width:21px !important;
+    height:21px;
+    min-height:21px;
+  }
+  .member-check-grid > .member-check > span { font-size:14px; }
+  .member-check-grid > .member-check > b { font-size:11px; }
+  #memberList .member-record {
+    grid-template-columns:22px minmax(0,1fr) auto 34px;
+    gap:7px;
+    padding:11px 0;
+  }
+  #memberList .member-record .btn { min-width:48px; min-height:38px; padding:7px 9px; font-size:12px; }
+  #memberList .member-record .x { width:34px; min-width:34px; height:34px; }
+  .member-bulk-toolbar { align-items:flex-start; gap:8px; }
+  .member-bulk-toolbar label { flex:1 1 100%; }
+  .member-bulk-toolbar button { flex:1 1 100%; width:100%; }
+  .member-bulk-toolbar small { margin:0; }
+}
+@media (max-width:360px) {
+  #memberList .member-record {
+    grid-template-columns:20px minmax(0,1fr) auto 32px;
+    gap:5px;
+  }
+  #memberList .member-record .btn { min-width:42px; padding:6px 7px; font-size:11px; }
+  #memberList .member-record .x { width:32px; min-width:32px; height:32px; }
+  .member-check-grid > .member-check { padding:9px; column-gap:7px; }
+  .member-check-grid > .member-check > b { font-size:10px; }
+}
