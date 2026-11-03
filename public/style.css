@@ -1641,3 +1641,12 @@ button { max-width:100%; }
 .member-import + .inline-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 .member-import + .inline-form #addMember { grid-column:1 / -1; width:100%; }
 @media(max-width:520px){ .member-import + .inline-form { grid-template-columns:1fr; } }
+
+/* v35: bulk member roster actions */
+.member-bulk-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;margin:8px 0;border-bottom:1px solid var(--border)}
+.member-bulk-toolbar label{display:flex;align-items:center;gap:7px;font-weight:700;white-space:nowrap}
+.member-bulk-toolbar input[type="checkbox"],.member-row-select{width:18px!important;height:18px!important;min-width:18px;flex:0 0 18px;accent-color:var(--primary)}
+.member-bulk-toolbar small{color:var(--muted);margin-left:auto}
+.member-bulk-toolbar button:disabled{opacity:.45;cursor:not-allowed}
+.member-record .member-row-select{margin:0 3px 0 0}
+@media(max-width:520px){.member-bulk-toolbar{align-items:flex-start}.member-bulk-toolbar button{width:100%}.member-bulk-toolbar small{margin-left:0}}

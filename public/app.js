@@ -2547,7 +2547,7 @@ function applyRemote(rem) {
         if (cur) state.currentReception = cur;   // 入力途中の受付は消さない
       }
       ctx.bar = ev.bar;
-      ctx.tt = ev.tt || ctx.tt;
+      ctx.tt = ensureTt(ev.tt || ctx.tt);
     }
   }
   saveLocalDb();
@@ -2752,7 +2752,7 @@ function openEvent(id) {
   const ev = db.events.find(e => e.id === id);
   if (!ev) return;
   ev.bar = ensureBar(ev.bar);
-  ev.tt = ev.tt || createTt();
+  ev.tt = ensureTt(ev.tt);
   ev.u.tt = ev.u.tt || 0;
   if (ev.archived) {
     ctx = { ev, mode: "archive", dirty: false, bar: structuredClone(ev.bar), tt: structuredClone(ev.tt) };
@@ -2834,8 +2834,12 @@ function renderMembers() {
   const planned=Array.isArray(ctx.ev.participants)?ctx.ev.participants:[];
   const receptionNames=new Set((state.receptionHistory||[]).flatMap(r=>(r.guests||[]).filter(g=>g.type==="tmp").flatMap(g=>[g.memberId||"",`name:${g.name||""}`])));
   screen.innerHTML=`<div class="card"><div class="card-title">参加予定メンバー</div><p class="sub-text">参加予定に登録したメンバーの受付状況を確認できます。チェックボックス・名前・受付状況は横並びで表示されます。</p><div class="member-check-grid">${members.map(m=>`<label class="member-check"><input type="checkbox" data-participant="${esc(m.id)}" ${planned.includes(m.id)?"checked":""}><span>${esc(memberDisplayName(m))}${m.nickname?` <small>(${esc(m.name)})</small>`:""} <small>${esc(m.grade||"")}</small></span><b class="${(receptionNames.has(m.id)||receptionNames.has(`name:${m.name}`))?"checked":"pending"}">${(receptionNames.has(m.id)||receptionNames.has(`name:${m.name}`))?"受付済み":"未受付"}</b></label>`).join("")||`<div class="sub-text">先に名簿へメンバーを登録してください。</div>`}</div><button class="btn btn-primary full" id="saveParticipants">参加予定を保存</button></div>
-  <div class="card"><div class="card-title">メンバー名簿</div><div class="member-import"><label>CSV／Excelを読み込む<input type="file" id="memberFile" accept=".csv,.xlsx,.xls"></label><small>表に他の項目が含まれていても、「名前（氏名）」「学年」「ニックネーム（DJネーム）」の列を取り込みます。</small></div><div class="inline-form"><input id="memberName" placeholder="本名・氏名"><input id="memberGrade" placeholder="学年（例：3年）"><input id="memberNickname" placeholder="ニックネーム／DJネーム（任意）"><button class="btn btn-primary full" id="addMember">メンバーを追加</button></div><div id="memberList">${members.map(m=>{const st=memberStats(m.id);return `<div class="member-record"><div class="member-record-main"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname?`<small>本名：${esc(m.name)}</small>`:""}<small>${esc(m.grade||"学年未登録")} ・ 参加 ${st.attendance}回 ・ DJ ${st.dj}回 ・ 最終出演 ${esc(st.lastDate)}</small></div><button class="btn btn-secondary" data-edit-member="${esc(m.id)}">編集</button><button class="x" data-delete-member="${esc(m.id)}">×</button></div>`}).join("")||`<p class="sub-text">名簿はまだ空です。</p>`}</div></div>`;
+  <div class="card"><div class="card-title">メンバー名簿</div><div class="member-import"><label>CSV／Excelを読み込む<input type="file" id="memberFile" accept=".csv,.xlsx,.xls"></label><small>表に他の項目が含まれていても、「名前（氏名）」「学年」「ニックネーム（DJネーム）」の列を取り込みます。</small></div><div class="inline-form"><input id="memberName" placeholder="本名・氏名"><input id="memberGrade" placeholder="学年（例：3年）"><input id="memberNickname" placeholder="ニックネーム／DJネーム（任意）"><button class="btn btn-primary full" id="addMember">メンバーを追加</button></div><div class="member-bulk-toolbar"><label><input type="checkbox" id="selectAllMembers"> 全員選択</label><button type="button" class="btn btn-danger" id="deleteSelectedMembers" disabled>選択したメンバーを一括削除</button><small id="selectedMemberCount">0名選択中</small></div><div id="memberList">${members.map(m=>{const st=memberStats(m.id);return `<div class="member-record"><input class="member-row-select" type="checkbox" data-select-member="${esc(m.id)}" aria-label="${esc(memberDisplayName(m))}を選択"><div class="member-record-main"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname?`<small>本名：${esc(m.name)}</small>`:""}<small>${esc(m.grade||"学年未登録")} ・ 参加 ${st.attendance}回 ・ DJ ${st.dj}回 ・ 最終出演 ${esc(st.lastDate)}</small></div><button class="btn btn-secondary" data-edit-member="${esc(m.id)}">編集</button><button class="x" data-delete-member="${esc(m.id)}">×</button></div>`}).join("")||`<p class="sub-text">名簿はまだ空です。</p>`}</div></div>`;
   document.getElementById("saveParticipants").onclick=()=>{ctx.ev.participants=[...screen.querySelectorAll('[data-participant]:checked')].map(x=>x.dataset.participant);ctx.ev.u.meta=Date.now();persistDb();alert("参加予定を保存しました");renderMembers();};
+  const updateBulkSelection=()=>{const selected=[...screen.querySelectorAll("[data-select-member]:checked")];const all=[...screen.querySelectorAll("[data-select-member]")];const del=document.getElementById("deleteSelectedMembers");const count=document.getElementById("selectedMemberCount");del.disabled=selected.length===0;count.textContent=`${selected.length}名選択中`;const allBox=document.getElementById("selectAllMembers");allBox.checked=all.length>0&&selected.length===all.length;allBox.indeterminate=selected.length>0&&selected.length<all.length;};
+  screen.querySelectorAll("[data-select-member]").forEach(box=>box.addEventListener("change",updateBulkSelection));
+  document.getElementById("selectAllMembers").onchange=e=>{screen.querySelectorAll("[data-select-member]").forEach(box=>box.checked=e.target.checked);updateBulkSelection();};
+  document.getElementById("deleteSelectedMembers").onclick=()=>{const ids=[...screen.querySelectorAll("[data-select-member]:checked")].map(x=>x.dataset.selectMember);if(!ids.length)return;const names=ids.map(id=>db.members.find(m=>m.id===id)?.name).filter(Boolean);if(!confirm(`${ids.length}名のメンバーを名簿から一括削除しますか？\n\n${names.slice(0,8).join("、")}${names.length>8?` ほか${names.length-8}名`:""}\n\n参加予定リストからも除外されます。過去の受付・売上・出演履歴は保持されます。`))return;const removed=new Set(ids);db.members=(db.members||[]).filter(m=>!removed.has(m.id));for(const ev of db.events||[]){if(Array.isArray(ev.participants)){const next=ev.participants.filter(id=>!removed.has(id));if(next.length!==ev.participants.length){ev.participants=next;ev.u=ev.u||{};ev.u.meta=Date.now();}}}db.membersUpdated=Date.now();persistDb();alert(`${ids.length}名を名簿から削除しました。過去の履歴は保持されています。`);renderMembers();};
   document.getElementById("addMember").onclick=()=>{const name=document.getElementById("memberName").value.trim(),grade=document.getElementById("memberGrade").value.trim(),nickname=document.getElementById("memberNickname").value.trim();if(!name){alert("名前を入力してください");return;}const found=(db.members||[]).find(m=>m.name.trim().toLowerCase()===name.toLowerCase());if(found){found.grade=grade;found.nickname=nickname;alert("登録済みメンバーの学年・ニックネームを更新しました。");}else{db.members.push({id:uid(),name,grade,nickname});}db.membersUpdated=Date.now();persistDb();renderMembers();};
   screen.querySelectorAll("[data-edit-member]").forEach(btn=>btn.onclick=()=>{const m=db.members.find(x=>x.id===btn.dataset.editMember);if(!m)return;const name=prompt("本名・氏名",m.name);if(name===null)return;const grade=prompt("学年",m.grade||"");if(grade===null)return;const nickname=prompt("ニックネーム／DJネーム（空欄なら本名表示）",m.nickname||"");if(nickname===null)return;if(!name.trim()){alert("名前を入力してください");return;}m.name=name.trim();m.grade=grade.trim();m.nickname=nickname.trim();db.membersUpdated=Date.now();persistDb();renderMembers();});
   screen.querySelectorAll("[data-delete-member]").forEach(btn=>btn.onclick=()=>{const m=db.members.find(x=>x.id===btn.dataset.deleteMember);if(!m||!confirm(`${m.name}を名簿から削除しますか？過去の履歴は保持されます。`))return;db.members=db.members.filter(x=>x.id!==m.id);db.membersUpdated=Date.now();persistDb();renderMembers();});
@@ -3230,6 +3234,14 @@ function renderBarHome() {
 
 /* ---------- タイムテーブル・シフト（現在の出番を自動表示） ---------- */
 function createTt() { return { acts: [], shifts: [], offsetMinutes: 0 }; }
+// 旧バージョンや一部端末から同期された不完全なタイムテーブルでも画面遷移できるよう正規化
+function ensureTt(value) {
+  const tt = value && typeof value === "object" ? value : {};
+  if (!Array.isArray(tt.acts)) tt.acts = [];
+  if (!Array.isArray(tt.shifts)) tt.shifts = [];
+  if (!Number.isFinite(Number(tt.offsetMinutes))) tt.offsetMinutes = 0;
+  return tt;
+}
 function saveTt() {
   if (!ctx) return;
   if (ctx.mode === "archive") { ctx.dirty = true; return; }
@@ -3294,7 +3306,8 @@ function renderEventTimeline(){
 }
 
 function renderTimetable() {
-  const tt = ctx.tt;
+  if (!ctx) { navigate(renderEventList); return; }
+  const tt = ctx.tt = ensureTt(ctx.tt);
   const sorted = l => l.slice().sort((a, b) => slotRange(a)[0] - slotRange(b)[0]);
   screen.innerHTML = `
   <div class="card"><div class="card-title">進行時間の調整</div><div class="offset-controls"><button class="btn btn-secondary" data-offset="-5">−5分</button><button class="btn btn-secondary" data-offset="-1">−1分</button><strong id="offsetValue">${Number(tt.offsetMinutes||0)>=0?"+":""}${Number(tt.offsetMinutes||0)}分</strong><button class="btn btn-secondary" data-offset="1">＋1分</button><button class="btn btn-secondary" data-offset="5">＋5分</button><button class="btn btn-secondary" id="resetOffset">リセット</button></div><small class="sub-text">マイナスは巻き、プラスは押し。出番の表示時刻に反映されます。</small></div>
