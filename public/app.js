@@ -3501,11 +3501,11 @@ function renderBarHome() {
     $("bEnd").textContent = c.hasEnd ? yen(c.end) : "-";
     $("bRev").textContent = c.hasEnd ? yen(c.revenue) : "-";
     $("bCashSales").textContent = yen(s.cashRevenue);
-    $("bEnv").textContent = c.hasEnd ? `キャッシュドリンク：${formatMoney(s.cashRevenue)}円\nファーストドリンク(ドリチケ)：${s.ticketUnits}杯` : "（金庫内の金額を入力すると表示されます）";
-    const rem = b.remain === "" ? null : Number(b.remain);
-    $("bRemainSt").innerHTML = rem === null ? "-" : (rem === c.start ? `<span class="ok">一致 ✓</span>` : `<span class="ng">不一致（差 ${formatSignedMoney(rem - c.start)}）</span>`);
     const receptionState = ev.state || state;
     const issued = getIssuedDrinkTicketCount(receptionState);
+    $("bEnv").textContent = c.hasEnd ? `キャッシュドリンク：${formatMoney(s.cashRevenue)}円` : "（金庫内の金額を入力すると表示されます）";
+    const rem = b.remain === "" ? null : Number(b.remain);
+    $("bRemainSt").innerHTML = rem === null ? "-" : (rem === c.start ? `<span class="ok">一致 ✓</span>` : `<span class="ng">不一致（差 ${formatSignedMoney(rem - c.start)}）</span>`);
     const receptionExpectedRemaining = Math.max(0, Number(receptionState.drinkTickets || 0));
     const expectedUnused = issued - Number(s.ticketUnits || 0);
     $("bTickets").textContent = `${issued}枚`;
@@ -3546,19 +3546,26 @@ function renderBarHome() {
     } else {
       barStatus.innerHTML = `<span class="ok">一致 ✓</span>`;
     }
-    if (receptionActualRemaining !== null && collected !== null && collected === Number(s.ticketUnits || 0)) {
-      const missedHandout = Math.max(0, receptionActualRemaining - receptionExpectedRemaining);
-      const handedOutActual = Math.max(0, issued - missedHandout);
-      const possiblyUnused = handedOutActual - Number(s.ticketUnits || 0);
-      if (possiblyUnused > 0 && missedHandout === 0) {
-        notes.push(`受付の残数と販売記録も整合しています。実際に渡したと考えられる枚数との差${possiblyUnused}枚は、ドリチケを使わなかった来場者がいる可能性があります。`);
-      } else if (missedHandout > 0 && possiblyUnused === 0) {
-        notes.push(`受付で渡し忘れた可能性のある${missedHandout}枚を考慮すると、実際に渡したと考えられる枚数と販売記録は一致しています。未使用者がいるとは限りません。`);
-      } else if (possiblyUnused < 0) {
-        notes.push("販売記録上の使用枚数が、実際に渡したと考えられる枚数を上回っています。受付・販売の記録を再確認してください。");
-        hasWarning = true;
-      } else if (possiblyUnused === 0 && !hasWarning && missedHandout === 0) {
-        notes.push("受付・バーカウンターの現物枚数と販売記録に大きなずれはありません。");
+    // 未使用チケットの可能性を示すのは、受付の現物残数が理論値と一致し、
+    // かつバーの回収現物枚数が販売記録と一致している場合に限定する。
+    if (receptionActualRemaining !== null && collected !== null) {
+      const receptionMatches = receptionActualRemaining === receptionExpectedRemaining;
+      const barMatches = collected === Number(s.ticketUnits || 0);
+      const possiblyUnused = issued - Number(s.ticketUnits || 0);
+
+      if (receptionMatches && barMatches) {
+        if (possiblyUnused > 0) {
+          notes.push(`受付の現物残数は理論値と一致し、バーの回収枚数も販売記録と一致しています。配布枚数${issued}枚に対して回収枚数は${Number(s.ticketUnits || 0)}枚のため、差の${possiblyUnused}枚は未使用チケットの可能性があります（人数ではなく枚数です）。`);
+        } else if (possiblyUnused === 0 && !hasWarning) {
+          notes.push("受付の現物残数・バーの回収枚数ともに理論値／販売記録と一致しています。未使用チケットの差はありません。");
+        } else if (possiblyUnused < 0) {
+          notes.push(`販売記録上の使用枚数が受付で配布した枚数を${Math.abs(possiblyUnused)}枚上回っています。受付の配布記録・販売記録を再確認してください。`);
+          hasWarning = true;
+        }
+      } else if (!receptionMatches) {
+        notes.push("受付の現物残数が理論値と一致していないため、未使用チケットの判定は保留しています。受付での渡し忘れ・余分な配布・紛失・数え間違いなどを先に確認してください。");
+      } else if (!barMatches) {
+        notes.push("バーの回収現物枚数と販売記録が一致していないため、未使用チケットの判定は保留しています。販売記録・回収漏れ・数え間違いを確認してください。");
       }
     }
     diagnosis.className = `ticket-result-note${hasWarning ? " is-warning" : notes.length && receptionActualRemaining !== null && collected !== null ? " is-ok" : ""}`;
