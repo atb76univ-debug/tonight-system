@@ -2719,7 +2719,7 @@ function renderGuide() {
     <section class="guide-step"><div class="guide-visual">${guideIllustration("bar")}</div><div class="guide-copy"><span class="guide-number">03</span><h3>ドリンクを販売</h3><p>最初に金庫の準備を行い、商品管理で共通のドリンクラインナップを登録します。登録内容はすべての回で共有され、追加・削除・価格変更も各回に反映されます。販売画面で商品・数量・支払方法を選択して会計します。</p></div></section>
     <section class="guide-step"><div class="guide-visual">${guideIllustration("schedule")}</div><div class="guide-copy"><span class="guide-number">04</span><h3>出番・シフトを登録</h3><p>タイムテーブルではDJ・VJ・LIVE・その他の種別で出番を登録できます。フェスアプリ風の縦型タイムラインは現在位置を自動表示。進行時間の調整はマイナスで巻き、プラスで押しとして出番時刻に反映されます。スタッフのシフトも登録でき、NOW / NEXT は自動更新されます。</p></div></section>
     <section class="guide-step"><div class="guide-visual">${guideIllustration("schedule")}</div><div class="guide-copy"><span class="guide-number">05</span><h3>ヘッダーのNOW / NEXT表示</h3><p>イベント画面上部には、出番とシフトが左右2列で表示され、それぞれNOW（進行中）とNEXT（次の予定）が横並びになります。「縮小」を押すと文字・余白・カードの高さを小さくして縦幅を抑えられます。「しまう」で内容を隠し、「通常」「ひらく」で元に戻せます。表示設定は端末ごとに保持されます。</p></div></section>
-    <section class="guide-step"><div class="guide-visual">${guideIllustration("event")}</div><div class="guide-copy"><span class="guide-number">06</span><h3>メンバー名簿・参加予定</h3><p>イベントホームから名簿を開き、名前と学年を登録できます。CSV／Excelからの一括登録、参加予定メンバーの受付状況、参加回数・DJ出演回数・最終出演日を確認できます。</p></div></section><div class="card guide-notes"><h3>覚えておくと便利なこと</h3><ul><li>受付・販売履歴・スケジュールはイベントごとに管理されます。メンバー名簿は全イベント共通です。</li><li>タイムテーブルの進行時間調整は出番に反映されます。マイナスが巻き、プラスが押しです。</li><li>ドリンクの商品名・価格のラインナップは全イベント共通です。商品管理で追加・変更・削除すると、すべての回に反映されます。</li><li>売切れ設定はイベントごとに管理されます。ある回で売切れにしても、別の回の販売状態には影響しません。</li><li>受付履歴や販売履歴を削除・取消した場合、削除履歴は横並びのカードで赤い取り消し線付きで記録され、30日以内なら「復元」できます。復元すると集計にも反映されます。</li><li>イベントホームへ戻ると、受付・バーカウンター・タイムテーブルに移動できます。</li><li>終了したイベントはアーカイブできます。アーカイブ中の変更は保存確認が表示されます。</li><li>複数端末で使う場合は、同じイベントURLにアクセスしてください。</li></ul></div>
+    <section class="guide-step"><div class="guide-visual">${guideIllustration("event")}</div><div class="guide-copy"><span class="guide-number">06</span><h3>メンバー名簿・参加予定</h3><p>イベントホームから名簿を開き、名前と学年を登録できます。CSV／Excelからの一括登録、参加予定メンバーの受付状況、参加回数・DJ出演回数・最終出演日を確認できます。出番・シフトの担当者は参加予定者から選び、チップ形式で複数人を追加・解除できます。</p></div></section><div class="card guide-notes"><h3>覚えておくと便利なこと</h3><ul><li>受付・販売履歴・スケジュールはイベントごとに管理されます。メンバー名簿は全イベント共通です。</li><li>タイムテーブルの進行時間調整は出番に反映されます。マイナスが巻き、プラスが押しです。</li><li>ドリンクの商品名・価格のラインナップは全イベント共通です。商品管理で追加・変更・削除すると、すべての回に反映されます。</li><li>売切れ設定はイベントごとに管理されます。ある回で売切れにしても、別の回の販売状態には影響しません。</li><li>受付履歴や販売履歴を削除・取消した場合、削除履歴は横並びのカードで赤い取り消し線付きで記録され、30日以内なら「復元」できます。復元すると集計にも反映されます。</li><li>イベントホームへ戻ると、受付・バーカウンター・タイムテーブルに移動できます。</li><li>終了したイベントはアーカイブできます。アーカイブ中の変更は保存確認が表示されます。</li><li>複数端末で使う場合は、同じイベントURLにアクセスしてください。</li></ul></div>
     <button class="btn btn-primary btn-large guide-back" id="guideBack">イベント一覧に戻る</button>`;
   document.getElementById("guideBack").onclick = () => navigate(renderEventList);
 }
@@ -3309,7 +3309,7 @@ function renderTimetable() {
         <label><input type="radio" name="actType" value="その他"> その他</label>
       </div>
       <input class="full" id="aCustomType" placeholder="その他の種別を入力（例：ダンス）" hidden>
-      <div class="full"><label>出演メンバー（複数選択可）</label><select id="aMembers" multiple size="4" class="member-multi-select">${(db.members||[]).map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.grade?`（${esc(m.grade)}）`:""}</option>`).join("")}</select><input class="full" id="aName" placeholder="名簿外の出演者名・グループ名（自由入力）"></div>
+      <div class="full member-picker"><label for="aMemberPick">出演メンバー（参加予定者から追加）</label><div class="member-picker-controls"><select id="aMemberPick" class="member-picker-select"><option value="">メンバーを選択</option>${(db.members||[]).filter(m=>(ctx.ev.participants||[]).includes(m.id)).sort((a,b)=>a.name.localeCompare(b.name,"ja")).map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.grade?`（${esc(m.grade)}）`:""}</option>`).join("")}</select><button type="button" class="btn btn-secondary member-add-btn" id="aMemberAdd">追加</button></div><div id="aMemberChips" class="member-chips" aria-live="polite"></div><input class="full" id="aName" placeholder="名簿外の出演者名・グループ名（自由入力）"></div>
       <button class="btn btn-primary full" id="aAdd">出番を追加</button><button class="btn btn-secondary full" id="aCancel" hidden>編集をキャンセル</button>
     </div></div>
     <p class="sub-text">編集ボタンから登録内容を変更できます。23:00〜翌1:00のような日付またぎにも対応しています。</p>
@@ -3320,7 +3320,7 @@ function renderTimetable() {
     ${sorted(tt.shifts).map(s => `<div class="tt-record" data-shift-row="${esc(s.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(s.start)}–${esc(s.end)}</span><strong>${esc(s.role)}：${esc(s.name)}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-es="${esc(s.id)}">編集</button><button type="button" class="x" data-ds="${esc(s.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
     <div class="tt-form-panel" id="shiftFormPanel"><div class="tt-form-heading" id="shiftFormHeading">シフトを追加</div><div class="inline-form">
       <input type="time" id="sStart" value="19:00"><input type="time" id="sEnd" value="21:00">
-      <input id="sRole" list="roleList" placeholder="役割（受付・バーなど）"><div class="full"><label>担当メンバー（複数選択可）</label><select id="sMembers" multiple size="4" class="member-multi-select">${(db.members||[]).map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.grade?`（${esc(m.grade)}）`:""}</option>`).join("")}</select><input id="sName" placeholder="名簿外の担当者名（自由入力）"></div>
+      <input id="sRole" list="roleList" placeholder="役割（受付・バーなど）"><div class="full member-picker"><label for="sMemberPick">担当メンバー（参加予定者から追加）</label><div class="member-picker-controls"><select id="sMemberPick" class="member-picker-select"><option value="">メンバーを選択</option>${(db.members||[]).filter(m=>(ctx.ev.participants||[]).includes(m.id)).sort((a,b)=>a.name.localeCompare(b.name,"ja")).map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.grade?`（${esc(m.grade)}）`:""}</option>`).join("")}</select><button type="button" class="btn btn-secondary member-add-btn" id="sMemberAdd">追加</button></div><div id="sMemberChips" class="member-chips" aria-live="polite"></div><input id="sName" placeholder="名簿外の担当者名（自由入力）"></div>
       <datalist id="roleList"><option>受付</option><option>バーカウンター</option><option>音響</option><option>照明</option><option>物販</option></datalist>
       <button class="btn btn-primary full" id="sAdd">シフトを追加</button><button class="btn btn-secondary full" id="sCancel" hidden>編集をキャンセル</button>
     </div></div>
@@ -3330,18 +3330,40 @@ function renderTimetable() {
   document.getElementById("resetOffset").onclick=()=>{tt.offsetMinutes=0;saveTt();renderTimetable();};
   const $ = id => document.getElementById(id);
   let editA = null, editS = null;
+  let actSelected = [], shiftSelected = [];
+  const memberName = id => (db.members||[]).find(m=>m.id===id)?.name || "登録外メンバー";
+  const drawChips = (prefix, ids) => {
+    const box=$(prefix+"MemberChips");
+    box.innerHTML=ids.map(id=>`<span class="member-chip">${esc(memberName(id))}<button type="button" data-remove-member="${esc(id)}" data-picker="${prefix}" aria-label="${esc(memberName(id))}を解除">×</button></span>`).join("") || `<span class="member-picker-empty">まだ選択されていません</span>`;
+    box.querySelectorAll("[data-remove-member]").forEach(btn=>btn.onclick=()=>{
+      const arr=prefix==="a"?actSelected:shiftSelected;
+      const at=arr.indexOf(btn.dataset.removeMember);if(at>=0)arr.splice(at,1);
+      drawChips(prefix,arr);
+    });
+  };
+  const addPickedMember = prefix => {
+    const select=$(prefix+"MemberPick"), id=select.value;
+    if(!id)return;
+    const arr=prefix==="a"?actSelected:shiftSelected;
+    if(!arr.includes(id))arr.push(id);
+    select.value="";
+    drawChips(prefix,arr);
+  };
+  $("aMemberAdd").onclick=()=>addPickedMember("a");
+  $("sMemberAdd").onclick=()=>addPickedMember("s");
+  drawChips("a",actSelected); drawChips("s",shiftSelected);
   screen.querySelectorAll('input[name="actType"]').forEach(r => r.addEventListener("change", () => { $("aCustomType").hidden = r.value !== "その他" || !r.checked; }));
   $("aAdd").onclick = () => {
     const type = screen.querySelector('input[name="actType"]:checked')?.value || "DJ";
     const customType = $("aCustomType").value.trim();
-    const chosen=[...$("aMembers").selectedOptions].map(x=>({id:x.value,name:x.textContent.replace(/（.*）$/,"")})); const free=$("aName").value.trim(); const o = { start: $("aStart").value, end: $("aEnd").value, type, customType: type === "その他" ? customType : "", name:[chosen.map(x=>x.name).join("、"),free].filter(Boolean).join("、"), memberIds:chosen.map(x=>x.id) };
+    const chosen=actSelected.map(id=>({id,name:memberName(id)})); const free=$("aName").value.trim(); const o = { start: $("aStart").value, end: $("aEnd").value, type, customType: type === "その他" ? customType : "", name:[chosen.map(x=>x.name).join("、"),free].filter(Boolean).join("、"), memberIds:chosen.map(x=>x.id) };
     if (!o.start || !o.end || !o.name || (type === "その他" && !customType)) { alert("開始・終了時刻、種別、出演者名を入力してください"); return; }
     if (!isValidTimeRange(o.start, o.end)) { alert("終了時刻が開始時刻より前になっています。日付またぎの場合は、終了時刻を翌日0:00〜5:59で入力してください。"); return; }
     if (editA) Object.assign(tt.acts.find(x => x.id === editA), o); else tt.acts.push({ id: uid(), ...o });
     saveTt(); renderTimetable();
   };
   $("sAdd").onclick = () => {
-    const chosen=[...$("sMembers").selectedOptions].map(x=>({id:x.value,name:x.textContent.replace(/（.*）$/,"")})); const free=$("sName").value.trim(); const o = { start: $("sStart").value, end: $("sEnd").value, role: $("sRole").value.trim(), name:[chosen.map(x=>x.name).join("、"),free].filter(Boolean).join("、"), memberIds:chosen.map(x=>x.id) };
+    const chosen=shiftSelected.map(id=>({id,name:memberName(id)})); const free=$("sName").value.trim(); const o = { start: $("sStart").value, end: $("sEnd").value, role: $("sRole").value.trim(), name:[chosen.map(x=>x.name).join("、"),free].filter(Boolean).join("、"), memberIds:chosen.map(x=>x.id) };
     if (!o.start || !o.end || !o.role || !o.name) { alert("開始・終了時刻、役割、担当者名を入力してください"); return; }
     if (!isValidTimeRange(o.start, o.end)) { alert("終了時刻が開始時刻より前になっています。日付またぎの場合は、終了時刻を翌日0:00〜5:59で入力してください。"); return; }
     if (editS) Object.assign(tt.shifts.find(x => x.id === editS), o); else tt.shifts.push({ id: uid(), ...o });
@@ -3349,14 +3371,14 @@ function renderTimetable() {
   };
   screen.querySelectorAll("[data-ea]").forEach(el => el.onclick = () => {
     const a = tt.acts.find(x => x.id === el.dataset.ea); if (!a) return;
-    editA = a.id; $("aStart").value = a.start; $("aEnd").value = a.end; $("aName").value = a.memberIds?.length ? a.name.split("、").slice(a.memberIds.length).join("、") : a.name; [...$("aMembers").options].forEach(o=>o.selected=(a.memberIds||[]).includes(o.value)); const actType = a.type || "DJ"; screen.querySelectorAll('input[name="actType"]').forEach(r => r.checked = r.value === actType); $("aCustomType").hidden = actType !== "その他"; $("aCustomType").value = a.customType || ""; $("aAdd").textContent = "変更を保存"; $("aCancel").hidden = false; $("actFormHeading").textContent = "出番を編集中"; $("actFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.actRow === a.id)); $("actFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
+    editA = a.id; $("aStart").value = a.start; $("aEnd").value = a.end; $("aName").value = a.memberIds?.length ? a.name.split("、").slice(a.memberIds.length).join("、") : a.name; actSelected=(a.memberIds||[]).slice(); drawChips("a",actSelected); const actType = a.type || "DJ"; screen.querySelectorAll('input[name="actType"]').forEach(r => r.checked = r.value === actType); $("aCustomType").hidden = actType !== "その他"; $("aCustomType").value = a.customType || ""; $("aAdd").textContent = "変更を保存"; $("aCancel").hidden = false; $("actFormHeading").textContent = "出番を編集中"; $("actFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.actRow === a.id)); $("actFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
   });
   screen.querySelectorAll("[data-es]").forEach(el => el.onclick = () => {
     const s = tt.shifts.find(x => x.id === el.dataset.es); if (!s) return;
-    editS = s.id; $("sStart").value = s.start; $("sEnd").value = s.end; $("sRole").value = s.role; $("sName").value = s.memberIds?.length ? s.name.split("、").slice(s.memberIds.length).join("、") : s.name; [...$("sMembers").options].forEach(o=>o.selected=(s.memberIds||[]).includes(o.value)); $("sAdd").textContent = "変更を保存"; $("sCancel").hidden = false; $("shiftFormHeading").textContent = "シフトを編集中"; $("shiftFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.shiftRow === s.id)); $("shiftFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
+    editS = s.id; $("sStart").value = s.start; $("sEnd").value = s.end; $("sRole").value = s.role; $("sName").value = s.memberIds?.length ? s.name.split("、").slice(s.memberIds.length).join("、") : s.name; shiftSelected=(s.memberIds||[]).slice(); drawChips("s",shiftSelected); $("sAdd").textContent = "変更を保存"; $("sCancel").hidden = false; $("shiftFormHeading").textContent = "シフトを編集中"; $("shiftFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.shiftRow === s.id)); $("shiftFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
   });
-  $("aCancel").onclick = () => { editA = null; $("aStart").value = "20:00"; $("aEnd").value = "20:30"; $("aName").value = ""; [...$("aMembers").options].forEach(o=>o.selected=false); screen.querySelector('input[name="actType"][value="DJ"]').checked = true; $("aCustomType").value = ""; $("aCustomType").hidden = true; $("aAdd").textContent = "出番を追加"; $("aCancel").hidden = true; $("actFormHeading").textContent = "出番を追加"; $("actFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.remove("is-selected")); };
-  $("sCancel").onclick = () => { editS = null; $("sStart").value = "19:00"; $("sEnd").value = "21:00"; $("sRole").value = ""; $("sName").value = ""; [...$("sMembers").options].forEach(o=>o.selected=false); $("sAdd").textContent = "シフトを追加"; $("sCancel").hidden = true; $("shiftFormHeading").textContent = "シフトを追加"; $("shiftFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.remove("is-selected")); };
+  $("aCancel").onclick = () => { editA = null; $("aStart").value = "20:00"; $("aEnd").value = "20:30"; $("aName").value = ""; actSelected=[]; drawChips("a",actSelected); screen.querySelector('input[name="actType"][value="DJ"]').checked = true; $("aCustomType").value = ""; $("aCustomType").hidden = true; $("aAdd").textContent = "出番を追加"; $("aCancel").hidden = true; $("actFormHeading").textContent = "出番を追加"; $("actFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.remove("is-selected")); };
+  $("sCancel").onclick = () => { editS = null; $("sStart").value = "19:00"; $("sEnd").value = "21:00"; $("sRole").value = ""; $("sName").value = ""; shiftSelected=[]; drawChips("s",shiftSelected); $("sAdd").textContent = "シフトを追加"; $("sCancel").hidden = true; $("shiftFormHeading").textContent = "シフトを追加"; $("shiftFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.remove("is-selected")); };
   screen.querySelectorAll("[data-da]").forEach(btn => btn.onclick = () => {
     if (!confirm("この出番を削除しますか？")) return;
     tt.acts = tt.acts.filter(x => x.id !== btn.dataset.da); saveTt(); renderTimetable();
