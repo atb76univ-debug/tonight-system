@@ -12,17 +12,40 @@
 <body>
   <header class="topbar">
     <button id="backBtn" class="icon-btn hidden" aria-label="前の画面に戻る">←</button>
-    <div class="header-main"><div class="brand-mini">tonight!</div><h1 id="pageTitle">イベント一覧</h1></div>
+    <div class="header-main"><div class="brand-mini">tonight!</div><h1 id="pageTitle">tonight!</h1></div>
     <span id="headerLive" class="header-live hidden"><i></i><span>LIVE</span></span>
     <button id="eventHomeBtn" class="event-home-btn hidden" aria-label="イベントホームに戻る">⌂ <span>イベントホーム</span></button>
     <span id="sync" class="sync-state"></span>
   </header>
   <section id="eventPulse" class="event-pulse hidden" aria-live="polite">
-    <div class="event-pulse-top"><span class="event-pulse-title">NOW / NEXT</span><span class="event-pulse-hint">20秒ごとに更新</span></div>
+    <div class="event-pulse-top"><span class="event-pulse-title">NOW / NEXT</span><div class="event-pulse-controls"><span class="event-pulse-hint">20秒ごとに更新</span><button type="button" id="pulseCompactBtn" class="pulse-control" aria-label="表示サイズ切替">縮小</button><button type="button" id="pulseCollapseBtn" class="pulse-control" aria-expanded="true">しまう</button></div></div>
     <div id="globalNowBox"></div>
   </section>
   <main id="app"></main>
   <div id="modalRoot"></div>
+  <script>
+    (() => {
+      const pulse = document.getElementById("eventPulse");
+      const compactKey = "tonightPulseCompact";
+      const collapsedKey = "tonightPulseCollapsed";
+      const apply = () => {
+        pulse.classList.toggle("is-compact", localStorage.getItem(compactKey) === "1");
+        pulse.classList.toggle("is-collapsed", localStorage.getItem(collapsedKey) === "1");
+        const c = document.getElementById("pulseCollapseBtn");
+        const z = document.getElementById("pulseCompactBtn");
+        if (c) { c.textContent = pulse.classList.contains("is-collapsed") ? "ひらく" : "しまう"; c.setAttribute("aria-expanded", String(!pulse.classList.contains("is-collapsed"))); }
+        if (z) z.textContent = pulse.classList.contains("is-compact") ? "通常" : "縮小";
+      };
+      pulse.addEventListener("click", e => {
+        if (e.target.id === "pulseCompactBtn") localStorage.setItem(compactKey, pulse.classList.contains("is-compact") ? "0" : "1");
+        if (e.target.id === "pulseCollapseBtn") localStorage.setItem(collapsedKey, pulse.classList.contains("is-collapsed") ? "0" : "1");
+        apply();
+      });
+      window.addEventListener("DOMContentLoaded", apply);
+      new MutationObserver(apply).observe(pulse, { attributes:true, attributeFilter:["class"] });
+      apply();
+    })();
+  </script>
   <script src="app.js"></script>
 </body>
 </html>

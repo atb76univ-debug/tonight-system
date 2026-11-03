@@ -43,9 +43,24 @@ function createInitialState() {
     },
 
     receptionHistory: [],
+    deletedReceptionHistory: [],
 
     currentReception: null
   };
+}
+
+const DELETION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+function pruneDeletionLog(items) {
+  const cutoff = Date.now() - DELETION_RETENTION_MS;
+  return (Array.isArray(items) ? items : []).filter(x => Number(x.deletedAt || 0) >= cutoff);
+}
+function ensureDeletionLogs() {
+  if (!state) return;
+  state.deletedReceptionHistory = pruneDeletionLog(state.deletedReceptionHistory || []);
+}
+function ensureBarDeletionLog(bar) {
+  bar.deletedSales = pruneDeletionLog(bar.deletedSales || []);
+  return bar;
 }
 
 function loadState() {
@@ -68,6 +83,8 @@ function loadState() {
 
     parsed.receptionHistory =
       parsed.receptionHistory || [];
+    parsed.deletedReceptionHistory =
+      pruneDeletionLog(parsed.deletedReceptionHistory || []);
 
     parsed.startCashBreakdown =
       parsed.startCashBreakdown || {};
@@ -145,7 +162,7 @@ function renderReceptionTabs() {
 
 function getPageTitle(renderFunc) {
   const titles = new Map([
-    [renderEventList, "イベント一覧"], [renderEventNew, "新しい回を作成"],
+    [renderEventList, "tonight!"], [renderGuide, "使い方"], [renderEventNew, "新しい回を作成"],
     [renderEventPage, "イベントホーム"], [renderEventEdit, "イベント情報"],
     [renderSetup, "会計準備"], [renderHome, "受付ホーム"],
     [renderReceptionInput, "受付"], [renderDiscountScreen, "割引設定"],
@@ -1722,11 +1739,26 @@ function renderHistory() {
       }
     );
 
+  const deletedEntries = pruneDeletionLog(state.deletedReceptionHistory || []);
+  if (deletedEntries.length) {
+    html += `<div class="deleted-history-section"><div class="card-title">削除した履歴（30日間保存）</div>`;
+    deletedEntries.forEach(item => {
+      const entry = item.entry;
+      const deletedAt = new Date(item.deletedAt).toLocaleString("ja-JP");
+      html += `<div class="deleted-history-row"><div class="deleted-history-content"><s>${esc(entry.timestamp || "")} ・ 一般 ${Number(entry.general||0)}名 / TMP ${Number(entry.tmp||0)}名 ・ ¥${formatMoney(entry.totalAmount || 0)}</s><small>削除日時：${deletedAt}</small></div><button class="btn btn-secondary" data-restore-reception="${esc(entry.id)}">復元</button></div>`;
+    });
+    html += `</div>`;
+  }
+
   html += `
   </div>
   `;
 
   screen.innerHTML = html;
+  screen.querySelectorAll("[data-restore-reception]").forEach(btn => btn.onclick = () => {
+    if (!confirm("この受付履歴を復元しますか？来場者数・金額・ドリチケ残数も元に戻ります。")) return;
+    restoreHistory(btn.dataset.restoreReception);
+  });
 
   const clearEventBtn =
     document.getElementById(
@@ -1792,18 +1824,33 @@ function deleteHistory(id) {
     target.general +
     target.tmp;
 
+  ensureDeletionLogs();
+  state.deletedReceptionHistory.unshift({ entry: structuredClone(target), deletedAt: Date.now() });
   state.receptionHistory =
-
-    state.receptionHistory
-      .filter(
-        x =>
-          x.id !== id
-      );
+    state.receptionHistory.filter(x => x.id !== id);
 
   saveState();
 
   renderHistory();
 }
+function restoreHistory(id) {
+  ensureDeletionLogs();
+  const index = state.deletedReceptionHistory.findIndex(x => x.entry?.id === id);
+  if (index < 0) return;
+  const [record] = state.deletedReceptionHistory.splice(index, 1);
+  const entry = structuredClone(record.entry);
+  if (state.receptionHistory.some(x => x.id === entry.id)) return;
+  const people = Number(entry.general || 0) + Number(entry.tmp || 0);
+  state.drinkTickets = Math.max(0, Number(state.drinkTickets || 0) - people);
+  state.totals.general += Number(entry.general || 0);
+  state.totals.tmp += Number(entry.tmp || 0);
+  state.totals.grossEntrance += Number(entry.grossEntrance || ((people) * (ENTRY_FEE + DRINK_FEE)));
+  state.totals.totalDiscount += Number(entry.totalDiscount || 0);
+  state.receptionHistory.unshift(entry);
+  saveState();
+  renderHistory();
+}
+
 function clearReceptionHistory() {
 
   if (
@@ -1819,7 +1866,12 @@ function clearReceptionHistory() {
     state.totals.tmp;
 
   state.drinkTickets += totalPeople;
-
+  ensureDeletionLogs();
+  const deletedAt = Date.now();
+  state.deletedReceptionHistory = [
+    ...state.receptionHistory.map(entry => ({ entry: structuredClone(entry), deletedAt })),
+    ...state.deletedReceptionHistory
+  ];
   state.receptionHistory = [];
 
   state.totals = {
@@ -1839,7 +1891,9 @@ function clearReceptionAccountingData() {
     "この回の受付会計データを一括削除しますか？\n受付履歴・来場者数・初期金庫額・ドリチケ残数をリセットします。\nイベント情報、出番／シフト、バーカウンターの会計データは削除されません。"
   )) return;
 
+  const deletedReceptionHistory = pruneDeletionLog(state.deletedReceptionHistory || []);
   state = createInitialState();
+  state.deletedReceptionHistory = deletedReceptionHistory;
   saveState();
   pageHistory = [renderEventList, renderEventPage];
   navigate(renderSetup);
@@ -2353,7 +2407,7 @@ function defaultBarProducts() {
   return [{ id: uid(), name: "ドリンク", price: 500 }];
 }
 function createBar() {
-  return { started: false, startBreakdown: {}, endBreakdown: {}, tally: 0, tickets: 0, remain: "", checks: {}, products: defaultBarProducts(), sales: [], resetAt: 0, voidedSales: [] };
+  return { started: false, startBreakdown: {}, endBreakdown: {}, tally: 0, tickets: 0, remain: "", checks: {}, products: defaultBarProducts(), sales: [], resetAt: 0, voidedSales: [], deletedSales: [] };
 }
 function ensureBar(bar) {
   const b = bar || createBar();
@@ -2368,6 +2422,7 @@ function ensureBar(bar) {
   if (!Array.isArray(b.sales)) b.sales = [];
   b.resetAt = Number(b.resetAt || 0);
   if (!Array.isArray(b.voidedSales)) b.voidedSales = [];
+  ensureBarDeletionLog(b);
   return b;
 }
 function newEvent(name, date, st) {
@@ -2381,14 +2436,29 @@ function newEvent(name, date, st) {
 function loadDb() {
   try {
     const r = localStorage.getItem(DB_KEY);
-    if (r) { const d = JSON.parse(r); d.events = d.events || []; return d; }
+    if (r) {
+      const d = JSON.parse(r); d.events = d.events || [];
+      for (const e of d.events) {
+        e.state = e.state || createInitialState();
+        e.state.deletedReceptionHistory = pruneDeletionLog(e.state.deletedReceptionHistory || []);
+        e.bar = ensureBar(e.bar);
+      }
+      if (!Array.isArray(d.drinkLineup)) {
+        const first = d.events.find(e => Array.isArray(e.bar?.products) && e.bar.products.length);
+        d.drinkLineup = first ? first.bar.products.map(p => ({ id:p.id || uid(), name:p.name, price:Number(p.price||0) })) : defaultBarProducts();
+        d.drinkLineupUpdated = Date.now();
+      }
+      return d;
+    }
   } catch {}
-  const d = { events: [], updated: 0 };
+  const d = { events: [], drinkLineup: null, drinkLineupUpdated: 0, updated: 0 };
   // これまでの端末内データ（1回分）を最初の回として引き継ぐ
   const old = loadState();
   if (old.initialized || old.receptionHistory.length) {
     d.events.push(newEvent("過去データ（移行）", todayStr(), old));
   }
+  d.drinkLineup = defaultBarProducts().map(p => ({ id:p.id, name:p.name, price:p.price }));
+  d.drinkLineupUpdated = Date.now();
   return d;
 }
 
@@ -2396,6 +2466,16 @@ function loadDb() {
 function mergeBarTransactions(a = {}, b = {}) {
   const resetAt = Math.max(Number(a.resetAt || 0), Number(b.resetAt || 0));
   const voided = new Set([...(a.voidedSales || []), ...(b.voidedSales || [])]);
+  const deletedMap = new Map();
+  [...(a.deletedSales || []), ...(b.deletedSales || [])].forEach(x => {
+    if (!x?.sale?.id || Number(x.deletedAt || 0) < Date.now() - DELETION_RETENTION_MS) return;
+    const prev = deletedMap.get(x.sale.id);
+    if (!prev || Math.max(Number(x.deletedAt||0),Number(x.restoredAt||0)) > Math.max(Number(prev.deletedAt||0),Number(prev.restoredAt||0))) deletedMap.set(x.sale.id, structuredClone(x));
+  });
+  for (const [id, item] of deletedMap) {
+    if (Number(item.restoredAt || 0) > Number(item.deletedAt || 0)) voided.delete(id);
+    else voided.add(id);
+  }
   const byId = new Map();
   [...(a.sales || []), ...(b.sales || [])].forEach(sale => {
     if (!sale?.id || Number(sale.timestamp || 0) <= resetAt || voided.has(sale.id)) return;
@@ -2404,11 +2484,20 @@ function mergeBarTransactions(a = {}, b = {}) {
   return {
     sales: [...byId.values()].sort((x, y) => Number(y.timestamp || 0) - Number(x.timestamp || 0)),
     resetAt,
-    voidedSales: [...voided]
+    voidedSales: [...voided],
+    deletedSales: [...deletedMap.values()].sort((x,y) => Number(y.deletedAt||0)-Number(x.deletedAt||0))
   };
 }
 function mergeInto(t, s) {
   t.events = t.events || [];
+  if ((s.drinkLineupUpdated || 0) > (t.drinkLineupUpdated || 0)) {
+    t.drinkLineup = structuredClone(s.drinkLineup || []);
+    t.drinkLineupUpdated = s.drinkLineupUpdated;
+  }
+  if (!Array.isArray(t.drinkLineup)) {
+    const first = t.events.find(e => Array.isArray(e.bar?.products) && e.bar.products.length);
+    t.drinkLineup = first ? first.bar.products.map(p => ({id:p.id || uid(),name:p.name,price:Number(p.price||0)})) : defaultBarProducts().map(p => ({id:p.id,name:p.name,price:p.price}));
+  }
   for (const e of (s.events || [])) {
     const o = t.events.find(x => x.id === e.id);
     if (!o) { t.events.push(structuredClone(e)); continue; }
@@ -2425,12 +2514,13 @@ function mergeInto(t, s) {
     o.bar.sales = mergedBarTransactions.sales;
     o.bar.resetAt = mergedBarTransactions.resetAt;
     o.bar.voidedSales = mergedBarTransactions.voidedSales;
+    o.bar.deletedSales = mergedBarTransactions.deletedSales;
     if ((eu.tt || 0) > (o.u.tt || 0)) { o.tt = structuredClone(e.tt); o.u.tt = eu.tt; }
   }
   return t;
 }
 function dbSig() {
-  return db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
+  return "lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
 }
 function setSync(t) { const e = document.getElementById("sync"); if (e) e.textContent = t; }
 function saveLocalDb() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {} }
@@ -2592,7 +2682,7 @@ function renderEventList() {
 
   let html = `<div class="event-list-toolbar">
     <div><div class="eyebrow">TSUKUBA MUSIC PROJECT</div><div class="list-heading">イベントを選択</div></div>
-    <button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button>
+    <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
   </div>`;
   if (!evs.length) html += `<div class="card sub-text">まだ回がありません。「新しい回」から作成してください。</div>`;
 
@@ -2620,8 +2710,34 @@ function renderEventList() {
   });
   screen.innerHTML = html;
   document.getElementById("newEventBtn").onclick = () => navigate(renderEventNew);
+  document.getElementById("guideBtn").onclick = () => navigate(renderGuide);
   screen.querySelectorAll("[data-open]").forEach(el => el.onclick = () => openEvent(el.dataset.open));
 }
+
+function guideIllustration(kind) {
+  const common = `viewBox="0 0 320 150" role="img" aria-hidden="true"`;
+  const svg = {
+    event: `<svg ${common}><rect x="18" y="18" width="284" height="114" rx="15" fill="#f3f5f9"/><rect x="34" y="34" width="74" height="82" rx="9" fill="#263b5b"/><path d="M48 57h46M48 69h36M48 81h42" stroke="white" stroke-width="5" stroke-linecap="round"/><rect x="121" y="34" width="164" height="34" rx="8" fill="white" stroke="#dce2ec"/><path d="M136 51h72" stroke="#263b5b" stroke-width="6" stroke-linecap="round"/><rect x="121" y="78" width="164" height="38" rx="8" fill="white" stroke="#dce2ec"/><circle cx="143" cy="97" r="8" fill="#27b77a"/><path d="M160 97h93" stroke="#aeb8c8" stroke-width="5" stroke-linecap="round"/></svg>`,
+    reception: `<svg ${common}><rect x="24" y="18" width="272" height="114" rx="15" fill="#f3f5f9"/><rect x="43" y="31" width="104" height="88" rx="10" fill="white" stroke="#dce2ec"/><circle cx="95" cy="56" r="13" fill="#dce8f8"/><path d="M68 91h54M78 104h34" stroke="#263b5b" stroke-width="6" stroke-linecap="round"/><rect x="164" y="31" width="113" height="88" rx="10" fill="white" stroke="#dce2ec"/><path d="M179 50h82M179 69h82M179 88h82" stroke="#c4ccda" stroke-width="7" stroke-linecap="round"/><circle cx="246" cy="104" r="8" fill="#27b77a"/></svg>`,
+    bar: `<svg ${common}><rect x="22" y="18" width="276" height="114" rx="15" fill="#f3f5f9"/><rect x="39" y="32" width="115" height="84" rx="10" fill="white" stroke="#dce2ec"/><rect x="52" y="45" width="38" height="28" rx="5" fill="#e5edf8"/><rect x="101" y="45" width="38" height="28" rx="5" fill="#e5edf8"/><path d="M52 88h87" stroke="#c4ccda" stroke-width="7" stroke-linecap="round"/><rect x="171" y="32" width="110" height="84" rx="10" fill="#263b5b"/><path d="M187 51h78M187 68h78" stroke="#b8c7dc" stroke-width="6" stroke-linecap="round"/><rect x="187" y="82" width="78" height="21" rx="6" fill="#27b77a"/></svg>`,
+    schedule: `<svg ${common}><rect x="22" y="18" width="276" height="114" rx="15" fill="#f3f5f9"/><rect x="38" y="31" width="244" height="88" rx="10" fill="white" stroke="#dce2ec"/><rect x="50" y="43" width="94" height="28" rx="7" fill="#e8f0ff"/><rect x="155" y="43" width="113" height="28" rx="7" fill="#e8f8ef"/><path d="M60 57h70M165 57h88" stroke="#526f9c" stroke-width="5" stroke-linecap="round"/><path d="M50 87h218" stroke="#dce2ec" stroke-width="5" stroke-linecap="round"/><circle cx="91" cy="101" r="6" fill="#526f9c"/><circle cx="207" cy="101" r="6" fill="#27b77a"/></svg>`
+  };
+  return svg[kind] || "";
+}
+
+function renderGuide() {
+  screen.innerHTML = `
+    <div class="guide-intro"><div class="eyebrow">QUICK GUIDE</div><h2>tonight! の使い方</h2><p>イベントを作成して、受付・ドリンク販売・タイムテーブルをまとめて管理できます。</p></div>
+    <section class="guide-step"><div class="guide-visual">${guideIllustration("event")}</div><div class="guide-copy"><span class="guide-number">01</span><h3>イベントを作成</h3><p>「＋ 新しい回」からイベント名と開催日を登録します。フライヤーも設定できます。作成したイベントを選ぶと、その回の管理画面に進みます。</p></div></section>
+    <section class="guide-step"><div class="guide-visual">${guideIllustration("reception")}</div><div class="guide-copy"><span class="guide-number">02</span><h3>受付を管理</h3><p>最初に金庫の初期金額などを設定します。受付では来場区分・割引・支払金額を入力し、履歴やリザルト、金庫照合を確認できます。</p></div></section>
+    <section class="guide-step"><div class="guide-visual">${guideIllustration("bar")}</div><div class="guide-copy"><span class="guide-number">03</span><h3>ドリンクを販売</h3><p>最初に金庫の準備を行い、商品管理で共通のドリンクラインナップを登録します。登録内容はすべての回で共有され、追加・削除・価格変更も各回に反映されます。販売画面で商品・数量・支払方法を選択して会計します。</p></div></section>
+    <section class="guide-step"><div class="guide-visual">${guideIllustration("schedule")}</div><div class="guide-copy"><span class="guide-number">04</span><h3>出番・シフトを登録</h3><p>タイムテーブルではDJ・VJ・LIVE・その他の種別で出番を登録できます。スタッフのシフトも登録でき、NOW / NEXT は自動で更新されます。</p></div></section>
+    <section class="guide-step"><div class="guide-visual">${guideIllustration("schedule")}</div><div class="guide-copy"><span class="guide-number">05</span><h3>ヘッダーのNOW / NEXT表示</h3><p>イベント画面上部には、現在の出番・シフト（NOW）と次の予定（NEXT）が表示されます。「縮小」を押すとコンパクトに、「しまう」を押すと内容を一時的に非表示にできます。「通常」または「ひらく」で元に戻せます。表示設定は端末ごとに保持されます。</p></div></section>
+    <div class="card guide-notes"><h3>覚えておくと便利なこと</h3><ul><li>受付・販売履歴・スケジュールはイベントごとに管理されます。</li><li>ドリンクの商品名・価格のラインナップは全イベント共通です。商品管理で追加・変更・削除すると、すべての回に反映されます。</li><li>売切れ設定はイベントごとに管理されます。ある回で売切れにしても、別の回の販売状態には影響しません。</li><li>受付履歴や販売履歴を削除・取消した場合、削除履歴に赤い取り消し線付きで記録され、30日以内なら「復元」できます。復元すると集計にも反映されます。</li><li>イベントホームへ戻ると、受付・バーカウンター・タイムテーブルに移動できます。</li><li>終了したイベントはアーカイブできます。アーカイブ中の変更は保存確認が表示されます。</li><li>複数端末で使う場合は、同じイベントURLにアクセスしてください。</li></ul></div>
+    <button class="btn btn-primary btn-large guide-back" id="guideBack">イベント一覧に戻る</button>`;
+  document.getElementById("guideBack").onclick = () => navigate(renderEventList);
+}
+
 function renderEventNew() {
   screen.innerHTML = `<div class="card">
     <div class="card-title">新しい回を作る</div>
@@ -2759,7 +2875,11 @@ function barCashRows(kind, breakdown) {
 function renderBarHome() {
   const ev = ctx.ev, b = ensureBar(ctx.bar);
   if (!b.started) { renderBarSetup(); return; }
+  const sharedLineup = Array.isArray(db.drinkLineup) ? db.drinkLineup : defaultBarProducts();
+  const previousProducts = b.products || [];
+  b.products = sharedLineup.map(p => ({ ...p, soldOut: Boolean(previousProducts.find(x => x.id === p.id)?.soldOut) }));
   ctx.bar = b;
+  if (ctx.mode === "live") { ev.bar = b; }
   if (barCartEventId !== ev.id) { barCart = []; barCartEventId = ev.id; }
   const dt = new Date(ev.date + "T00:00:00"), md = `${dt.getMonth() + 1}/${dt.getDate()}`;
   const yen = n => "¥" + formatMoney(n);
@@ -2819,7 +2939,7 @@ function renderBarHome() {
   <div class="card" data-bar-section="products">
     <div class="product-management">
       <div class="card-title">商品・価格の設定</div>
-      <p class="sub-text">商品名と販売価格を登録します。販売済みの記録には、その時点の商品名・価格が残ります。</p>
+      <p class="sub-text">ここで登録したドリンクラインナップは、すべてのイベント回で共通して使われます。商品を削除・追加すると、他の回にも反映されます。販売済みの記録は残ります。</p>
       <div class="product-admin-list">
         ${b.products.map(p => `<div class="product-admin-row" data-product-row="${esc(p.id)}">
           <input type="text" value="${esc(p.name)}" aria-label="商品名" data-product-name="${esc(p.id)}">
@@ -2840,6 +2960,14 @@ function renderBarHome() {
   <div class="card" data-bar-section="history">
     <div class="card-title">直近の販売</div>
     ${recent || `<div class="sub-text">販売履歴はまだありません。</div>`}
+    ${(b.deletedSales || []).length ? `<div class="deleted-history-section"><div class="card-title">取消した販売履歴（30日間保存）</div>${b.deletedSales.slice().sort((x,y)=>Number(y.deletedAt||0)-Number(x.deletedAt||0)).map(x => {
+      const sale = x.sale || {};
+      const details = (sale.items || []).map(i => `${esc(i.name)} ×${Number(i.qty||0)}`).join("、");
+      const when = new Date(sale.timestamp || x.deletedAt).toLocaleString("ja-JP");
+      const deleted = new Date(x.deletedAt).toLocaleString("ja-JP");
+      const restored = Number(x.restoredAt||0) > Number(x.deletedAt||0);
+      return `<div class="deleted-history-row ${restored ? "is-restored" : ""}"><div class="deleted-history-content"><s>${when} ・ ${sale.paymentMethod === "ticket" ? "ドリチケ" : "現金"} ・ ${details} ・ ${sale.paymentMethod === "ticket" ? "チケット" : yen(sale.totalAmount||0)}</s><small>${restored ? "復元済み" : `取消日時：${deleted}`}</small></div>${restored ? `<span class="sub-text">復元済み</span>` : `<button class="btn btn-secondary" data-restore-sale="${esc(sale.id)}">復元</button>`}</div>`;
+    }).join("")}</div>` : ""}
   </div>
 
   <div class="card" data-bar-section="cash">
@@ -2968,6 +3096,12 @@ function renderBarHome() {
     const price = Number(row.querySelector("[data-product-price]").value);
     if (!p || !name || !Number.isInteger(price) || price <= 0) { alert("商品名と1円以上の整数価格を入力してください"); return; }
     p.name = name; p.price = price;
+    db.drinkLineup = (db.drinkLineup || []).map(x => x.id === id ? { id, name, price } : x);
+    db.drinkLineupUpdated = Date.now();
+    for (const event of db.events) if (event.bar) {
+      const soldOut = Boolean(event.bar.products?.find(x => x.id === id)?.soldOut);
+      event.bar.products = db.drinkLineup.map(x => ({ ...x, soldOut: x.id === id ? soldOut : Boolean(event.bar.products?.find(y => y.id === x.id)?.soldOut) }));
+    }
     barCart = barCart.map(x => x.productId === id ? { ...x, name, price } : x);
     saveBar(); renderBarHome();
   });
@@ -2979,20 +3113,42 @@ function renderBarHome() {
   });
   screen.querySelectorAll("[data-delete-product]").forEach(btn => btn.onclick = () => {
     if (!confirm("この商品を販売メニューから削除しますか？\n過去の販売履歴は残ります。")) return;
-    b.products = b.products.filter(x => x.id !== btn.dataset.deleteProduct);
-    barCart = barCart.filter(x => x.productId !== btn.dataset.deleteProduct);
+    const deletedId = btn.dataset.deleteProduct;
+    db.drinkLineup = (db.drinkLineup || []).filter(x => x.id !== deletedId);
+    db.drinkLineupUpdated = Date.now();
+    for (const event of db.events) if (event.bar) event.bar.products = (event.bar.products || []).filter(x => x.id !== deletedId);
+    b.products = b.products.filter(x => x.id !== deletedId);
+    barCart = barCart.filter(x => x.productId !== deletedId);
     saveBar(); renderBarHome();
   });
   $("addBarProduct").onclick = () => {
     const name = $("newProductName").value.trim(), price = Number($("newProductPrice").value);
     if (!name || !Number.isInteger(price) || price <= 0) { alert("商品名と1円以上の整数価格を入力してください"); return; }
-    b.products.push({ id: uid(), name, price });
+    const product = { id: uid(), name, price };
+    db.drinkLineup = [...(db.drinkLineup || []), product];
+    db.drinkLineupUpdated = Date.now();
+    for (const event of db.events) if (event.bar) event.bar.products = [...(event.bar.products || []), { ...product }];
+    b.products = [...b.products, { ...product }];
     saveBar(); renderBarHome();
   };
   screen.querySelectorAll("[data-cancel-sale]").forEach(btn => btn.onclick = () => {
-    if (!confirm("この販売記録を取り消しますか？集計からも差し引かれます。")) return;
-    b.voidedSales = [...new Set([...(b.voidedSales || []), btn.dataset.cancelSale])];
-    b.sales = b.sales.filter(x => x.id !== btn.dataset.cancelSale);
+    if (!confirm("この販売記録を取り消しますか？集計からも差し引かれます。削除ログは30日間保存され、あとから復元できます。")) return;
+    const saleId = btn.dataset.cancelSale;
+    const sale = b.sales.find(x => x.id === saleId);
+    if (!sale) return;
+    b.deletedSales = pruneDeletionLog(b.deletedSales || []);
+    b.deletedSales.unshift({ sale: structuredClone(sale), deletedAt: Date.now(), restoredAt: 0 });
+    b.voidedSales = [...new Set([...(b.voidedSales || []), saleId])];
+    b.sales = b.sales.filter(x => x.id !== saleId);
+    saveBar(); renderBarHome();
+  });
+  screen.querySelectorAll("[data-restore-sale]").forEach(btn => btn.onclick = () => {
+    if (!confirm("この販売履歴を復元しますか？売上集計にも再び反映されます。")) return;
+    const item = b.deletedSales.find(x => x.sale?.id === btn.dataset.restoreSale && Number(x.restoredAt||0) <= Number(x.deletedAt||0));
+    if (!item) return;
+    item.restoredAt = Date.now();
+    if (!b.sales.some(x => x.id === item.sale.id)) b.sales.unshift(structuredClone(item.sale));
+    b.voidedSales = (b.voidedSales || []).filter(id => id !== item.sale.id);
     saveBar(); renderBarHome();
   });
 
@@ -3043,7 +3199,8 @@ function renderBarHome() {
   $("clearBarAccounting").onclick = () => {
     if (!confirm("この回のバーカウンター会計データを一括削除しますか？\n販売履歴・金庫の開始／終了額・受取チケット枚数・精算チェックをリセットします。\n商品名と価格の設定、受付データ、出番／シフトは残ります。")) return;
     const products = structuredClone(b.products);
-    Object.assign(b, createBar(), { products, sales: [], resetAt: Date.now(), voidedSales: [] });
+    const deletedSales = pruneDeletionLog(b.deletedSales || []);
+    Object.assign(b, createBar(), { products, sales: [], resetAt: Date.now(), voidedSales: [], deletedSales });
     barCart = []; saveBar(); renderBarHome();
   };
   refreshCart();
