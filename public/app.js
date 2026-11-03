@@ -3378,8 +3378,10 @@ function renderBarHome() {
     line.qty++;
     refreshCart();
   });
-  $("clearBarCart").onclick = () => { barCart = []; refreshCart(); };
-  $("barCashCheckout").onclick = () => {
+  const clearCartButton = $("clearBarCart");
+  if (clearCartButton) clearCartButton.onclick = () => { barCart = []; refreshCart(); };
+  const cashCheckoutButton = $("barCashCheckout");
+  if (cashCheckoutButton) cashCheckoutButton.onclick = () => {
     if (!barCart.length) { alert("商品をカートに追加してください"); return; }
     const total = cartTotal();
     let paid = 0;
@@ -3418,7 +3420,8 @@ function renderBarHome() {
     };
     refreshPayment();
   };
-  $("barTicketCheckout").onclick = () => {
+  const ticketCheckoutButton = $("barTicketCheckout");
+  if (ticketCheckoutButton) ticketCheckoutButton.onclick = () => {
     if (!barCart.length) { alert("商品をカートに追加してください"); return; }
     const total = cartTotal();
     const ticketUnits = cartUnits();
