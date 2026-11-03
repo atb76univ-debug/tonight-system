@@ -1453,8 +1453,18 @@ function renderPaymentScreen() {
 
 function renderChecklist() {
 
-  const reception =
-    state.currentReception;
+  const reception = state.currentReception;
+  // 受付データが完了処理などで破棄された後に古い履歴から戻ってきた場合は、
+  // null の受付データを参照せずホームへ戻す。
+  if (!reception) {
+    clearTimeout(successReturnTimer);
+    pageHistory = [renderHome];
+    currentRender = renderHome;
+    renderHome();
+    renderReceptionTabs();
+    updateBackButton();
+    return;
+  }
 
   screen.innerHTML = `
 
@@ -1708,7 +1718,12 @@ function renderSuccessScreen() {
   successReturnTimer = setTimeout(
     () => {
       state.currentReception = null;
-      navigate(renderHome);
+      // 完了前の割引・会計・確認画面を履歴に残さない。
+      pageHistory = [renderHome];
+      currentRender = renderHome;
+      renderHome();
+      renderReceptionTabs();
+      updateBackButton();
     },
     3000
   );
