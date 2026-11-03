@@ -1634,27 +1634,3 @@ button { max-width:100%; }
   .event-list-actions > .btn { padding:9px 10px; font-size:12px; }
   .event-list-actions .new-event-compact { padding:9px 11px; font-size:12px; }
 }
-
-/* v33: member roster fields including optional nickname */
-#memberList .member-record-main strong { overflow-wrap:anywhere; }
-#memberList .member-record-main small { overflow-wrap:anywhere; }
-.member-import + .inline-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-.member-import + .inline-form #addMember { grid-column:1 / -1; width:100%; }
-@media(max-width:520px){ .member-import + .inline-form { grid-template-columns:1fr; } }
-
-/* v35: bulk member roster actions */
-.member-bulk-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;margin:8px 0;border-bottom:1px solid var(--border)}
-.member-bulk-toolbar label{display:flex;align-items:center;gap:7px;font-weight:700;white-space:nowrap}
-.member-bulk-toolbar input[type="checkbox"],.member-row-select{width:18px!important;height:18px!important;min-width:18px;flex:0 0 18px;accent-color:var(--primary)}
-.member-bulk-toolbar small{color:var(--muted);margin-left:auto}
-.member-bulk-toolbar button:disabled{opacity:.45;cursor:not-allowed}
-.member-record .member-row-select{margin:0 3px 0 0}
-@media(max-width:520px){.member-bulk-toolbar{align-items:flex-start}.member-bulk-toolbar button{width:100%}.member-bulk-toolbar small{margin-left:0}}
-
-
-/* ナビゲーション操作の安定化 */
-.topbar{z-index:200;isolation:isolate}
-#backBtn{position:relative;z-index:201;flex:0 0 42px;touch-action:manipulation;pointer-events:auto;cursor:pointer}
-#backBtn:disabled{opacity:.45;cursor:default}
-.event-pulse{z-index:90}
-.navigation-error{margin:0 0 12px;padding:12px 14px;border:1px solid #e6b9b9;border-radius:12px;background:#fff4f4;color:#9f2424;font-size:13px;font-weight:700}

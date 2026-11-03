@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111111">
   <title>tonight!</title>
-  <link rel="stylesheet" href="style.css?v=41">
+  <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="TMPlogo.png">
 </head>
 <body>
   <header class="topbar">
-    <button type="button" id="backBtn" class="icon-btn hidden" aria-label="前の画面に戻る">←</button>
+    <button id="backBtn" class="icon-btn hidden" aria-label="前の画面に戻る">←</button>
     <div class="header-main"><div class="brand-mini">tonight!</div><h1 id="pageTitle">tonight!</h1></div>
     <span id="headerLive" class="header-live hidden"><i></i><span>LIVE</span></span>
-    <button type="button" id="eventHomeBtn" class="event-home-btn hidden" aria-label="イベントホームに戻る">⌂ <span>イベントホーム</span></button>
+    <button id="eventHomeBtn" class="event-home-btn hidden" aria-label="イベントホームに戻る">⌂ <span>イベントホーム</span></button>
     <span id="sync" class="sync-state"></span>
   </header>
   <section id="eventPulse" class="event-pulse hidden" aria-live="polite">
@@ -47,6 +47,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=41"></script>
+  <script src="app.js"></script>
 </body>
 </html>
