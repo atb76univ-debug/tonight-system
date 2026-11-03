@@ -1997,3 +1997,17 @@ button { max-width:100%; }
 .product-selection-qty .qty-btn{width:38px;height:38px;min-width:38px;border:1px solid #c6cad1;border-radius:50%;background:#fff;color:#20242b;font-size:23px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 2px 7px rgba(0,0,0,.12)}
 .product-selection-qty strong{min-width:24px;text-align:center;font-size:19px;font-weight:900;color:#252a32;font-variant-numeric:tabular-nums}
 @media(max-width:420px){.product-tile-card .product-tile{min-height:104px}.product-selection-qty{gap:12px}.product-selection-qty .qty-btn{width:36px;height:36px;min-width:36px}}
+
+/* 受付TMP入力：名簿選択と名簿外の自由入力を明確に分離 */
+.tmp-member-entry{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:8px;align-items:start;position:relative}
+.tmp-member-select-area,.tmp-member-free-area{grid-column:1;min-width:0;position:relative}
+.tmp-member-select-area{margin-bottom:2px}
+.tmp-member-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--border,#d8dee8);border-radius:9px;background:#fff;color:var(--text,#202938);font:inherit;font-size:15px;text-align:left;cursor:pointer;box-sizing:border-box}
+.tmp-member-toggle span{flex:0 0 auto;color:var(--muted,#687386)}
+.tmp-member-toggle[aria-expanded="true"]{border-color:var(--primary,#526d9b);border-bottom-left-radius:0;border-bottom-right-radius:0}
+.tmp-member-free-label{display:block;margin:3px 2px 5px;color:var(--muted,#687386);font-size:12px;line-height:1.4}
+.tmp-member-free-input{display:block;width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--border,#d8dee8);border-radius:9px;background:#fff;color:var(--text,#202938);font:inherit;font-size:16px;box-sizing:border-box}
+.tmp-member-entry .tmp-name-delete{grid-column:2;grid-row:1 / span 2;align-self:start;min-width:42px;min-height:42px}
+.tmp-member-entry .tmp-member-results{position:absolute;top:calc(100% - 2px);left:0;right:0;z-index:1005;max-height:min(42vh,280px);overflow-y:auto;background:#fff;border:1px solid var(--border,#d8dee8);border-radius:0 0 10px 10px;box-shadow:0 10px 24px rgba(0,0,0,.16);padding:5px;box-sizing:border-box}
+.tmp-member-entry .tmp-member-results[hidden]{display:none!important}
+@media(max-width:600px){.tmp-member-entry{grid-template-columns:minmax(0,1fr) 40px;gap:6px}.tmp-member-toggle,.tmp-member-free-input{min-height:46px}.tmp-member-entry .tmp-member-results{max-height: min(38vh,260px)}}

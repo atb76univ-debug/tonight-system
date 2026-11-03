@@ -1019,75 +1019,99 @@ function renderReceptionInput() {
   };
 
   const updateTmpNamesList = () => {
-    const listContainer = document.getElementById(
-      "tmpNamesList"
-    );
-    listContainer.innerHTML = tmpNames.map((item,index) => {
-      const name = typeof item === "string" ? item : (item.name || "");
-      const memberId = typeof item === "object" ? (item.memberId || "") : "";
-      return `<div class="member-pick-row"><div class="tmp-member-search-wrap"><input type="search" class="tmp-member-search" data-index="${index}" value="${esc(name)}" placeholder="TMPメンバーを検索／名簿外の名前も入力" autocomplete="off" aria-label="TMPメンバーを検索、または名簿外の名前を入力"><small class="tmp-member-input-help">候補を選択するか、名簿にない場合は名前をそのまま入力してください。</small><div class="tmp-member-results" data-index="${index}" role="listbox" aria-label="TMPメンバー候補"></div></div><button class="tmp-name-delete" data-index="${index}" type="button">削</button></div>`;
+    const listContainer = document.getElementById("tmpNamesList");
+    tmpNames = tmpNames.map(item => typeof item === "string"
+      ? { name: item, memberId: "", customName: item }
+      : { name: item.name || "", memberId: item.memberId || "", customName: item.customName || "" });
+
+    listContainer.innerHTML = tmpNames.map((item, index) => {
+      const selectedMember = (db.members || []).find(m => String(m.id) === String(item.memberId));
+      const selectedLabel = selectedMember ? memberDisplayName(selectedMember) : "名簿から選択";
+      return `<div class="member-pick-row tmp-member-entry" data-index="${index}">
+        <div class="tmp-member-select-area">
+          <button type="button" class="tmp-member-toggle" data-index="${index}" aria-expanded="false">${esc(selectedLabel)} <span aria-hidden="true">▾</span></button>
+          <div class="tmp-member-results" data-index="${index}" role="listbox" aria-label="TMPメンバー候補" hidden></div>
+        </div>
+        <div class="tmp-member-free-area">
+          <label class="tmp-member-free-label" for="tmpFreeName${index}">名簿にない場合（自由入力）</label>
+          <input id="tmpFreeName${index}" type="text" class="tmp-member-free-input" data-index="${index}" value="${esc(item.customName)}" placeholder="名前を入力">
+        </div>
+        <button class="tmp-name-delete" data-index="${index}" type="button" aria-label="このTMP来場者を削除">削</button>
+      </div>`;
     }).join("");
 
     const normalizeMemberSearch = value => String(value || "").normalize("NFKC").toLocaleLowerCase("ja").replace(/[ァ-ン]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)).replace(/[　\s・ー‐‑–—]/g, "");
-    const showMemberResults = (index, query) => {
+    const showMemberResults = (index, query = "") => {
       const resultBox = listContainer.querySelector(`.tmp-member-results[data-index="${index}"]`);
       if (!resultBox) return;
       const q = normalizeMemberSearch(query);
       const allMembers = [...(db.members || [])].sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b), "ja"));
-      const matches = allMembers.filter(m => {
-        if (!q) return true;
-        const haystack = normalizeMemberSearch([m.name, m.nickname, memberDisplayName(m)].filter(Boolean).join(" "));
-        return haystack.includes(q);
-      }).slice(0, 30);
-      resultBox.innerHTML = matches.length ? `${!q ? '<div class="tmp-member-results-hint">名簿のメンバー（入力すると絞り込めます）</div>' : ''}${matches.map(m => `<button type="button" role="option" class="tmp-member-result" data-member-id="${esc(m.id)}" data-index="${index}"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname ? `<small>本名：${esc(m.name)}</small>` : ""}${m.grade ? `<small>${esc(m.grade)}</small>` : ""}</button>`).join("")}` : `<div class="tmp-member-no-result">該当するメンバーがいません。入力した名前をそのまま使用できます。</div>`;
+      const matches = allMembers.filter(m => !q || normalizeMemberSearch([m.name, m.nickname, memberDisplayName(m)].filter(Boolean).join(" ")).includes(q)).slice(0, 40);
+      resultBox.innerHTML = matches.length
+        ? `${!q ? '<div class="tmp-member-results-hint">メンバーを選択してください</div>' : ''}${matches.map(m => `<button type="button" role="option" class="tmp-member-result" data-member-id="${esc(m.id)}" data-index="${index}"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname ? `<small>本名：${esc(m.name)}</small>` : ""}${m.grade ? `<small>${esc(m.grade)}</small>` : ""}</button>`).join("")}`
+        : `<div class="tmp-member-no-result">該当するメンバーがいません。</div>`;
       resultBox.hidden = false;
+      const toggle = listContainer.querySelector(`.tmp-member-toggle[data-index="${index}"]`);
+      if (toggle) toggle.setAttribute("aria-expanded", "true");
     };
 
-    listContainer.querySelectorAll(".tmp-member-search").forEach(input => {
-      input.addEventListener("input", e => {
-        const i = Number(e.target.dataset.index);
-        tmpNames[i] = { name: e.target.value, memberId: "" };
-        const box = listContainer.querySelector(`.tmp-member-results[data-index="${i}"]`);
-        if (box) { box.hidden = false; box.classList.remove("is-closed"); }
-        showMemberResults(i, e.target.value);
-      });
-      input.addEventListener("focus", e => {
-        const i = Number(e.target.dataset.index);
-        const box = listContainer.querySelector(`.tmp-member-results[data-index="${i}"]`);
-        if (box) box.classList.remove("is-closed");
-        showMemberResults(i, e.target.value);
-      });
-      input.addEventListener("keydown", e => { if (e.key === "Escape") { const box=listContainer.querySelector(`.tmp-member-results[data-index="${e.target.dataset.index}"]`); if(box) box.hidden=true; } });
-    });
-    // 候補ボタンは検索・フォーカス時に後から生成されるため、親要素でクリックを委譲する。
-    // これにより、動的に表示された候補を選択した際も確実に処理される。
+    listContainer.querySelectorAll(".tmp-member-toggle").forEach(button => button.addEventListener("click", () => {
+      const index = Number(button.dataset.index);
+      const box = listContainer.querySelector(`.tmp-member-results[data-index="${index}"]`);
+      if (!box) return;
+      if (!box.hidden) {
+        box.hidden = true;
+        button.setAttribute("aria-expanded", "false");
+      } else {
+        showMemberResults(index);
+      }
+    }));
+
+    listContainer.querySelectorAll(".tmp-member-free-input").forEach(input => input.addEventListener("input", e => {
+      const index = Number(e.target.dataset.index);
+      tmpNames[index].customName = e.target.value;
+      if (e.target.value.trim()) { tmpNames[index].memberId = ""; tmpNames[index].name = e.target.value.trim(); }
+    }));
+
     if (!listContainer.dataset.memberResultClickBound) {
       listContainer.dataset.memberResultClickBound = "1";
       listContainer.addEventListener("click", e => {
         const btn = e.target.closest(".tmp-member-result");
         if (!btn || !listContainer.contains(btn)) return;
-        const i = Number(btn.dataset.index);
-        const m = (db.members || []).find(x => String(x.id) === String(btn.dataset.memberId));
-        if (!m) return;
-        tmpNames[i] = { name: memberDisplayName(m), memberId: m.id };
-        const input = listContainer.querySelector(`.tmp-member-search[data-index="${i}"]`);
-        if (input) input.value = memberDisplayName(m);
-        const box = listContainer.querySelector(`.tmp-member-results[data-index="${i}"]`);
-        if (box) {
-          box.hidden = true;
-          box.classList.add("is-closed");
-          box.innerHTML = "";
+        const index = Number(btn.dataset.index);
+        const member = (db.members || []).find(m => String(m.id) === String(btn.dataset.memberId));
+        if (!member) return;
+        tmpNames[index].name = memberDisplayName(member);
+        tmpNames[index].memberId = member.id;
+        const toggle = listContainer.querySelector(`.tmp-member-toggle[data-index="${index}"]`);
+        if (toggle) {
+          toggle.innerHTML = `${esc(memberDisplayName(member))} <span aria-hidden="true">▾</span>`;
+          toggle.setAttribute("aria-expanded", "false");
         }
-        if (input) input.blur();
+        const box = listContainer.querySelector(`.tmp-member-results[data-index="${index}"]`);
+        if (box) box.hidden = true;
       });
     }
+
+    // 外側をタップすると候補を閉じる。自由入力欄は常に表示したまま。
+    if (!listContainer.dataset.outsideCloseBound) {
+      listContainer.dataset.outsideCloseBound = "1";
+      document.addEventListener("click", e => {
+        if (listContainer.contains(e.target)) return;
+        listContainer.querySelectorAll(".tmp-member-results:not([hidden])").forEach(box => {
+          box.hidden = true;
+          const toggle = listContainer.querySelector(`.tmp-member-toggle[data-index="${box.dataset.index}"]`);
+          if (toggle) toggle.setAttribute("aria-expanded", "false");
+        });
+      });
+    }
+
     listContainer.querySelectorAll(".tmp-name-delete").forEach(btn => btn.addEventListener("click", e => {
       const index = Number(e.currentTarget.dataset.index);
       tmpNames.splice(index, 1);
       tmp--;
       refresh();
     }));
-
   };
 
   refresh();
@@ -1144,7 +1168,7 @@ function renderReceptionInput() {
 
       // TMP客の名前入力チェック
       if (tmp > 0) {
-        const emptyNames = tmpNames.filter(item => !(typeof item === "string" ? item : item.name || "").trim());
+        const emptyNames = tmpNames.filter(item => !(typeof item === "string" ? item : ((item.memberId || "") || (item.customName || ""))).trim());
         
         if (emptyNames.length > 0) {
           alert(
@@ -1191,7 +1215,7 @@ function renderReceptionInput() {
 
           discount: 0,
 
-          name: (typeof tmpNames[i] === "string" ? tmpNames[i] : tmpNames[i].name) || "",
+          name: (typeof tmpNames[i] === "string" ? tmpNames[i] : (tmpNames[i].customName || tmpNames[i].name)) || "",
           memberId: typeof tmpNames[i] === "object" ? (tmpNames[i].memberId || "") : ""
 
         });
@@ -3166,6 +3190,7 @@ function getIssuedDrinkTicketCount(eventState) {
 }
 
 function renderBarHome() {
+  const $ = id => document.getElementById(id);
   const ev = ctx.ev, b = ensureBar(ctx.bar);
   if (!b.started) { renderBarSetup(); return; }
   const sharedLineup = Array.isArray(db.drinkLineup) ? db.drinkLineup : defaultBarProducts();
@@ -3185,14 +3210,21 @@ function renderBarHome() {
     <div class="sales-product-row"><strong>${esc(p.name)}</strong><span>${p.totalUnits}杯</span><span>現金 ${p.cashUnits}杯</span><span>チケ ${p.ticketUnits}杯</span><b>${yen(p.cashRevenue)}</b></div>
   `).join("");
   if (barOrderComplete) {
+    const completedSale = (b.sales || []).slice().sort((a, z) => Number(z.timestamp || 0) - Number(a.timestamp || 0))[0];
+    const completedItems = (completedSale?.items || []).map(item => `<div><span>${esc(item.name)} ×${Number(item.qty || 0)}</span></div>`).join("");
+    const completedTime = completedSale?.timestamp ? new Date(completedSale.timestamp).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : "";
     screen.innerHTML = `
-      <section class="bar-order-complete" role="status" aria-live="polite">
-        <div class="bar-order-complete-icon" aria-hidden="true">✓</div>
-        <h2>ご注文ありがとうございました！</h2>
-        <p>会計が完了しました。</p>
-        <div class="bar-order-complete-countdown"><strong>3</strong>秒後に商品選択画面へ戻ります</div>
-        <button type="button" class="btn btn-primary" id="barOrderCompleteNext">次の注文へ進む</button>
-      </section>`;
+      <div class="success-screen" role="status" aria-live="polite">
+        <div class="success-icon">✓</div>
+        <div class="success-text">注文完了</div>
+        <div class="success-subtext">3秒後に商品選択画面へ戻ります</div>
+        <div class="success-summary">
+          ${completedTime ? `<div><span>注文時刻</span><strong>${completedTime}</strong></div>` : ""}
+          ${completedItems ? `<div class="bar-complete-items"><span>ご注文内容</span><strong>${completedItems}</strong></div>` : ""}
+          <div><span>お支払い</span><strong>${completedSale?.paymentMethod === "ticket" ? "ドリチケ" : "現金"}</strong></div>
+        </div>
+        <button type="button" class="btn btn-primary btn-large" id="barOrderCompleteNext">次の注文へ進む</button>
+      </div>`;
     const returnToProducts = () => {
       if (!barOrderComplete) return;
       barOrderComplete = false;
@@ -3400,7 +3432,6 @@ function renderBarHome() {
   screen.querySelectorAll("[data-bar-page]").forEach(btn => btn.onclick = () => { barPage = btn.dataset.barPage; barCheckoutPage = false; renderBarHome(); });
   screen.querySelectorAll("[data-bar-section]").forEach(el => { el.hidden = el.dataset.barSection !== barPage; });
   updateBackButton();
-  const $ = id => document.getElementById(id);
   const cartTotal = () => barCart.reduce((sum, x) => sum + x.price * x.qty, 0);
   const cartUnits = () => barCart.reduce((sum, x) => sum + x.qty, 0);
   const refreshCart = () => {
