@@ -928,3 +928,22 @@ button:focus-visible,input:focus-visible{outline:3px solid rgba(115,87,255,.28);
 .sales-summary-grid em{font-size:11px;font-style:normal;margin-left:3px;color:var(--sub)}
 .product-management>.card-title{margin-bottom:8px}
 .env{white-space:pre-line}
+
+
+/* v17: NOW / NEXT side-by-side and act category controls */
+.schedule-section{margin-top:12px}
+.schedule-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:0}
+.schedule-column{display:flex;align-items:flex-start;gap:8px;min-width:0;padding:10px;border:1px solid #e3e6ed;border-radius:12px;background:#fff}
+.schedule-column-content{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.schedule-column .schedule-item{display:flex;flex-direction:column;gap:2px;min-width:0}
+.schedule-column .now-main{font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+.schedule-column .sub-text,.schedule-column small{font-size:11px;color:#70717a}
+.schedule-column .schedule-tag{flex:0 0 auto}
+.act-type-options{display:flex;flex-wrap:wrap;gap:8px}
+.act-type-options label{display:flex;align-items:center;gap:6px;padding:9px 13px;border:1px solid #dfe2e9;border-radius:10px;background:#fff;font-weight:700;cursor:pointer}
+.act-type-options input{accent-color:var(--accent)}
+@media(max-width:520px){
+  .schedule-columns{gap:6px}
+  .schedule-column{gap:5px;padding:7px}
+  .schedule-column .now-main{font-size:13px}
+}

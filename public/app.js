@@ -3079,27 +3079,16 @@ function nowHtml(tt, ev) {
   const shiftNow = current(tt.shifts || []);
   const shiftNext = next(tt.shifts || []);
   const eventState = t < 0 ? "開催前" : (t > 30 * 60 ? "開催終了" : "LIVE");
-
+  const actLabel = item => `${item.type === "その他" ? (item.customType || "その他") : (item.type || "DJ")}：${item.name}`;
   let html = `<div class="schedule-status"><span class="live-orb"></span><span>${eventState}</span><small>${esc(ev.date)}</small></div>`;
-  html += `<div class="now-row"><span class="now-label">出番</span><div class="now-detail">`;
-  if (actNow.length) {
-    html += actNow.map(item => `<div class="schedule-item"><span class="schedule-tag current">NOW</span><strong class="now-main">${esc(item.name)}</strong><span class="sub-text">${esc(item.start)}–${esc(item.end)}</span></div>`).join("");
-  }
-  if (actNext) {
-    html += `<div class="schedule-item"><span class="schedule-tag next">NEXT</span><strong class="now-main">${esc(actNext.name)}</strong><span class="sub-text">${esc(actNext.start)}–${esc(actNext.end)}</span></div>`;
-  }
-  if (!actNow.length && !actNext) html += `<span class="sub-text">${(tt.acts || []).length ? "この後の出番はありません" : "出番は未登録です"}</span>`;
+  html += `<div class="schedule-section"><div class="now-label">出番</div><div class="schedule-columns">`;
+  html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${actNow.length ? actNow.map(item => `<div class="schedule-item"><strong class="now-main">${esc(actLabel(item))}</strong><span class="sub-text">${esc(item.start)}–${esc(item.end)}</span></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
+  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${actNext ? `<div class="schedule-item"><strong class="now-main">${esc(actLabel(actNext))}</strong><span class="sub-text">${esc(actNext.start)}–${esc(actNext.end)}</span></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `</div></div>`;
-
-  html += `<div class="schedule-shifts"><div class="section-label">シフト</div>`;
-  if (shiftNow.length) {
-    html += shiftNow.map(item => `<div class="schedule-shift-row"><span class="schedule-tag current">NOW</span><strong>${esc(item.role)}：${esc(item.name)}</strong><small>${esc(item.start)}–${esc(item.end)}</small></div>`).join("");
-  }
-  if (shiftNext) {
-    html += `<div class="schedule-shift-row"><span class="schedule-tag next">NEXT</span><strong>${esc(shiftNext.role)}：${esc(shiftNext.name)}</strong><small>${esc(shiftNext.start)}–${esc(shiftNext.end)}</small></div>`;
-  }
-  if (!shiftNow.length && !shiftNext) html += `<div class="sub-text schedule-empty">${(tt.shifts || []).length ? "この後のシフトはありません" : "シフトは未登録です"}</div>`;
-  html += `</div>`;
+  html += `<div class="schedule-section"><div class="now-label">シフト</div><div class="schedule-columns">`;
+  html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${shiftNow.length ? shiftNow.map(item => `<div class="schedule-item"><strong>${esc(item.role)}：${esc(item.name)}</strong><small>${esc(item.start)}–${esc(item.end)}</small></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
+  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(shiftNext.name)}</strong><small>${esc(shiftNext.start)}–${esc(shiftNext.end)}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
+  html += `</div></div>`;
   return html;
 }
 function updateNow() {
@@ -3118,10 +3107,17 @@ function renderTimetable() {
 
   <div class="card">
     <div class="card-title">タイムテーブル（出番）</div>
-    ${sorted(tt.acts).map(a => `<div class="tt-record" data-act-row="${esc(a.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(a.start)}–${esc(a.end)}</span><strong>${esc(a.name)}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-ea="${esc(a.id)}">編集</button><button type="button" class="x" data-da="${esc(a.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
+    ${sorted(tt.acts).map(a => `<div class="tt-record" data-act-row="${esc(a.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(a.start)}–${esc(a.end)}</span><strong>${esc(a.type === "その他" ? (a.customType || "その他") : (a.type || "DJ"))}：${esc(a.name)}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-ea="${esc(a.id)}">編集</button><button type="button" class="x" data-da="${esc(a.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
     <div class="tt-form-panel" id="actFormPanel"><div class="tt-form-heading" id="actFormHeading">出番を追加</div><div class="inline-form">
       <input type="time" id="aStart" value="20:00"><input type="time" id="aEnd" value="20:30">
-      <input class="full" id="aName" placeholder="出演者名">
+      <div class="full act-type-options" id="actTypeOptions">
+        <label><input type="radio" name="actType" value="DJ" checked> DJ</label>
+        <label><input type="radio" name="actType" value="VJ"> VJ</label>
+        <label><input type="radio" name="actType" value="LIVE"> LIVE</label>
+        <label><input type="radio" name="actType" value="その他"> その他</label>
+      </div>
+      <input class="full" id="aCustomType" placeholder="その他の種別を入力（例：ダンス）" hidden>
+      <input class="full" id="aName" placeholder="出演者・グループ名">
       <button class="btn btn-primary full" id="aAdd">出番を追加</button><button class="btn btn-secondary full" id="aCancel" hidden>編集をキャンセル</button>
     </div></div>
     <p class="sub-text">編集ボタンから登録内容を変更できます。23:00〜翌1:00のような日付またぎにも対応しています。</p>
@@ -3133,15 +3129,18 @@ function renderTimetable() {
     <div class="tt-form-panel" id="shiftFormPanel"><div class="tt-form-heading" id="shiftFormHeading">シフトを追加</div><div class="inline-form">
       <input type="time" id="sStart" value="19:00"><input type="time" id="sEnd" value="21:00">
       <input id="sRole" list="roleList" placeholder="役割（受付・バーなど）"><input id="sName" placeholder="担当者名">
-      <datalist id="roleList"><option>受付</option><option>バーカウンター</option><option>音響</option><option>照明</option><option>物販</option><option>VJ</option></datalist>
+      <datalist id="roleList"><option>受付</option><option>バーカウンター</option><option>音響</option><option>照明</option><option>物販</option></datalist>
       <button class="btn btn-primary full" id="sAdd">シフトを追加</button><button class="btn btn-secondary full" id="sCancel" hidden>編集をキャンセル</button>
     </div></div>
   </div>`;
   const $ = id => document.getElementById(id);
   let editA = null, editS = null;
+  screen.querySelectorAll('input[name="actType"]').forEach(r => r.addEventListener("change", () => { $("aCustomType").hidden = r.value !== "その他" || !r.checked; }));
   $("aAdd").onclick = () => {
-    const o = { start: $("aStart").value, end: $("aEnd").value, name: $("aName").value.trim() };
-    if (!o.start || !o.end || !o.name) { alert("開始・終了時刻と出演者名を入力してください"); return; }
+    const type = screen.querySelector('input[name="actType"]:checked')?.value || "DJ";
+    const customType = $("aCustomType").value.trim();
+    const o = { start: $("aStart").value, end: $("aEnd").value, type, customType: type === "その他" ? customType : "", name: $("aName").value.trim() };
+    if (!o.start || !o.end || !o.name || (type === "その他" && !customType)) { alert("開始・終了時刻、種別、出演者名を入力してください"); return; }
     if (!isValidTimeRange(o.start, o.end)) { alert("終了時刻が開始時刻より前になっています。日付またぎの場合は、終了時刻を翌日0:00〜5:59で入力してください。"); return; }
     if (editA) Object.assign(tt.acts.find(x => x.id === editA), o); else tt.acts.push({ id: uid(), ...o });
     saveTt(); renderTimetable();
@@ -3155,13 +3154,13 @@ function renderTimetable() {
   };
   screen.querySelectorAll("[data-ea]").forEach(el => el.onclick = () => {
     const a = tt.acts.find(x => x.id === el.dataset.ea); if (!a) return;
-    editA = a.id; $("aStart").value = a.start; $("aEnd").value = a.end; $("aName").value = a.name; $("aAdd").textContent = "変更を保存"; $("aCancel").hidden = false; $("actFormHeading").textContent = "出番を編集中"; $("actFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.actRow === a.id)); $("actFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
+    editA = a.id; $("aStart").value = a.start; $("aEnd").value = a.end; $("aName").value = a.name; const actType = a.type || "DJ"; screen.querySelectorAll('input[name="actType"]').forEach(r => r.checked = r.value === actType); $("aCustomType").hidden = actType !== "その他"; $("aCustomType").value = a.customType || ""; $("aAdd").textContent = "変更を保存"; $("aCancel").hidden = false; $("actFormHeading").textContent = "出番を編集中"; $("actFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.actRow === a.id)); $("actFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
   });
   screen.querySelectorAll("[data-es]").forEach(el => el.onclick = () => {
     const s = tt.shifts.find(x => x.id === el.dataset.es); if (!s) return;
     editS = s.id; $("sStart").value = s.start; $("sEnd").value = s.end; $("sRole").value = s.role; $("sName").value = s.name; $("sAdd").textContent = "変更を保存"; $("sCancel").hidden = false; $("shiftFormHeading").textContent = "シフトを編集中"; $("shiftFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.shiftRow === s.id)); $("shiftFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
   });
-  $("aCancel").onclick = () => { editA = null; $("aStart").value = "20:00"; $("aEnd").value = "20:30"; $("aName").value = ""; $("aAdd").textContent = "出番を追加"; $("aCancel").hidden = true; $("actFormHeading").textContent = "出番を追加"; $("actFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.remove("is-selected")); };
+  $("aCancel").onclick = () => { editA = null; $("aStart").value = "20:00"; $("aEnd").value = "20:30"; $("aName").value = ""; screen.querySelector('input[name="actType"][value="DJ"]').checked = true; $("aCustomType").value = ""; $("aCustomType").hidden = true; $("aAdd").textContent = "出番を追加"; $("aCancel").hidden = true; $("actFormHeading").textContent = "出番を追加"; $("actFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.remove("is-selected")); };
   $("sCancel").onclick = () => { editS = null; $("sStart").value = "19:00"; $("sEnd").value = "21:00"; $("sRole").value = ""; $("sName").value = ""; $("sAdd").textContent = "シフトを追加"; $("sCancel").hidden = true; $("shiftFormHeading").textContent = "シフトを追加"; $("shiftFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.remove("is-selected")); };
   screen.querySelectorAll("[data-da]").forEach(btn => btn.onclick = () => {
     if (!confirm("この出番を削除しますか？")) return;
