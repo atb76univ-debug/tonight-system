@@ -17,23 +17,26 @@ function mergeBarTransactions(a = {}, b = {}) {
 
 function mergeInto(t, s) {
   t.events = t.events || [];
+  if (Number(s.membersUpdated || 0) > Number(t.membersUpdated || 0)) {
+    t.members = structuredClone(s.members || []);
+    t.membersUpdated = Number(s.membersUpdated || 0);
+  }
+  if (Number(s.drinkLineupUpdated || 0) > Number(t.drinkLineupUpdated || 0)) {
+    t.drinkLineup = structuredClone(s.drinkLineup || []);
+    t.drinkLineupUpdated = Number(s.drinkLineupUpdated || 0);
+  }
   for (const e of (s.events || [])) {
     const o = t.events.find(x => x.id === e.id);
-    if (!o) { t.events.push(e); continue; }
+    if (!o) { t.events.push(structuredClone(e)); continue; }
     o.u = o.u || {};
     const eu = e.u || {};
     if ((eu.meta || 0) > (o.u.meta || 0)) {
-      for (const k of ['name', 'date', 'flyer', 'archived', 'deleted']) o[k] = e[k];
+      for (const k of ['name', 'date', 'flyer', 'archived', 'deleted', 'participants']) o[k] = structuredClone(e[k]);
       o.u.meta = eu.meta;
     }
-    if ((eu.rec || 0) > (o.u.rec || 0)) { o.state = e.state; o.u.rec = eu.rec; }
-    const mergedBarTransactions = mergeBarTransactions(o.bar || {}, e.bar || {});
-    if ((eu.bar || 0) > (o.u.bar || 0)) { o.bar = e.bar; o.u.bar = eu.bar; }
-    o.bar = o.bar || {};
-    o.bar.sales = mergedBarTransactions.sales;
-    o.bar.resetAt = mergedBarTransactions.resetAt;
-    o.bar.voidedSales = mergedBarTransactions.voidedSales;
-    if ((eu.tt || 0) > (o.u.tt || 0)) { o.tt = e.tt; o.u.tt = eu.tt; }
+    if ((eu.rec || 0) > (o.u.rec || 0)) { o.state = structuredClone(e.state); o.u.rec = eu.rec; }
+    if ((eu.bar || 0) > (o.u.bar || 0)) { o.bar = structuredClone(e.bar); o.u.bar = eu.bar; }
+    if ((eu.tt || 0) > (o.u.tt || 0)) { o.tt = structuredClone(e.tt); o.u.tt = eu.tt; }
   }
   return t;
 }
