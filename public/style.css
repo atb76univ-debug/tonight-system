@@ -1324,3 +1324,71 @@ select.member-multi-select {
   .member-picker-select { font-size:16px; }
   .member-chip { font-size:13px; }
 }
+
+
+/* v27: prevent member roster rows from collapsing under the global full-width button rule */
+#memberList {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:0;
+  width:100%;
+  min-width:0;
+}
+#memberList .member-record {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  padding:12px 2px;
+}
+#memberList .member-record-main {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
+  width:auto;
+}
+#memberList .member-record-main strong {
+  min-width:0;
+  font-size:16px;
+  line-height:1.4;
+  overflow-wrap:break-word;
+  word-break:normal;
+}
+#memberList .member-record-main small {
+  display:block;
+  min-width:0;
+  font-size:12px;
+  line-height:1.5;
+  overflow-wrap:break-word;
+  word-break:normal;
+}
+#memberList .member-record .btn {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:auto !important;
+  min-width:64px;
+  min-height:40px;
+  flex:0 0 auto;
+  padding:8px 14px;
+  white-space:nowrap;
+}
+#memberList .member-record .x {
+  flex:0 0 36px;
+  width:36px;
+  min-width:36px;
+  height:36px;
+}
+@media(max-width:520px) {
+  #memberList .member-record {
+    grid-template-columns:minmax(0,1fr) auto auto;
+    gap:7px;
+    padding:10px 0;
+  }
+  #memberList .member-record-main { flex-basis:auto; }
+  #memberList .member-record .btn { min-width:54px; padding:7px 10px; }
+}
