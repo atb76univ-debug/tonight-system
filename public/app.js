@@ -237,11 +237,17 @@ function getPageTitle(renderFunc) {
 }
 
 function updateBackButton() {
-  const canGoBack = pageHistory.length > 1;
+  const canGoBack = pageHistory.length > 1 && currentRender !== renderEventPage;
   backBtn.classList.toggle("hidden", !canGoBack);
   backBtn.disabled = !canGoBack;
   if (pageTitleEl) pageTitleEl.textContent = getPageTitle(currentRender);
-  if (eventHomeBtn) eventHomeBtn.classList.toggle("hidden", !ctx || currentRender === renderEventPage);
+  if (eventHomeBtn) {
+    eventHomeBtn.classList.toggle("hidden", !ctx);
+    const onEventHome = currentRender === renderEventPage;
+    eventHomeBtn.setAttribute("aria-label", onEventHome ? "トップページへ移動" : "イベントホームへ移動");
+    const label = eventHomeBtn.querySelector("span");
+    if (label) label.textContent = onEventHome ? "トップページ" : "イベントホーム";
+  }
   const pulse = document.getElementById("eventPulse");
   if (pulse) pulse.classList.toggle("hidden", !ctx);
   const headerLive = document.getElementById("headerLive");
@@ -267,8 +273,27 @@ function goEventHome() {
   if (homeIndex >= 0) pageHistory = pageHistory.slice(0, homeIndex + 1);
   else pageHistory.push(renderEventPage);
   currentRender = renderEventPage;
-  renderEventPage();
-  updateBackButton();
+  try {
+    renderEventPage();
+    renderReceptionTabs();
+    updateBackButton();
+  } catch (error) {
+    showNavigationError(error);
+  }
+}
+
+function goTopPage() {
+  if (!ctx || currentRender !== renderEventPage) return;
+  if (!leaveEvent()) return;
+  pageHistory = [renderEventList];
+  currentRender = renderEventList;
+  try {
+    renderEventList();
+    renderReceptionTabs();
+    updateBackButton();
+  } catch (error) {
+    showNavigationError(error);
+  }
 }
 
 backBtn.addEventListener("click", event => {
@@ -278,7 +303,8 @@ backBtn.addEventListener("click", event => {
 }, { capture: true });
 if (eventHomeBtn) eventHomeBtn.addEventListener("click", event => {
   event.preventDefault();
-  goEventHome();
+  if (currentRender === renderEventPage) goTopPage();
+  else goEventHome();
 });
 
 function tallyString(count) {
