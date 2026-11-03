@@ -2080,3 +2080,9 @@ button { max-width:100%; }
   #tmpNamesList .tmp-member-entry .tmp-name-delete { width:40px !important; min-width:40px !important; max-width:40px !important; }
   #tmpNamesList .tmp-member-entry .tmp-member-results { right:47px !important; }
 }
+
+/* バー会計：受け渡し確認チェックリスト */
+.bar-payment-checklist{display:grid;gap:10px;margin:16px 0;padding:14px 16px;border:1px solid #d9e0ea;border-radius:14px;background:#f7f9fc}
+.bar-payment-checklist label{display:flex;align-items:center;gap:12px;min-height:34px;font-size:16px;font-weight:750;line-height:1.45;cursor:pointer}
+.bar-payment-checklist input[type="checkbox"]{width:22px;height:22px;flex:0 0 22px;margin:0;accent-color:#263b5b}
+.bar-payment-checklist span{min-width:0;overflow-wrap:anywhere}

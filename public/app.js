@@ -147,6 +147,22 @@ function navigate(renderFunc) {
 }
 
 function back() {
+  // 受付完了画面は履歴上の入力途中画面へ戻さない。ヘッダー戻る操作は受付ホームへ戻す。
+  if (currentRender === renderSuccessScreen) {
+    clearTimeout(successReturnTimer);
+    state.currentReception = null;
+    pageHistory = [renderHome];
+    currentRender = renderHome;
+    try {
+      renderHome();
+      renderReceptionTabs();
+      updateBackButton();
+      return true;
+    } catch (error) {
+      showNavigationError(error);
+      return false;
+    }
+  }
   if (pageHistory.length <= 1) return false;
 
   const oldHistory = pageHistory.slice();
@@ -3516,6 +3532,10 @@ function renderBarHome() {
             <button data-bar-add-cash="5000">+5000</button><button data-bar-add-cash="10000">+10000</button><button id="barCashierClear">C</button>
           </div>
           <p class="cashier-help">受け取ったお札・硬貨のボタンを押して積み上げてください（押し間違いはC）</p>
+          <div class="bar-payment-checklist" aria-label="現金受け取り確認">
+            <label><input type="checkbox" id="barCashReceivedCheck"><span>現金を受け取った</span></label>
+            <label><input type="checkbox" id="barChangeGivenCheck"><span>お釣りを渡した</span></label>
+          </div>
           <button class="cashier-confirm" id="barCashierConfirm" disabled>会計を確定</button>
         </div>
       </div>`);
@@ -3526,8 +3546,12 @@ function renderBarHome() {
       if (paid === total) { statusEl.textContent = "💵 ちょうど頂きました"; statusEl.className = "cashier-status exact"; }
       else if (paid > total) { statusEl.textContent = `お釣り ${yen(diff)}`; statusEl.className = "cashier-status change"; }
       else { statusEl.textContent = `あと ${yen(total - paid)} 不足しています`; statusEl.className = "cashier-status short"; }
-      confirmBtn.disabled = paid < total;
+      const cashReceived = $("barCashReceivedCheck")?.checked === true;
+      const changeGiven = $("barChangeGivenCheck")?.checked === true;
+      confirmBtn.disabled = paid < total || !cashReceived || !changeGiven;
     };
+    $("barCashReceivedCheck").onchange = refreshPayment;
+    $("barChangeGivenCheck").onchange = refreshPayment;
     screen.querySelectorAll("[data-bar-add-cash]").forEach(btn => btn.onclick = () => { paid += Number(btn.dataset.barAddCash); refreshPayment(); });
     $("barCashierExact").onclick = () => { paid = total; refreshPayment(); };
     $("barCashierClear").onclick = () => { paid = 0; refreshPayment(); };
@@ -3551,13 +3575,19 @@ function renderBarHome() {
           <div class="cashier-total-row"><span>使用するドリチケ</span><strong>${ticketUnits}枚</strong></div>
           <div class="ticket-confirm-items">${ticketItems}</div>
           <div class="cashier-status short ticket-confirm-warning">この内容でドリチケ会計を確定します。<br>確定後は販売履歴に記録されます。</div>
-          <button type="button" class="cashier-confirm" id="barTicketConfirmSubmit">ドリチケ会計を確定</button>
+          <div class="bar-payment-checklist" aria-label="ドリチケ受け取り確認">
+            <label><input type="checkbox" id="barTicketReceivedCheck"><span>ドリチケを受け取った</span></label>
+          </div>
+          <button type="button" class="cashier-confirm" id="barTicketConfirmSubmit" disabled>ドリチケ会計を確定</button>
         </div>
       </div>`);
     const overlay = $("barTicketConfirmOverlay");
     $("barTicketConfirmCancel").onclick = () => overlay.remove();
     overlay.addEventListener("click", event => { if (event.target === overlay) overlay.remove(); });
-    $("barTicketConfirmSubmit").onclick = event => {
+    const ticketReceivedCheck = $("barTicketReceivedCheck");
+    const ticketSubmitButton = $("barTicketConfirmSubmit");
+    ticketReceivedCheck.onchange = () => { ticketSubmitButton.disabled = !ticketReceivedCheck.checked; };
+    ticketSubmitButton.onclick = event => {
       const button = event.currentTarget;
       if (button.disabled) return;
       button.disabled = true;
