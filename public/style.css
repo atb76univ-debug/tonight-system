@@ -897,3 +897,18 @@ button:focus-visible,input:focus-visible{outline:3px solid rgba(115,87,255,.28);
 .cashier-help{font-size:14px;color:#66748c;margin:12px 2px 24px;line-height:1.5}
 .cashier-confirm{width:100%;min-height:76px;border:0;border-radius:18px;background:#263b5b;color:#fff;font-size:22px;font-weight:900}.cashier-confirm:disabled{background:#98a5b8;cursor:not-allowed}
 @media(max-width:520px){.cashier-dialog{padding:18px;border-radius:22px}.cashier-head{margin-bottom:20px}.cashier-head h2{font-size:20px}.cashier-paid{font-size:44px}.cashier-status{font-size:18px;min-height:68px}.cashier-keypad{gap:7px}.cashier-keypad button{min-height:62px;font-size:21px}.cashier-help{font-size:12px;margin-bottom:16px}.cashier-confirm{min-height:64px}}
+
+
+/* Timetable editing affordance */
+.tt-record{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 12px;margin:8px 0;border:1px solid #e5e8ef;border-radius:14px;background:#fff;transition:border-color .18s ease,background .18s ease,box-shadow .18s ease,transform .18s ease}
+.tt-record-main{display:flex;flex-direction:column;gap:4px;min-width:0}
+.tt-record-main strong{font-size:15px;overflow-wrap:anywhere}
+.tt-record-time{font-size:13px;font-weight:800;color:#68758b;font-variant-numeric:tabular-nums}
+.tt-record-actions{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.tt-edit-btn{padding:8px 13px!important;min-height:36px;font-size:13px!important;font-weight:800}
+.tt-record.is-selected{border:2px solid #526f9c;background:#eef4ff;box-shadow:0 5px 16px rgba(65,94,140,.14);transform:scale(1.012)}
+.tt-form-panel{margin-top:14px;padding:14px;border:1px solid #e4e7ed;border-radius:16px;background:#f8f9fc;transition:background .2s ease,border-color .2s ease,box-shadow .2s ease}
+.tt-form-panel.is-editing{border:2px solid #7895c2;background:#f0f5ff;box-shadow:0 6px 18px rgba(65,94,140,.12)}
+.tt-form-heading{font-size:15px;font-weight:900;margin-bottom:10px;color:#39465c}
+.tt-form-panel.is-editing .tt-form-heading{color:#315987}
+@media(max-width:420px){.tt-record{padding:11px 9px;gap:7px}.tt-record-main strong{font-size:14px}.tt-edit-btn{padding:7px 10px!important}.tt-record-actions{gap:5px}}

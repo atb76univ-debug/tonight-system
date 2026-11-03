@@ -394,24 +394,23 @@ function renderSetup() {
 }
 
 function renderCashInputs(breakdown = {}) {
-
-  return CASH_DENOMINATIONS
-    .map(
-      value => {
-
-        const count =
-          Number(
-            breakdown[value] || 0
-          );
-
-        return `
-      <div class="cash-entry-row">
-        <label class="cash-denomination"><span class="cash-denom-value">${value.toLocaleString()}</span><span class="cash-denom-unit">円</span></label>
-        <div class="cash-entry-input-wrap"><input type="number" min="0" step="1" inputmode="numeric" value="${count}" data-cash="${value}" aria-label="${value.toLocaleString()}円の枚数"><span>枚</span></div>
-      </div>
-    `;
-      }
-    )
+  return `<div class="cash-entry-list">` + CASH_DENOMINATIONS
+    .map(value => {
+      const count = Number(breakdown[value] || 0);
+      return `
+        <div class="cash-entry-row">
+          <label class="cash-denomination">
+            <span class="cash-denom-value">${value.toLocaleString()}</span>
+            <span class="cash-denom-unit">円</span>
+          </label>
+          <div class="cash-entry-input-wrap">
+            <input type="number" min="0" step="1" inputmode="numeric"
+              value="${count}" data-cash="${value}"
+              aria-label="${value.toLocaleString()}円の枚数">
+            <span>枚</span>
+          </div>
+        </div>`;
+    })
     .join("") + `</div>`;
 }
 
@@ -3137,24 +3136,24 @@ function renderTimetable() {
 
   <div class="card">
     <div class="card-title">タイムテーブル（出番）</div>
-    ${sorted(tt.acts).map(a => `<div class="row"><span class="tt-edit" data-ea="${esc(a.id)}">${esc(a.start)}–${esc(a.end)}　<strong>${esc(a.name)}</strong></span><button class="x" data-da="${esc(a.id)}">×</button></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
-    <div class="inline-form">
+    ${sorted(tt.acts).map(a => `<div class="tt-record" data-act-row="${esc(a.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(a.start)}–${esc(a.end)}</span><strong>${esc(a.name)}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-ea="${esc(a.id)}">編集</button><button type="button" class="x" data-da="${esc(a.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
+    <div class="tt-form-panel" id="actFormPanel"><div class="tt-form-heading" id="actFormHeading">出番を追加</div><div class="inline-form">
       <input type="time" id="aStart" value="20:00"><input type="time" id="aEnd" value="20:30">
       <input class="full" id="aName" placeholder="出演者名">
-      <button class="btn btn-primary full" id="aAdd">追加</button><button class="btn btn-secondary full" id="aCancel" hidden>編集をキャンセル</button>
-    </div>
-    <p class="sub-text">登録済みの行をタップすると編集できます。23:00〜翌1:00のような日付またぎは登録できます。</p>
+      <button class="btn btn-primary full" id="aAdd">出番を追加</button><button class="btn btn-secondary full" id="aCancel" hidden>編集をキャンセル</button>
+    </div></div>
+    <p class="sub-text">編集ボタンから登録内容を変更できます。23:00〜翌1:00のような日付またぎにも対応しています。</p>
   </div>
 
   <div class="card">
     <div class="card-title">シフト</div>
-    ${sorted(tt.shifts).map(s => `<div class="row"><span class="tt-edit" data-es="${esc(s.id)}">${esc(s.start)}–${esc(s.end)}　${esc(s.role)}：<strong>${esc(s.name)}</strong></span><button class="x" data-ds="${esc(s.id)}">×</button></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
-    <div class="inline-form">
+    ${sorted(tt.shifts).map(s => `<div class="tt-record" data-shift-row="${esc(s.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(s.start)}–${esc(s.end)}</span><strong>${esc(s.role)}：${esc(s.name)}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-es="${esc(s.id)}">編集</button><button type="button" class="x" data-ds="${esc(s.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
+    <div class="tt-form-panel" id="shiftFormPanel"><div class="tt-form-heading" id="shiftFormHeading">シフトを追加</div><div class="inline-form">
       <input type="time" id="sStart" value="19:00"><input type="time" id="sEnd" value="21:00">
       <input id="sRole" list="roleList" placeholder="役割（受付・バーなど）"><input id="sName" placeholder="担当者名">
       <datalist id="roleList"><option>受付</option><option>バーカウンター</option><option>音響</option><option>照明</option><option>物販</option><option>VJ</option></datalist>
-      <button class="btn btn-primary full" id="sAdd">追加</button><button class="btn btn-secondary full" id="sCancel" hidden>編集をキャンセル</button>
-    </div>
+      <button class="btn btn-primary full" id="sAdd">シフトを追加</button><button class="btn btn-secondary full" id="sCancel" hidden>編集をキャンセル</button>
+    </div></div>
   </div>`;
   const $ = id => document.getElementById(id);
   let editA = null, editS = null;
@@ -3174,14 +3173,14 @@ function renderTimetable() {
   };
   screen.querySelectorAll("[data-ea]").forEach(el => el.onclick = () => {
     const a = tt.acts.find(x => x.id === el.dataset.ea); if (!a) return;
-    editA = a.id; $("aStart").value = a.start; $("aEnd").value = a.end; $("aName").value = a.name; $("aAdd").textContent = "更新"; $("aCancel").hidden = false;
+    editA = a.id; $("aStart").value = a.start; $("aEnd").value = a.end; $("aName").value = a.name; $("aAdd").textContent = "変更を保存"; $("aCancel").hidden = false; $("actFormHeading").textContent = "出番を編集中"; $("actFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.actRow === a.id)); $("actFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
   });
   screen.querySelectorAll("[data-es]").forEach(el => el.onclick = () => {
     const s = tt.shifts.find(x => x.id === el.dataset.es); if (!s) return;
-    editS = s.id; $("sStart").value = s.start; $("sEnd").value = s.end; $("sRole").value = s.role; $("sName").value = s.name; $("sAdd").textContent = "更新"; $("sCancel").hidden = false;
+    editS = s.id; $("sStart").value = s.start; $("sEnd").value = s.end; $("sRole").value = s.role; $("sName").value = s.name; $("sAdd").textContent = "変更を保存"; $("sCancel").hidden = false; $("shiftFormHeading").textContent = "シフトを編集中"; $("shiftFormPanel").classList.add("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.toggle("is-selected", row.dataset.shiftRow === s.id)); $("shiftFormPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
   });
-  $("aCancel").onclick = () => { editA = null; $("aStart").value = "20:00"; $("aEnd").value = "20:30"; $("aName").value = ""; $("aAdd").textContent = "追加"; $("aCancel").hidden = true; };
-  $("sCancel").onclick = () => { editS = null; $("sStart").value = "19:00"; $("sEnd").value = "21:00"; $("sRole").value = ""; $("sName").value = ""; $("sAdd").textContent = "追加"; $("sCancel").hidden = true; };
+  $("aCancel").onclick = () => { editA = null; $("aStart").value = "20:00"; $("aEnd").value = "20:30"; $("aName").value = ""; $("aAdd").textContent = "出番を追加"; $("aCancel").hidden = true; $("actFormHeading").textContent = "出番を追加"; $("actFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-act-row]").forEach(row => row.classList.remove("is-selected")); };
+  $("sCancel").onclick = () => { editS = null; $("sStart").value = "19:00"; $("sEnd").value = "21:00"; $("sRole").value = ""; $("sName").value = ""; $("sAdd").textContent = "シフトを追加"; $("sCancel").hidden = true; $("shiftFormHeading").textContent = "シフトを追加"; $("shiftFormPanel").classList.remove("is-editing"); screen.querySelectorAll("[data-shift-row]").forEach(row => row.classList.remove("is-selected")); };
   screen.querySelectorAll("[data-da]").forEach(btn => btn.onclick = () => {
     if (!confirm("この出番を削除しますか？")) return;
     tt.acts = tt.acts.filter(x => x.id !== btn.dataset.da); saveTt(); renderTimetable();
