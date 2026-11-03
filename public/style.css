@@ -1208,6 +1208,76 @@ select.member-multi-select {
   min-height:34px;
   padding:6px 10px;
 }
+/* v28: fix participant attendance cards; global input width:100% was stretching checkboxes */
+.member-check-grid {
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));
+  align-items:stretch;
+}
+.member-check {
+  display:grid;
+  grid-template-columns:20px minmax(0,1fr) auto;
+  align-items:center;
+  gap:9px;
+  width:100%;
+  min-width:0;
+  min-height:54px;
+  padding:10px 12px;
+}
+.member-check input[type="checkbox"] {
+  display:block;
+  width:20px !important;
+  min-width:20px;
+  height:20px;
+  min-height:20px;
+  padding:0 !important;
+  margin:0;
+  flex:none;
+  accent-color:#168653;
+}
+.member-check span {
+  display:block;
+  min-width:0;
+  width:auto;
+  flex:none;
+  overflow-wrap:break-word;
+  word-break:normal;
+  line-height:1.45;
+}
+.member-check span small {
+  display:inline;
+  margin-left:4px;
+  white-space:nowrap;
+}
+.member-check b {
+  display:inline-block;
+  justify-self:end;
+  white-space:nowrap;
+  line-height:1.4;
+  font-size:11px;
+}
+@media(max-width:520px) {
+  .member-check-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .member-check {
+    grid-template-columns:18px minmax(0,1fr);
+    gap:6px;
+    padding:9px;
+    min-height:58px;
+  }
+  .member-check input[type="checkbox"] {
+    width:18px !important;
+    min-width:18px;
+    height:18px;
+    min-height:18px;
+  }
+  .member-check b {
+    grid-column:2;
+    justify-self:start;
+    margin-top:1px;
+  }
+}
+
 @media(max-width:520px) {
   .member-multi-select,
   select.member-multi-select {
@@ -1391,4 +1461,138 @@ select.member-multi-select {
   }
   #memberList .member-record-main { flex-basis:auto; }
   #memberList .member-record .btn { min-width:54px; padding:7px 10px; }
+}
+
+/* v29: app-wide layout hardening for forms, history and action rows */
+/* Form sizing must not stretch checkboxes, radios, file pickers or range controls. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+select,
+textarea {
+  max-width:100%;
+  min-width:0;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  width:20px !important;
+  min-width:20px;
+  max-width:20px;
+  height:20px;
+  min-height:20px;
+  padding:0 !important;
+  margin:0;
+  flex:0 0 20px;
+  accent-color:var(--accent, #7357ff);
+}
+input[type="file"] { max-width:100%; }
+button { max-width:100%; }
+.btn { min-width:0; }
+
+/* Deleted / restored records: content may wrap, actions must remain compact. */
+.deleted-history-list {
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));
+  align-items:stretch;
+}
+.deleted-history-row {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  padding:10px;
+  border:1px solid #efcccc;
+  border-radius:10px;
+  background:#fffafa;
+}
+.deleted-history-content {
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+.deleted-history-content s { display:block; white-space:normal; overflow-wrap:anywhere; }
+.deleted-history-content small { display:block; line-height:1.45; }
+.deleted-history-row > .btn,
+.deleted-history-row > button {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:auto !important;
+  min-width:56px;
+  min-height:38px;
+  padding:8px 12px;
+  white-space:nowrap;
+  flex:0 0 auto;
+}
+.deleted-history-row.is-restored > .sub-text { white-space:nowrap; }
+
+/* Reception history records and their controls. */
+.history-item { min-width:0; overflow-wrap:anywhere; }
+.history-item > div { min-width:0; }
+.history-item .history-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.history-item .history-actions button,
+.history-item > button.btn {
+  width:auto !important;
+  min-width:84px;
+  min-height:38px;
+  padding:8px 12px;
+  flex:0 0 auto;
+}
+.history-actions button { min-width:0; }
+
+/* Bar sales history: long item names must not squeeze the amount/action column. */
+.sale-history-row { min-width:0; }
+.sale-history-row > div:first-child { flex:1 1 auto; min-width:0; }
+.sale-history-right { flex:0 0 auto; min-width:70px; }
+.sale-history-right .mini-danger { white-space:nowrap; }
+
+/* Product settings: compact action columns and safe shrinking on narrow screens. */
+.product-admin-row { min-width:0; }
+.product-admin-row > * { min-width:0; }
+.product-admin-row .btn { width:auto !important; min-height:38px; white-space:nowrap; }
+.product-admin-row .mini-danger { white-space:nowrap; }
+
+/* Member cards and participant cards share predictable sizing. */
+.member-check-grid { align-items:stretch; }
+.member-check { min-width:0; }
+.member-check span { min-width:0; overflow-wrap:anywhere; }
+.member-check b { flex:0 0 auto; }
+#memberList .member-record { min-width:0; }
+#memberList .member-record-main { overflow-wrap:anywhere; }
+
+/* Timetable action buttons should never inherit full-row button sizing. */
+.tt-record { min-width:0; }
+.tt-record-actions .btn,
+.tt-record-actions .x,
+.offset-controls .btn {
+  width:auto !important;
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+
+/* Horizontal tabs and action grids should not overflow their cards. */
+.reception-page-nav,
+.bar-page-nav,
+.event-action-grid,
+.schedule-columns { min-width:0; }
+.reception-page-tab,
+.bar-page-tab { min-width:0; overflow-wrap:anywhere; }
+
+@media (max-width:520px) {
+  .deleted-history-list { grid-template-columns:minmax(0,1fr); }
+  .deleted-history-row { grid-template-columns:minmax(0,1fr) auto; gap:7px; padding:8px; }
+  .deleted-history-row > .btn,
+  .deleted-history-row > button { min-width:52px; padding:7px 9px; font-size:12px; }
+  .history-item .history-actions { gap:6px; }
+  .sale-history-row { align-items:flex-start; gap:8px; }
+  .sale-history-right { min-width:62px; }
+  .product-admin-row { grid-template-columns:minmax(0,1fr) 76px auto; }
+  .product-admin-row .btn { padding:8px 9px; font-size:11px; }
+}
+@media (max-width:360px) {
+  .deleted-history-row { grid-template-columns:minmax(0,1fr); }
+  .deleted-history-row > .btn,
+  .deleted-history-row > button { justify-self:start; }
+  .reception-page-tab { font-size:9px; }
+  .bar-page-tab { font-size:10px; }
 }
