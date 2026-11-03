@@ -1987,10 +1987,13 @@ button { max-width:100%; }
 .tmp-member-results[hidden], .tmp-member-results.is-closed{display:none!important;visibility:hidden!important;pointer-events:none!important}
 
 /* 商品選択画面でも数量を直接増減できる */
-.product-tile-card{min-width:0;display:flex;flex-direction:column;gap:6px}
-.product-tile-card .product-tile{width:100%;box-sizing:border-box}
-.product-selection-qty{display:flex;align-items:center;justify-content:center;gap:14px;min-height:38px;padding:2px 4px;border:1px solid #e4e6eb;border-radius:10px;background:#f8f9fb;box-sizing:border-box}
+.product-tile-card{min-width:0;position:relative;display:block}
+.product-tile-card .product-tile{width:100%;box-sizing:border-box;min-height:112px}
+/* 選択済み商品はタイル全体を淡いグレーにし、数量操作をアイコン面に重ねる */
+.product-tile.has-selection{background:#e7e9ed;border-color:#c9cdd4;color:#555b65;filter:saturate(.35)}
+.product-tile.has-selection .product-tile-name,.product-tile.has-selection strong,.product-tile.has-selection small{color:#555b65}
+.product-selection-qty{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;gap:14px;min-height:0;padding:8px;border:1px solid rgba(105,112,124,.24);border-radius:13px;background:rgba(220,223,229,.78);box-sizing:border-box;backdrop-filter:blur(1.5px)}
 .product-selection-qty[hidden]{display:none!important}
-.product-selection-qty .qty-btn{width:34px;height:32px;min-width:34px;border:0;border-radius:8px;background:#e9edf3;color:#20242b;font-size:20px;font-weight:800;line-height:1;cursor:pointer}
-.product-selection-qty strong{min-width:18px;text-align:center;font-size:15px;font-variant-numeric:tabular-nums}
-@media(max-width:420px){.product-selection-qty{gap:10px}.product-selection-qty .qty-btn{width:32px;height:32px;min-width:32px}}
+.product-selection-qty .qty-btn{width:38px;height:38px;min-width:38px;border:1px solid #c6cad1;border-radius:50%;background:#fff;color:#20242b;font-size:23px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 2px 7px rgba(0,0,0,.12)}
+.product-selection-qty strong{min-width:24px;text-align:center;font-size:19px;font-weight:900;color:#252a32;font-variant-numeric:tabular-nums}
+@media(max-width:420px){.product-tile-card .product-tile{min-height:104px}.product-selection-qty{gap:12px}.product-selection-qty .qty-btn{width:36px;height:36px;min-width:36px}}

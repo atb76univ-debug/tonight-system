@@ -3274,7 +3274,7 @@ function renderBarHome() {
           const selected = barCart.find(x => x.productId === p.id);
           const qty = selected ? selected.qty : 0;
           return `<div class="product-tile-card" data-product-card="${esc(p.id)}">
-            <button type="button" class="product-tile ${p.soldOut ? "sold-out" : ""}" data-add-product="${esc(p.id)}" ${p.soldOut ? "disabled aria-disabled=\"true\"" : ""}>
+            <button type="button" class="product-tile ${p.soldOut ? "sold-out" : ""} ${qty ? "has-selection" : ""}" data-add-product="${esc(p.id)}" ${p.soldOut ? "disabled aria-disabled=\"true\"" : ""}>
               <span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>${p.soldOut ? "売切れ" : "＋ 注文に追加"}</small>
             </button>
             <div class="product-selection-qty" data-selection-qty="${esc(p.id)}" ${qty ? "" : "hidden"}>
@@ -3415,7 +3415,11 @@ function renderBarHome() {
     screen.querySelectorAll("[data-selection-qty]").forEach(el => {
       const id = el.dataset.selectionQty;
       const line = barCart.find(x => x.productId === id);
-      el.hidden = !line || line.qty <= 0;
+      const selected = !!line && line.qty > 0;
+      el.hidden = !selected;
+      const card = el.closest(".product-tile-card");
+      const tile = card && card.querySelector(".product-tile");
+      if (tile) tile.classList.toggle("has-selection", selected);
       const count = el.querySelector("strong");
       if (count) count.textContent = String(line ? line.qty : 0);
     });
