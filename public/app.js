@@ -13,22 +13,6 @@ const CASH_DENOMINATIONS = [
   10
 ];
 
-// メンバー表示名：ニックネームがあれば優先し、なければ本名を表示
-function memberDisplayName(member) { const nickname = String(member?.nickname ?? "").trim(); return nickname || String(member?.name ?? "登録外メンバー"); }
-function recordMemberDisplay(item) {
-  const ids = Array.isArray(item?.memberIds) ? item.memberIds : [];
-  const savedNames = String(item?.name ?? "").split("、").map(name => name.trim()).filter(Boolean);
-  if (!ids.length) return savedNames.join("、");
-  const members = Array.isArray(db?.members) ? db.members : [];
-  const names = ids.map((id, index) => {
-    const member = members.find(m => m && m.id === id);
-    return member ? memberDisplayName(member) : (savedNames[index] || "登録外メンバー");
-  });
-  const freeNames = savedNames.slice(ids.length);
-  return [...names, ...freeNames].filter(Boolean).join("、");
-}
-
-
 const screen = document.getElementById("app");
 const backBtn = document.getElementById("backBtn");
 const eventHomeBtn = document.getElementById("eventHomeBtn");
@@ -2892,6 +2876,7 @@ function renderEventPage() {
   };
 }
 
+function memberDisplayName(member) { const nickname = String(member?.nickname ?? "").trim(); return nickname || String(member?.name ?? "登録外メンバー"); }
 
 function memberStats(memberId) {
   let attendance=0, dj=0, lastDate="";
@@ -2938,11 +2923,11 @@ function renderMembers() {
         const hs=headers.map(norm);
         const exact = kind==="name"
           ? ["名前","氏名","name","メンバー","member","fullname","氏名漢字","名前漢字"]
-          : kind==="grade" ? ["学年","grade","year","学年(例3年)","学年例3年"]
+          : kind==="grade" ? ["学年","年次","学籍年次","grade","year","学年(例3年)","学年例3年"]
           : ["ニックネーム","djネーム","dj名","nickname","djname","artistname","活動名"];
         let i=hs.findIndex(h=>exact.map(norm).includes(h));
         if(i>=0)return i;
-        if(kind==="grade") i=hs.findIndex(h=>h.includes("学年") || h==="学籍年次" || h.includes("grade"));
+        if(kind==="grade") i=hs.findIndex(h=>h.includes("学年") || h==="年次" || h.includes("年次") || h.includes("grade"));
         if(kind==="name") i=hs.findIndex(h=>h.includes("氏名") || h.includes("名前") || h==="name" || h.includes("fullname"));
         if(kind==="nickname") i=hs.findIndex(h=>h.includes("ニックネーム") || h.includes("djネーム") || h.includes("dj名") || h.includes("nickname") || h.includes("活動名"));
         return i;
@@ -3394,6 +3379,18 @@ function adjustedTime(s){const off=Number(ctx?.tt?.offsetMinutes||0);return {sta
 function isValidTimeRange(start, end) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start || "") || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end || "")) return false;
   return toMin(end) > toMin(start);
+}
+function recordMemberDisplay(item) {
+  const ids = Array.isArray(item?.memberIds) ? item.memberIds : [];
+  const savedNames = String(item?.name ?? "").split("、").map(name => name.trim()).filter(Boolean);
+  if (!ids.length) return savedNames.join("、");
+  const members = Array.isArray(db?.members) ? db.members : [];
+  const names = ids.map((id, index) => {
+    const member = members.find(m => m && m.id === id);
+    return member ? memberDisplayName(member) : (savedNames[index] || "登録外メンバー");
+  });
+  const freeNames = savedNames.slice(ids.length);
+  return [...names, ...freeNames].filter(Boolean).join("、");
 }
 
 function nowHtml(tt, ev) {
