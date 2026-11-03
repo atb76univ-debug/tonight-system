@@ -1025,7 +1025,7 @@ function renderReceptionInput() {
     listContainer.innerHTML = tmpNames.map((item,index) => {
       const name = typeof item === "string" ? item : (item.name || "");
       const memberId = typeof item === "object" ? (item.memberId || "") : "";
-      return `<div class="member-pick-row"><div class="tmp-member-search-wrap"><input type="search" class="tmp-member-search" data-index="${index}" value="${esc(name)}" placeholder="TMPメンバーを名前で検索（ひらがな可）" autocomplete="off" aria-label="TMPメンバーを名前で検索"><div class="tmp-member-results" data-index="${index}" hidden></div></div><button class="tmp-name-delete" data-index="${index}" type="button">削</button></div>`;
+      return `<div class="member-pick-row"><div class="tmp-member-search-wrap"><input type="search" class="tmp-member-search" data-index="${index}" value="${esc(name)}" placeholder="TMPメンバーを検索／名簿外の名前も入力" autocomplete="off" aria-label="TMPメンバーを検索、または名簿外の名前を入力"><small class="tmp-member-input-help">候補を選択するか、名簿にない場合は名前をそのまま入力してください。</small><div class="tmp-member-results" data-index="${index}" role="listbox" aria-label="TMPメンバー候補"></div></div><button class="tmp-name-delete" data-index="${index}" type="button">削</button></div>`;
     }).join("");
 
     const normalizeMemberSearch = value => String(value || "").normalize("NFKC").toLocaleLowerCase("ja").replace(/[ァ-ン]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)).replace(/[　\s・ー‐‑–—]/g, "");
@@ -1033,12 +1033,13 @@ function renderReceptionInput() {
       const resultBox = listContainer.querySelector(`.tmp-member-results[data-index="${index}"]`);
       if (!resultBox) return;
       const q = normalizeMemberSearch(query);
-      if (!q) { resultBox.hidden = true; resultBox.innerHTML = ""; return; }
-      const matches = (db.members || []).filter(m => {
+      const allMembers = [...(db.members || [])].sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b), "ja"));
+      const matches = allMembers.filter(m => {
+        if (!q) return true;
         const haystack = normalizeMemberSearch([m.name, m.nickname, memberDisplayName(m)].filter(Boolean).join(" "));
         return haystack.includes(q);
-      }).slice(0, 12);
-      resultBox.innerHTML = matches.length ? matches.map(m => `<button type="button" class="tmp-member-result" data-member-id="${esc(m.id)}" data-index="${index}"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname ? `<small>${esc(m.name)}</small>` : ""}${m.grade ? `<small>${esc(m.grade)}</small>` : ""}</button>`).join("") : `<div class="tmp-member-no-result">該当するメンバーがいません。自由入力として登録できます。</div>`;
+      }).slice(0, 30);
+      resultBox.innerHTML = matches.length ? `${!q ? '<div class="tmp-member-results-hint">名簿のメンバー（入力すると絞り込めます）</div>' : ''}${matches.map(m => `<button type="button" role="option" class="tmp-member-result" data-member-id="${esc(m.id)}" data-index="${index}"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname ? `<small>本名：${esc(m.name)}</small>` : ""}${m.grade ? `<small>${esc(m.grade)}</small>` : ""}</button>`).join("")}` : `<div class="tmp-member-no-result">該当するメンバーがいません。入力した名前をそのまま使用できます。</div>`;
       resultBox.hidden = false;
     };
 
@@ -1067,15 +1068,6 @@ function renderReceptionInput() {
       refresh();
     }));
 
-    // 削除ボタンのイベント
-    document.querySelectorAll(".tmp-name-delete").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        const index = parseInt(e.target.dataset.index);
-        tmpNames.splice(index, 1);
-        tmp--;
-        refresh();
-      });
-    });
   };
 
   refresh();
@@ -2463,6 +2455,7 @@ let ctx = null;          // 開いている回 { ev, mode: "live" | "archive", d
 let pushTimer = null;
 let barCart = [];
 let barCartEventId = null;
+let barCheckoutPage = false;
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -3158,7 +3151,7 @@ function renderBarHome() {
   b.products = sharedLineup.map(p => ({ ...p, soldOut: Boolean(previousProducts.find(x => x.id === p.id)?.soldOut) }));
   ctx.bar = b;
   if (ctx.mode === "live") { ev.bar = b; }
-  if (barCartEventId !== ev.id) { barCart = []; barCartEventId = ev.id; }
+  if (barCartEventId !== ev.id) { barCart = []; barCartEventId = ev.id; barCheckoutPage = false; }
   const dt = new Date(ev.date + "T00:00:00"), md = `${dt.getMonth() + 1}/${dt.getDate()}`;
   const yen = n => "¥" + formatMoney(n);
   const sales = summarizeBarSales(b);
@@ -3208,20 +3201,30 @@ function renderBarHome() {
       <div><small>うちドリチケ</small><strong>${sales.ticketUnits}<em>杯</em></strong></div>
       <div><small>現金売上</small><strong>${yen(sales.cashRevenue)}</strong></div>
     </div>
-    <div class="section-label">商品をタップして注文に追加</div>
-    <div class="product-grid">
-      ${b.products.map(p => `<button class="product-tile ${p.soldOut ? "sold-out" : ""}" data-add-product="${esc(p.id)}" ${p.soldOut ? "disabled aria-disabled=\"true\"" : ""}><span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>${p.soldOut ? "売切れ" : "＋ 注文に追加"}</small></button>`).join("") || `<div class="sub-text">商品がありません。「商品・価格の設定」から追加してください。</div>`}
-    </div>
-    <div class="cart-panel">
-      <div class="cart-heading"><strong>注文カート</strong><button class="text-button" id="clearBarCart">クリア</button></div>
-      <div id="barCartLines"></div>
-      <div class="cart-total"><span id="barCartCount">0点</span><strong id="barCartTotal">¥0</strong></div>
-      <div class="checkout-actions">
-        <button class="btn btn-primary" id="barCashCheckout">現金で会計</button>
-        <button class="btn btn-ticket" id="barTicketCheckout">ドリチケで会計</button>
+    ${barCheckoutPage ? `
+      <div class="bar-checkout-page">
+        <div class="bar-checkout-page-heading"><button type="button" class="bar-checkout-back" id="barBackToProducts">← 商品選択に戻る</button><div class="card-title">注文内容・会計</div></div>
+        <div class="cart-panel bar-checkout-cart">
+          <div class="cart-heading"><strong>選択中の商品</strong><button class="text-button" id="clearBarCart">すべてクリア</button></div>
+          <div id="barCartLines"></div>
+          <div class="cart-total"><span id="barCartCount">0点</span><strong id="barCartTotal">¥0</strong></div>
+          <div class="checkout-actions">
+            <button class="btn btn-primary" id="barCashCheckout">現金で会計</button>
+            <button class="btn btn-ticket" id="barTicketCheckout">ドリチケで会計</button>
+          </div>
+          <p class="sub-text">ドリチケ会計は商品1点につきチケット1枚として記録します。</p>
+        </div>
       </div>
-      <p class="sub-text">ドリチケ会計は商品1点につきチケット1枚として記録します。</p>
-    </div>
+    ` : `
+      <div class="section-label">商品をタップして注文に追加</div>
+      <div class="product-grid">
+        ${b.products.map(p => `<button class="product-tile ${p.soldOut ? "sold-out" : ""}" data-add-product="${esc(p.id)}" ${p.soldOut ? "disabled aria-disabled=\"true\"" : ""}><span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>${p.soldOut ? "売切れ" : "＋ 注文に追加"}</small></button>`).join("") || `<div class="sub-text">商品がありません。「商品・価格の設定」から追加してください。</div>`}
+      </div>
+      <div class="bar-cart-dock ${barCart.length ? "has-items" : ""}" id="barCartDock" aria-live="polite">
+        <div class="bar-cart-dock-info"><strong id="barCartDockItems">${barCart.length ? barCart.map(x => `${esc(x.name)} ×${x.qty}`).join("　") : "商品を選択してください"}</strong><span id="barCartDockTotal">${yen(barCart.reduce((n,x)=>n+x.price*x.qty,0))}</span></div>
+        <button type="button" class="bar-cart-dock-next" id="barGoCheckout" ${barCart.length ? "" : "disabled"}>会計へ進む <span aria-hidden="true">→</span></button>
+      </div>
+    `}
     <div class="bar-latest-orders" aria-live="polite">
       <div class="bar-latest-orders-heading"><strong>直近の注文</strong><span>最新3件</span></div>
       ${latestOrdersHtml || `<div class="bar-latest-orders-empty">まだ注文はありません。</div>`}
@@ -3293,7 +3296,7 @@ function renderBarHome() {
   </div>
 
   <div class="card" data-bar-section="cash">
-    <div class="card-title">確認・ドリチケ照合(試行運用)</div>
+    <div class="card-title">確認・ドリチケ照合</div>
     <div class="ticket-reconciliation">
       <div class="ticket-reconciliation-heading"><strong>受付・販売記録から自動集計</strong><span>クラウド同期</span></div>
       <div class="ticket-reconciliation-grid">
@@ -3329,7 +3332,7 @@ function renderBarHome() {
   <button class="btn btn-danger btn-large" data-bar-section="cash" id="clearBarAccounting">バーカウンターの会計データを一括削除</button>
   `;
 
-  screen.querySelectorAll("[data-bar-page]").forEach(btn => btn.onclick = () => { barPage = btn.dataset.barPage; renderBarHome(); });
+  screen.querySelectorAll("[data-bar-page]").forEach(btn => btn.onclick = () => { barPage = btn.dataset.barPage; barCheckoutPage = false; renderBarHome(); });
   screen.querySelectorAll("[data-bar-section]").forEach(el => { el.hidden = el.dataset.barSection !== barPage; });
   updateBackButton();
   const $ = id => document.getElementById(id);
@@ -3337,6 +3340,13 @@ function renderBarHome() {
   const cartUnits = () => barCart.reduce((sum, x) => sum + x.qty, 0);
   const refreshCart = () => {
     const lines = $("barCartLines");
+    const dock = $("barCartDock");
+    if (dock) {
+      $("barCartDockItems").textContent = barCart.length ? barCart.map(x => `${x.name} ×${x.qty}`).join("　") : "商品を選択してください";
+      $("barCartDockTotal").textContent = yen(cartTotal());
+      dock.classList.toggle("has-items", barCart.length > 0);
+      $("barGoCheckout").disabled = !barCart.length;
+    }
     if (!lines) return;
     lines.innerHTML = barCart.map(x => `<div class="cart-line">
       <div class="cart-line-title"><strong>${esc(x.name)}</strong><small>${yen(x.price)} × ${x.qty}</small></div>
@@ -3357,6 +3367,10 @@ function renderBarHome() {
     });
   };
 
+  const goCheckout = $("barGoCheckout");
+  if (goCheckout) goCheckout.onclick = () => { if (!barCart.length) return; barCheckoutPage = true; renderBarHome(); };
+  const backToProducts = $("barBackToProducts");
+  if (backToProducts) backToProducts.onclick = () => { barCheckoutPage = false; renderBarHome(); };
   screen.querySelectorAll("[data-add-product]").forEach(btn => btn.onclick = () => {
     const p = b.products.find(x => x.id === btn.dataset.addProduct); if (!p || p.soldOut) return;
     let line = barCart.find(x => x.productId === p.id);
@@ -3400,7 +3414,7 @@ function renderBarHome() {
     $("barCashierCancel").onclick = () => $("barCashierOverlay").remove();
     confirmBtn.onclick = () => {
       b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "cash", items: structuredClone(barCart), totalAmount: total, paidAmount: paid, change: paid - total });
-      barCart = []; saveBar(); renderBarHome();
+      barCart = []; barCheckoutPage = false; saveBar(); renderBarHome();
     };
     refreshPayment();
   };
@@ -3428,7 +3442,7 @@ function renderBarHome() {
       button.disabled = true;
       button.textContent = "会計を記録しています…";
       b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "ticket", items: structuredClone(barCart), totalAmount: total, paidAmount: 0, change: 0 });
-      barCart = []; saveBar(); renderBarHome();
+      barCart = []; barCheckoutPage = false; saveBar(); renderBarHome();
     };
   };
 
@@ -3598,7 +3612,7 @@ function renderBarHome() {
     const products = structuredClone(b.products);
     const deletedSales = pruneDeletionLog(b.deletedSales || []);
     Object.assign(b, createBar(), { products, sales: [], resetAt: Date.now(), voidedSales: [], deletedSales });
-    barCart = []; saveBar(); renderBarHome();
+    barCart = []; barCheckoutPage = false; saveBar(); renderBarHome();
   };
   refreshCart();
   recalc();

@@ -1919,3 +1919,56 @@ button { max-width:100%; }
 .ticket-confirm-item strong{flex:0 0 auto;font-variant-numeric:tabular-nums}
 .ticket-confirm-warning{min-height:74px;margin:16px 0 14px;border-color:#f0d28a;background:#fff8e7;color:#76520c;font-size:16px;line-height:1.55}
 @media(max-width:520px){.ticket-confirm-item{padding:11px 12px;font-size:15px}.ticket-confirm-warning{font-size:14px;min-height:66px}}
+
+
+/* 受付TMPメンバー検索：候補ボタンが削除ボタン用スタイルに巻き込まれないよう独立 */
+.member-pick-row{display:flex;align-items:flex-start;gap:8px;flex-wrap:nowrap;min-width:0}
+.member-pick-row .tmp-member-search-wrap{position:relative;display:block;flex:1 1 auto;width:calc(100% - 48px);min-width:0}
+.member-pick-row .tmp-member-search{display:block;width:100%;height:44px;min-width:0;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--text);font:inherit;font-size:16px;line-height:1.4;writing-mode:horizontal-tb;white-space:nowrap}
+.tmp-member-input-help{display:block;margin:5px 2px 0;color:var(--muted,#777);font-size:11px;line-height:1.5}
+.tmp-member-results{position:absolute;left:0;right:0;top:calc(100% + 3px);z-index:1000;display:block;max-height:min(48vh,320px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;padding:5px;background:#fff;border:1px solid #d8dee8;border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.18);box-sizing:border-box}
+.tmp-member-results[hidden]{display:none!important}
+.member-pick-row .tmp-member-results .tmp-member-result{display:flex!important;position:static!important;align-items:center;justify-content:flex-start;gap:8px;width:100%!important;min-width:0!important;height:auto!important;min-height:42px;margin:0;padding:9px 10px;border:0!important;border-radius:7px;background:#fff;color:#202938;font-family:inherit;font-size:14px;font-weight:500;line-height:1.4;text-align:left;white-space:normal;writing-mode:horizontal-tb;box-shadow:none;cursor:pointer}
+.member-pick-row .tmp-member-results .tmp-member-result:hover,.member-pick-row .tmp-member-results .tmp-member-result:focus{background:#f0f4fa;outline:2px solid #d9e4f5;outline-offset:-2px}
+.tmp-member-result strong{display:block;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:normal;overflow-wrap:anywhere;font-size:14px;line-height:1.4}
+.tmp-member-result small{display:block;flex:0 0 auto;color:#687386;font-size:11px;white-space:nowrap}
+.tmp-member-results-hint{padding:6px 9px 8px;color:#687386;font-size:11px;border-bottom:1px solid #edf0f4;margin-bottom:3px}
+.tmp-member-no-result{padding:12px;color:#687386;font-size:13px;line-height:1.5}
+.member-pick-row .tmp-name-delete{flex:0 0 40px;width:40px!important;min-width:40px;height:40px!important;margin:0;padding:0;border:1px solid var(--danger);border-radius:9px;background:#fff;color:var(--danger);font-size:12px;writing-mode:horizontal-tb}
+@media(max-width:600px){.member-pick-row{align-items:flex-start;gap:7px}.member-pick-row .tmp-member-search-wrap{flex:1 1 auto;width:calc(100% - 47px);min-width:0}.tmp-member-results{max-height: min(45vh,280px)}.tmp-member-result strong{font-size:14px}}
+
+
+/* 商品選択と会計を分離したドリンク販売UI */
+.bar-cart-dock{
+  position:sticky; bottom:calc(10px + env(safe-area-inset-bottom)); z-index:30;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin:16px -2px 14px; padding:12px 14px;
+  border:1px solid #dce3ef; border-radius:16px; background:rgba(255,255,255,.97);
+  box-shadow:0 8px 28px rgba(25,42,68,.16); backdrop-filter:blur(12px);
+}
+.bar-cart-dock-info{display:flex; flex:1 1 auto; flex-direction:column; gap:3px; min-width:0}
+.bar-cart-dock-info strong{font-size:13px; line-height:1.45; color:#34445e; overflow-wrap:anywhere; word-break:normal}
+.bar-cart-dock-info span{font-size:19px; font-weight:900; color:#172943; font-variant-numeric:tabular-nums}
+.bar-cart-dock-next{flex:0 0 auto; min-height:46px; display:inline-flex; align-items:center; justify-content:center; gap:10px; padding:0 17px; border:0; border-radius:12px; background:#263b5b; color:#fff; font-size:14px; font-weight:850; cursor:pointer; white-space:nowrap}
+.bar-cart-dock-next span{font-size:21px; line-height:1}
+.bar-cart-dock-next:disabled{background:#c8ced8; color:#fff; cursor:not-allowed; box-shadow:none}
+.bar-checkout-page{padding-top:4px}
+.bar-checkout-page-heading{display:flex; flex-direction:column; align-items:flex-start; gap:12px; margin:4px 0 14px}
+.bar-checkout-back{border:0; background:#eef2f8; color:#34445e; border-radius:10px; padding:9px 13px; font-size:13px; font-weight:800; cursor:pointer}
+.bar-checkout-cart{background:#fff; padding:14px}
+.bar-checkout-cart .cart-line{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid #eceff4}
+.bar-checkout-cart .cart-line-title{min-width:0; flex:1}
+.bar-checkout-cart .cart-line-title strong{display:block; overflow-wrap:anywhere}
+.bar-checkout-cart .cart-line-actions{display:flex; align-items:center; gap:7px; flex:0 0 auto}
+.bar-checkout-cart .checkout-actions{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px}
+.bar-checkout-cart .checkout-actions .btn{min-width:0; white-space:normal}
+@media(max-width:480px){
+ .bar-cart-dock{gap:8px; padding:10px 11px; margin-left:0; margin-right:0}
+ .bar-cart-dock-info strong{font-size:11px}
+ .bar-cart-dock-info span{font-size:17px}
+ .bar-cart-dock-next{min-height:44px; padding:0 12px; font-size:12px; gap:6px}
+ .bar-checkout-cart{padding:10px}
+ .bar-checkout-cart .cart-line{align-items:flex-start; flex-direction:column; gap:8px}
+ .bar-checkout-cart .cart-line-actions{width:100%; justify-content:flex-end}
+ .bar-checkout-cart .checkout-actions{grid-template-columns:1fr; gap:8px}
+}
