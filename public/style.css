@@ -2011,3 +2011,72 @@ button { max-width:100%; }
 .tmp-member-entry .tmp-member-results{position:absolute;top:calc(100% - 2px);left:0;right:0;z-index:1005;max-height:min(42vh,280px);overflow-y:auto;background:#fff;border:1px solid var(--border,#d8dee8);border-radius:0 0 10px 10px;box-shadow:0 10px 24px rgba(0,0,0,.16);padding:5px;box-sizing:border-box}
 .tmp-member-entry .tmp-member-results[hidden]{display:none!important}
 @media(max-width:600px){.tmp-member-entry{grid-template-columns:minmax(0,1fr) 40px;gap:6px}.tmp-member-toggle,.tmp-member-free-input{min-height:46px}.tmp-member-entry .tmp-member-results{max-height: min(38vh,260px)}}
+
+
+/* v42: 受付TMP名簿選択ボタンの幅崩れを防止（旧 .member-pick-row button の幅40px指定を上書き） */
+#tmpNamesList .tmp-member-entry {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 42px !important;
+  align-items:start !important;
+  width:100% !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+}
+#tmpNamesList .tmp-member-entry .tmp-member-select-area,
+#tmpNamesList .tmp-member-entry .tmp-member-free-area {
+  grid-column:1 !important;
+  width:100% !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+}
+#tmpNamesList .tmp-member-entry .tmp-member-toggle {
+  display:flex !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:100% !important;
+  height:auto !important;
+  min-height:46px !important;
+  padding:10px 12px !important;
+  border:1px solid var(--border,#d8dee8) !important;
+  border-radius:9px !important;
+  background:#fff !important;
+  color:var(--text,#202938) !important;
+  font-family:inherit !important;
+  font-size:15px !important;
+  font-weight:600 !important;
+  line-height:1.4 !important;
+  text-align:left !important;
+  white-space:normal !important;
+  writing-mode:horizontal-tb !important;
+  overflow-wrap:anywhere !important;
+  box-sizing:border-box !important;
+}
+#tmpNamesList .tmp-member-entry .tmp-member-toggle > span {
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+  height:auto !important;
+  color:var(--muted,#687386) !important;
+  font-size:14px !important;
+}
+#tmpNamesList .tmp-member-entry .tmp-name-delete {
+  grid-column:2 !important;
+  grid-row:1 / span 2 !important;
+  width:42px !important;
+  min-width:42px !important;
+  max-width:42px !important;
+  height:42px !important;
+  padding:0 !important;
+  writing-mode:horizontal-tb !important;
+}
+#tmpNamesList .tmp-member-entry .tmp-member-results {
+  left:0 !important;
+  right:48px !important;
+  width:auto !important;
+  min-width:0 !important;
+}
+@media(max-width:600px) {
+  #tmpNamesList .tmp-member-entry { grid-template-columns:minmax(0,1fr) 40px !important; gap:7px !important; }
+  #tmpNamesList .tmp-member-entry .tmp-name-delete { width:40px !important; min-width:40px !important; max-width:40px !important; }
+  #tmpNamesList .tmp-member-entry .tmp-member-results { right:47px !important; }
+}
