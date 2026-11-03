@@ -95,7 +95,7 @@ function navigate(renderFunc) {
   currentRender = renderFunc;
 
   renderFunc();
-
+  renderReceptionTabs();
   updateBackButton();
 }
 
@@ -116,8 +116,31 @@ function back() {
 
   currentRender = previous;
   previous();
+  renderReceptionTabs();
 
   updateBackButton();
+}
+
+function renderReceptionTabs() {
+  if (![renderHome, renderReceptionInput, renderHistory, renderResult, renderCashCheck].includes(currentRender)) return;
+  const active = currentRender === renderHome ? "home" : currentRender === renderReceptionInput ? "input" : currentRender === renderHistory ? "history" : currentRender === renderResult ? "result" : "cash";
+  const nav = document.createElement("nav");
+  nav.className = "reception-page-nav";
+  nav.innerHTML = `
+    <button class="reception-page-tab ${active === "home" ? "active" : ""}" data-rec-page="home">ホーム</button>
+    <button class="reception-page-tab ${active === "input" ? "active" : ""}" data-rec-page="input">受付</button>
+    <button class="reception-page-tab ${active === "history" ? "active" : ""}" data-rec-page="history">履歴</button>
+    <button class="reception-page-tab ${active === "result" ? "active" : ""}" data-rec-page="result">リザルト</button>
+    <button class="reception-page-tab ${active === "cash" ? "active" : ""}" data-rec-page="cash">金庫照合</button>`;
+  screen.prepend(nav);
+  nav.querySelectorAll("[data-rec-page]").forEach(btn => btn.addEventListener("click", () => {
+    if (state.currentReception && btn.dataset.recPage !== "input") {
+      if (!confirm("入力途中の受付を中止して移動しますか？")) return;
+      state.currentReception = null;
+    }
+    const pages = {home:renderHome,input:renderReceptionInput,history:renderHistory,result:renderResult,cash:renderCashCheck};
+    navigate(pages[btn.dataset.recPage]);
+  }));
 }
 
 function getPageTitle(renderFunc) {
@@ -143,6 +166,8 @@ function updateBackButton() {
   if (eventHomeBtn) eventHomeBtn.classList.toggle("hidden", !ctx || currentRender === renderEventPage);
   const pulse = document.getElementById("eventPulse");
   if (pulse) pulse.classList.toggle("hidden", !ctx);
+  const headerLive = document.getElementById("headerLive");
+  if (headerLive) headerLive.classList.toggle("hidden", !ctx || ctx.mode === "archive");
   document.body.classList.toggle("in-event", !!ctx);
   updateNow();
 }
@@ -1279,117 +1304,45 @@ function setDiscount(
 }
 
 function renderPaymentScreen() {
-
-  const guests =
-    state.currentReception.guests;
-
-  let total = 0;
-
-  guests.forEach(
-    guest => {
-
-      total +=
-
-        ENTRY_FEE +
-
-        DRINK_FEE -
-
-        guest.discount;
-    }
-  );
-
-  state.currentReception
-    .totalAmount = total;
-
+  const guests = state.currentReception.guests;
+  const total = guests.reduce((sum, guest) => sum + ENTRY_FEE + DRINK_FEE - guest.discount, 0);
+  state.currentReception.totalAmount = total;
+  let paid = 0;
   screen.innerHTML = `
-
-  <div class="card payment-card">
-
-    <div class="card-title">
-      お支払い金額
-    </div>
-
-    <div
-      class="money-display"
-    >
-
-      <div class="amount">
-
-        ¥${formatMoney(
-          total
-        )}
-
+    <div class="cashier-overlay">
+      <div class="cashier-dialog">
+        <div class="cashier-head"><h2>預かり金額</h2><button class="cashier-cancel" id="cashierCancel">中断</button></div>
+        <div class="cashier-total-row"><span>合計</span><strong>¥${formatMoney(total)}</strong></div>
+        <div class="cashier-paid" id="cashierPaid">¥0</div>
+        <div class="cashier-status" id="cashierStatus">受け取ったお札・硬貨のボタンを押して積み上げてください</div>
+        <div class="cashier-keypad">
+          <button data-add-cash="100">+100</button><button data-add-cash="500">+500</button><button data-add-cash="1000">+1000</button>
+          <button data-add-cash="5000">+5000</button><button data-add-cash="10000">+10000</button><button id="cashierClear">C</button>
+        </div>
+        <p class="cashier-help">受け取ったお札・硬貨のボタンを押して積み上げてください（押し間違いはC）</p>
+        <button class="cashier-confirm" id="cashierConfirm" disabled>確認へ</button>
       </div>
-
-    </div>
-
-    <div class="form-row">
-
-      <label>
-
-        預かり金額
-
-      </label>
-
-      <input
-        id="paidAmount"
-        type="number"
-      >
-
-    </div>
-
-    <button
-      class="
-      btn
-      btn-primary
-      btn-large
-      "
-      id="calcChangeBtn"
-    >
-
-      次へ
-
-    </button>
-
-  </div>
-  `;
-
-  document
-    .getElementById(
-      "calcChangeBtn"
-    )
-    .onclick = () => {
-
-      const paid = Number(
-        document
-          .getElementById(
-            "paidAmount"
-          )
-          .value
-      );
-
-      if (
-        paid < total
-      ) {
-
-        alert(
-          "預かり金額不足"
-        );
-
-        return;
-      }
-
-      state.currentReception
-        .paidAmount = paid;
-
-      state.currentReception
-        .change =
-          paid - total;
-
-      navigate(
-        renderChecklist
-      );
-    };
+    </div>`;
+  const paidEl = document.getElementById("cashierPaid");
+  const statusEl = document.getElementById("cashierStatus");
+  const confirmBtn = document.getElementById("cashierConfirm");
+  const refresh = () => {
+    paidEl.textContent = `¥${formatMoney(paid)}`;
+    const diff = paid - total;
+    if (paid === total) { statusEl.textContent = "💵 ちょうど頂きました"; statusEl.className = "cashier-status exact"; }
+    else if (paid > total) { statusEl.textContent = `お釣り ¥${formatMoney(diff)}`; statusEl.className = "cashier-status change"; }
+    else { statusEl.textContent = `あと ¥${formatMoney(total-paid)} 不足しています`; statusEl.className = "cashier-status short"; }
+    confirmBtn.disabled = paid < total;
+  };
+  screen.querySelectorAll("[data-add-cash]").forEach(btn => btn.onclick = () => { paid += Number(btn.dataset.addCash); refresh(); });
+  document.getElementById("cashierClear").onclick = () => { paid = 0; refresh(); };
+  document.getElementById("cashierCancel").onclick = () => navigate(renderReceptionInput);
+  confirmBtn.onclick = () => {
+    state.currentReception.paidAmount = paid;
+    state.currentReception.change = paid - total;
+    navigate(renderChecklist);
+  };
+  refresh();
 }
 
 function renderChecklist() {
