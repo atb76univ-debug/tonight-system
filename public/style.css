@@ -993,3 +993,149 @@ button:focus-visible,input:focus-visible{outline:3px solid rgba(115,87,255,.28);
 .deleted-history-content small { color:var(--muted); font-size:11px; }
 .deleted-history-row .btn { flex-shrink:0; }
 .deleted-history-row.is-restored { opacity:.58; }
+
+/* v22: two-column header schedule + genuinely compact vertical layout */
+#eventPulse #globalNowBox .schedule-overview-grid {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:12px;
+  align-items:start;
+}
+#eventPulse #globalNowBox .schedule-section {
+  min-width:0;
+  margin-top:0;
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:rgba(255,255,255,.72);
+}
+#eventPulse #globalNowBox .schedule-section .now-label {
+  margin:0 0 6px;
+  font-size:12px;
+  font-weight:800;
+}
+#eventPulse #globalNowBox .schedule-columns {
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:6px;
+}
+#eventPulse #globalNowBox .schedule-column {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px;
+  min-width:0;
+  padding:7px;
+}
+#eventPulse #globalNowBox .schedule-column .schedule-tag {
+  font-size:9px;
+  line-height:1.1;
+  padding:2px 5px;
+}
+#eventPulse #globalNowBox .schedule-column .now-main,
+#eventPulse #globalNowBox .schedule-column strong {
+  font-size:12px;
+  line-height:1.2;
+}
+#eventPulse #globalNowBox .schedule-column .sub-text,
+#eventPulse #globalNowBox .schedule-column small {
+  font-size:10px;
+  line-height:1.15;
+}
+#eventPulse.is-compact {
+  padding:3px 8px !important;
+}
+#eventPulse.is-compact .event-pulse-top {
+  margin:0 0 2px !important;
+  min-height:20px;
+}
+#eventPulse.is-compact .event-pulse-title {
+  font-size:9px !important;
+  line-height:1 !important;
+}
+#eventPulse.is-compact .event-pulse-hint {
+  display:none !important;
+}
+#eventPulse.is-compact .pulse-control {
+  padding:2px 6px !important;
+  font-size:9px !important;
+  line-height:1.1 !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-status {
+  display:none !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-overview-grid {
+  gap:5px !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-section {
+  padding:3px 5px !important;
+  border-radius:7px !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-section .now-label {
+  margin:0 0 2px !important;
+  font-size:9px !important;
+  line-height:1 !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-columns {
+  gap:3px !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-column {
+  padding:3px 4px !important;
+  gap:1px !important;
+  border-radius:5px !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-column .schedule-tag {
+  font-size:7px !important;
+  padding:1px 3px !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-column .now-main,
+#eventPulse.is-compact #globalNowBox .schedule-column strong {
+  font-size:9px !important;
+  line-height:1.05 !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-column .sub-text,
+#eventPulse.is-compact #globalNowBox .schedule-column small {
+  font-size:8px !important;
+  line-height:1 !important;
+}
+#eventPulse.is-compact #globalNowBox .schedule-column-content {
+  gap:1px !important;
+}
+@media(max-width:520px) {
+  #eventPulse #globalNowBox .schedule-overview-grid {
+    gap:5px;
+  }
+  #eventPulse #globalNowBox .schedule-section {
+    padding:5px;
+  }
+  #eventPulse #globalNowBox .schedule-columns {
+    gap:3px;
+  }
+  #eventPulse #globalNowBox .schedule-column {
+    padding:4px;
+  }
+  #eventPulse #globalNowBox .schedule-column .now-main,
+  #eventPulse #globalNowBox .schedule-column strong {
+    font-size:10px;
+  }
+}
+
+
+/* v23: deletion logs displayed as horizontal cards */
+.deleted-history-list {
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap:8px 12px;
+  align-items:stretch;
+}
+.deleted-history-row {
+  display:flex; flex-direction:row; align-items:center; justify-content:space-between;
+  gap:10px; min-width:0; padding:10px 12px;
+  border:1px solid #efcccc; border-radius:9px; background:rgba(255,248,248,.72);
+}
+.deleted-history-content { flex:1 1 auto; min-width:0; }
+.deleted-history-content s { display:block; overflow-wrap:anywhere; }
+.deleted-history-row .btn { flex:0 0 auto; white-space:nowrap; }
+@media(max-width:420px) {
+  .deleted-history-row { gap:7px; padding:8px; }
+  .deleted-history-row .btn { padding:7px 9px; font-size:11px; }
+}

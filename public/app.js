@@ -1741,13 +1741,13 @@ function renderHistory() {
 
   const deletedEntries = pruneDeletionLog(state.deletedReceptionHistory || []);
   if (deletedEntries.length) {
-    html += `<div class="deleted-history-section"><div class="card-title">削除した履歴（30日間保存）</div>`;
+    html += `<div class="deleted-history-section"><div class="card-title">削除した履歴（30日間保存）</div><div class="deleted-history-list">`;
     deletedEntries.forEach(item => {
       const entry = item.entry;
       const deletedAt = new Date(item.deletedAt).toLocaleString("ja-JP");
       html += `<div class="deleted-history-row"><div class="deleted-history-content"><s>${esc(entry.timestamp || "")} ・ 一般 ${Number(entry.general||0)}名 / TMP ${Number(entry.tmp||0)}名 ・ ¥${formatMoney(entry.totalAmount || 0)}</s><small>削除日時：${deletedAt}</small></div><button class="btn btn-secondary" data-restore-reception="${esc(entry.id)}">復元</button></div>`;
     });
-    html += `</div>`;
+    html += `</div></div>`;
   }
 
   html += `
@@ -2732,8 +2732,8 @@ function renderGuide() {
     <section class="guide-step"><div class="guide-visual">${guideIllustration("reception")}</div><div class="guide-copy"><span class="guide-number">02</span><h3>受付を管理</h3><p>最初に金庫の初期金額などを設定します。受付では来場区分・割引・支払金額を入力し、履歴やリザルト、金庫照合を確認できます。</p></div></section>
     <section class="guide-step"><div class="guide-visual">${guideIllustration("bar")}</div><div class="guide-copy"><span class="guide-number">03</span><h3>ドリンクを販売</h3><p>最初に金庫の準備を行い、商品管理で共通のドリンクラインナップを登録します。登録内容はすべての回で共有され、追加・削除・価格変更も各回に反映されます。販売画面で商品・数量・支払方法を選択して会計します。</p></div></section>
     <section class="guide-step"><div class="guide-visual">${guideIllustration("schedule")}</div><div class="guide-copy"><span class="guide-number">04</span><h3>出番・シフトを登録</h3><p>タイムテーブルではDJ・VJ・LIVE・その他の種別で出番を登録できます。スタッフのシフトも登録でき、NOW / NEXT は自動で更新されます。</p></div></section>
-    <section class="guide-step"><div class="guide-visual">${guideIllustration("schedule")}</div><div class="guide-copy"><span class="guide-number">05</span><h3>ヘッダーのNOW / NEXT表示</h3><p>イベント画面上部には、現在の出番・シフト（NOW）と次の予定（NEXT）が表示されます。「縮小」を押すとコンパクトに、「しまう」を押すと内容を一時的に非表示にできます。「通常」または「ひらく」で元に戻せます。表示設定は端末ごとに保持されます。</p></div></section>
-    <div class="card guide-notes"><h3>覚えておくと便利なこと</h3><ul><li>受付・販売履歴・スケジュールはイベントごとに管理されます。</li><li>ドリンクの商品名・価格のラインナップは全イベント共通です。商品管理で追加・変更・削除すると、すべての回に反映されます。</li><li>売切れ設定はイベントごとに管理されます。ある回で売切れにしても、別の回の販売状態には影響しません。</li><li>受付履歴や販売履歴を削除・取消した場合、削除履歴に赤い取り消し線付きで記録され、30日以内なら「復元」できます。復元すると集計にも反映されます。</li><li>イベントホームへ戻ると、受付・バーカウンター・タイムテーブルに移動できます。</li><li>終了したイベントはアーカイブできます。アーカイブ中の変更は保存確認が表示されます。</li><li>複数端末で使う場合は、同じイベントURLにアクセスしてください。</li></ul></div>
+    <section class="guide-step"><div class="guide-visual">${guideIllustration("schedule")}</div><div class="guide-copy"><span class="guide-number">05</span><h3>ヘッダーのNOW / NEXT表示</h3><p>イベント画面上部には、出番とシフトが左右2列で表示され、それぞれNOW（進行中）とNEXT（次の予定）が横並びになります。「縮小」を押すと文字・余白・カードの高さを小さくして縦幅を抑えられます。「しまう」で内容を隠し、「通常」「ひらく」で元に戻せます。表示設定は端末ごとに保持されます。</p></div></section>
+    <div class="card guide-notes"><h3>覚えておくと便利なこと</h3><ul><li>受付・販売履歴・スケジュールはイベントごとに管理されます。</li><li>ドリンクの商品名・価格のラインナップは全イベント共通です。商品管理で追加・変更・削除すると、すべての回に反映されます。</li><li>売切れ設定はイベントごとに管理されます。ある回で売切れにしても、別の回の販売状態には影響しません。</li><li>受付履歴や販売履歴を削除・取消した場合、削除履歴は横並びのカードで赤い取り消し線付きで記録され、30日以内なら「復元」できます。復元すると集計にも反映されます。</li><li>イベントホームへ戻ると、受付・バーカウンター・タイムテーブルに移動できます。</li><li>終了したイベントはアーカイブできます。アーカイブ中の変更は保存確認が表示されます。</li><li>複数端末で使う場合は、同じイベントURLにアクセスしてください。</li></ul></div>
     <button class="btn btn-primary btn-large guide-back" id="guideBack">イベント一覧に戻る</button>`;
   document.getElementById("guideBack").onclick = () => navigate(renderEventList);
 }
@@ -2960,14 +2960,14 @@ function renderBarHome() {
   <div class="card" data-bar-section="history">
     <div class="card-title">直近の販売</div>
     ${recent || `<div class="sub-text">販売履歴はまだありません。</div>`}
-    ${(b.deletedSales || []).length ? `<div class="deleted-history-section"><div class="card-title">取消した販売履歴（30日間保存）</div>${b.deletedSales.slice().sort((x,y)=>Number(y.deletedAt||0)-Number(x.deletedAt||0)).map(x => {
+    ${(b.deletedSales || []).length ? `<div class="deleted-history-section"><div class="card-title">取消した販売履歴（30日間保存）</div><div class="deleted-history-list">${b.deletedSales.slice().sort((x,y)=>Number(y.deletedAt||0)-Number(x.deletedAt||0)).map(x => {
       const sale = x.sale || {};
       const details = (sale.items || []).map(i => `${esc(i.name)} ×${Number(i.qty||0)}`).join("、");
       const when = new Date(sale.timestamp || x.deletedAt).toLocaleString("ja-JP");
       const deleted = new Date(x.deletedAt).toLocaleString("ja-JP");
       const restored = Number(x.restoredAt||0) > Number(x.deletedAt||0);
       return `<div class="deleted-history-row ${restored ? "is-restored" : ""}"><div class="deleted-history-content"><s>${when} ・ ${sale.paymentMethod === "ticket" ? "ドリチケ" : "現金"} ・ ${details} ・ ${sale.paymentMethod === "ticket" ? "チケット" : yen(sale.totalAmount||0)}</s><small>${restored ? "復元済み" : `取消日時：${deleted}`}</small></div>${restored ? `<span class="sub-text">復元済み</span>` : `<button class="btn btn-secondary" data-restore-sale="${esc(sale.id)}">復元</button>`}</div>`;
-    }).join("")}</div>` : ""}
+    }).join("")}</div></div>` : ""}
   </div>
 
   <div class="card" data-bar-section="cash">
@@ -3238,6 +3238,7 @@ function nowHtml(tt, ev) {
   const eventState = t < 0 ? "開催前" : (t > 30 * 60 ? "開催終了" : "LIVE");
   const actLabel = item => `${item.type === "その他" ? (item.customType || "その他") : (item.type || "DJ")}：${item.name}`;
   let html = `<div class="schedule-status"><span class="live-orb"></span><span>${eventState}</span><small>${esc(ev.date)}</small></div>`;
+  html += `<div class="schedule-overview-grid">`;
   html += `<div class="schedule-section"><div class="now-label">出番</div><div class="schedule-columns">`;
   html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${actNow.length ? actNow.map(item => `<div class="schedule-item"><strong class="now-main">${esc(actLabel(item))}</strong><span class="sub-text">${esc(item.start)}–${esc(item.end)}</span></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${actNext ? `<div class="schedule-item"><strong class="now-main">${esc(actLabel(actNext))}</strong><span class="sub-text">${esc(actNext.start)}–${esc(actNext.end)}</span></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
@@ -3246,6 +3247,7 @@ function nowHtml(tt, ev) {
   html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${shiftNow.length ? shiftNow.map(item => `<div class="schedule-item"><strong>${esc(item.role)}：${esc(item.name)}</strong><small>${esc(item.start)}–${esc(item.end)}</small></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(shiftNext.name)}</strong><small>${esc(shiftNext.start)}–${esc(shiftNext.end)}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `</div></div>`;
+  html += `</div>`;
   return html;
 }
 function updateNow() {
