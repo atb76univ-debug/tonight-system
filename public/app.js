@@ -2892,12 +2892,42 @@ function memberStats(memberId) {
   return {attendance,dj,lastDate:lastDate||"—"};
 }
 function renderMembers() {
-  const members=(db.members||[]).slice().sort((a,b)=>memberDisplayName(a).localeCompare(memberDisplayName(b),"ja"));
+  const gradeNumber = value => {
+    const match = String(value || "").match(/\\d+/);
+    return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
+  };
+  const compareGrade = (a,b) => {
+    const ga=String(a.grade||"").trim(), gb=String(b.grade||"").trim();
+    const na=gradeNumber(ga), nb=gradeNumber(gb);
+    if(na!==nb) return na-nb;
+    if(!ga && gb) return 1;
+    if(ga && !gb) return -1;
+    return ga.localeCompare(gb,"ja") || memberDisplayName(a).localeCompare(memberDisplayName(b),"ja");
+  };
+  const members=(db.members||[]).slice().sort(compareGrade);
+  const gradeOptions=[...new Set(members.map(m=>String(m.grade||"").trim()||"学年未登録"))]
+    .sort((a,b)=>{
+      if(a==="学年未登録")return 1;
+      if(b==="学年未登録")return -1;
+      const na=gradeNumber(a),nb=gradeNumber(b);
+      return na!==nb?na-nb:a.localeCompare(b,"ja");
+    });
   const planned=Array.isArray(ctx.ev.participants)?ctx.ev.participants:[];
   const receptionNames=new Set((state.receptionHistory||[]).flatMap(r=>(r.guests||[]).filter(g=>g.type==="tmp").flatMap(g=>[g.memberId||"",`name:${g.name||""}`])));
   screen.innerHTML=`<div class="card"><div class="card-title">参加予定メンバー</div><p class="sub-text">参加予定に登録したメンバーの受付状況を確認できます。チェックボックス・名前・受付状況は横並びで表示されます。</p><div class="member-check-grid">${members.map(m=>`<label class="member-check"><input type="checkbox" data-participant="${esc(m.id)}" ${planned.includes(m.id)?"checked":""}><span>${esc(memberDisplayName(m))}${m.nickname?` <small>(${esc(m.name)})</small>`:""} <small>${esc(m.grade||"")}</small></span><b class="${(receptionNames.has(m.id)||receptionNames.has(`name:${m.name}`))?"checked":"pending"}">${(receptionNames.has(m.id)||receptionNames.has(`name:${m.name}`))?"受付済み":"未受付"}</b></label>`).join("")||`<div class="sub-text">先に名簿へメンバーを登録してください。</div>`}</div><button class="btn btn-primary full" id="saveParticipants">参加予定を保存</button></div>
-  <div class="card"><div class="card-title">メンバー名簿</div><div class="member-import"><label>CSV／Excelを読み込む<input type="file" id="memberFile" accept=".csv,.xlsx,.xls"></label><small>表に他の項目が含まれていても、「名前（氏名）」「学年」「ニックネーム（DJネーム）」の列を取り込みます。</small></div><div class="inline-form"><input id="memberName" placeholder="本名・氏名"><input id="memberGrade" placeholder="学年（例：3年）"><input id="memberNickname" placeholder="ニックネーム／DJネーム（任意）"><button class="btn btn-primary full" id="addMember">メンバーを追加</button></div><div class="member-bulk-toolbar"><label><input type="checkbox" id="selectAllMembers"> 全員選択</label><button type="button" class="btn btn-danger" id="deleteSelectedMembers" disabled>選択したメンバーを一括削除</button><small id="selectedMemberCount">0名選択中</small></div><div id="memberList">${members.map(m=>{const st=memberStats(m.id);return `<div class="member-record"><input class="member-row-select" type="checkbox" data-select-member="${esc(m.id)}" aria-label="${esc(memberDisplayName(m))}を選択"><div class="member-record-main"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname?`<small>本名：${esc(m.name)}</small>`:""}<small>${esc(m.grade||"学年未登録")} ・ 参加 ${st.attendance}回 ・ DJ ${st.dj}回 ・ 最終出演 ${esc(st.lastDate)}</small></div><button class="btn btn-secondary" data-edit-member="${esc(m.id)}">編集</button><button class="x" data-delete-member="${esc(m.id)}">×</button></div>`}).join("")||`<p class="sub-text">名簿はまだ空です。</p>`}</div></div>`;
+  <div class="card"><div class="card-title">メンバー名簿</div><div class="member-import"><label>CSV／Excelを読み込む<input type="file" id="memberFile" accept=".csv,.xlsx,.xls"></label><small>表に他の項目が含まれていても、「名前（氏名）」「学年」「ニックネーム（DJネーム）」の列を取り込みます。</small></div><div class="inline-form"><input id="memberName" placeholder="本名・氏名"><input id="memberGrade" placeholder="学年（例：3年）"><input id="memberNickname" placeholder="ニックネーム／DJネーム（任意）"><button class="btn btn-primary full" id="addMember">メンバーを追加</button></div><div class="member-bulk-toolbar"><label><input type="checkbox" id="selectAllMembers"> 全員選択</label><button type="button" class="btn btn-danger" id="deleteSelectedMembers" disabled>選択したメンバーを一括削除</button><small id="selectedMemberCount">0名選択中</small></div><div class="member-filter-toolbar"><input type="search" id="memberNameSearch" placeholder="名前の一部で検索" aria-label="名前の一部で検索"><select id="memberGradeFilter" aria-label="学年で絞り込み"><option value="">すべての学年</option>${gradeOptions.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("")}</select></div><div id="memberList">${members.map(m=>{const st=memberStats(m.id);const grade=String(m.grade||"").trim()||"学年未登録";const searchText=[m.name,m.nickname,memberDisplayName(m)].filter(Boolean).join(" ").toLocaleLowerCase("ja");return `<div class="member-record" data-member-grade="${esc(grade)}" data-member-search="${esc(searchText)}"><input class="member-row-select" type="checkbox" data-select-member="${esc(m.id)}" aria-label="${esc(memberDisplayName(m))}を選択"><div class="member-record-main"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname?`<small>本名：${esc(m.name)}</small>`:""}<small>${esc(grade)} ・ 参加 ${st.attendance}回 ・ DJ ${st.dj}回 ・ 最終出演 ${esc(st.lastDate)}</small></div><button class="btn btn-secondary" data-edit-member="${esc(m.id)}">編集</button><button class="x" data-delete-member="${esc(m.id)}">×</button></div>`}).join("")||`<p class="sub-text">名簿はまだ空です。</p>`}</div></div>`;
   document.getElementById("saveParticipants").onclick=()=>{ctx.ev.participants=[...screen.querySelectorAll('[data-participant]:checked')].map(x=>x.dataset.participant);ctx.ev.u.meta=Date.now();persistDb();alert("参加予定を保存しました");renderMembers();};
+  const applyMemberFilters=()=>{
+    const query=(document.getElementById("memberNameSearch").value||"").trim().toLocaleLowerCase("ja");
+    const grade=document.getElementById("memberGradeFilter").value;
+    screen.querySelectorAll("#memberList .member-record").forEach(row=>{
+      const matchesName=!query || (row.dataset.memberSearch||"").includes(query);
+      const matchesGrade=!grade || row.dataset.memberGrade===grade;
+      row.hidden=!(matchesName&&matchesGrade);
+    });
+  };
+  document.getElementById("memberNameSearch").addEventListener("input",applyMemberFilters);
+  document.getElementById("memberGradeFilter").addEventListener("change",applyMemberFilters);
   const updateBulkSelection=()=>{const selected=[...screen.querySelectorAll("[data-select-member]:checked")];const all=[...screen.querySelectorAll("[data-select-member]")];const del=document.getElementById("deleteSelectedMembers");const count=document.getElementById("selectedMemberCount");del.disabled=selected.length===0;count.textContent=`${selected.length}名選択中`;const allBox=document.getElementById("selectAllMembers");allBox.checked=all.length>0&&selected.length===all.length;allBox.indeterminate=selected.length>0&&selected.length<all.length;};
   screen.querySelectorAll("[data-select-member]").forEach(box=>box.addEventListener("change",updateBulkSelection));
   document.getElementById("selectAllMembers").onchange=e=>{screen.querySelectorAll("[data-select-member]").forEach(box=>box.checked=e.target.checked);updateBulkSelection();};
