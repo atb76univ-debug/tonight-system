@@ -107,35 +107,79 @@ function saveState() {
   persistDb();
 }
 
+function showNavigationError(error) {
+  console.error("画面遷移エラー:", error);
+  const box = document.createElement("div");
+  box.className = "navigation-error";
+  box.textContent = "画面の表示に失敗しました。もう一度操作するか、ページを再読み込みしてください。";
+  screen.prepend(box);
+}
+
 function navigate(renderFunc) {
+  if (typeof renderFunc !== "function") return false;
+
+  const oldHistory = pageHistory.slice();
+  const oldRender = currentRender;
   pageHistory.push(renderFunc);
   currentRender = renderFunc;
 
-  renderFunc();
-  renderReceptionTabs();
-  updateBackButton();
+  try {
+    renderFunc();
+    renderReceptionTabs();
+    updateBackButton();
+    return true;
+  } catch (error) {
+    // 描画失敗時に履歴だけが先へ進まないよう、直前の状態へ戻す
+    pageHistory = oldHistory;
+    currentRender = oldRender;
+    if (oldRender) {
+      try {
+        oldRender();
+        renderReceptionTabs();
+        updateBackButton();
+      } catch (restoreError) {
+        console.error("前画面の復元にも失敗しました:", restoreError);
+      }
+    }
+    showNavigationError(error);
+    return false;
+  }
 }
 
 function back() {
-  if (pageHistory.length <= 1) {
-    return;
-  }
+  if (pageHistory.length <= 1) return false;
+
+  const oldHistory = pageHistory.slice();
+  const oldRender = currentRender;
+  const previous = pageHistory[pageHistory.length - 2];
 
   // 回の一覧に戻るとき、アーカイブの未保存変更を確認する
-  if (pageHistory[pageHistory.length - 2] === renderEventList && !leaveEvent()) {
-    return;
-  }
+  if (previous === renderEventList && !leaveEvent()) return false;
 
   pageHistory.pop();
-
-  const previous =
-    pageHistory[pageHistory.length - 1];
-
   currentRender = previous;
-  previous();
-  renderReceptionTabs();
 
-  updateBackButton();
+  try {
+    previous();
+    renderReceptionTabs();
+    updateBackButton();
+    return true;
+  } catch (error) {
+    // 戻り先の描画に失敗した場合は、履歴を元に戻す
+    pageHistory = oldHistory;
+    currentRender = oldRender;
+    if (oldRender) {
+      try {
+        oldRender();
+        renderReceptionTabs();
+        updateBackButton();
+      } catch (restoreError) {
+        console.error("戻る前の画面の復元にも失敗しました:", restoreError);
+      }
+    }
+    showNavigationError(error);
+    return false;
+  }
 }
 
 function renderReceptionTabs() {
@@ -177,8 +221,9 @@ function getPageTitle(renderFunc) {
 }
 
 function updateBackButton() {
-  if (pageHistory.length <= 1) backBtn.classList.add("hidden");
-  else backBtn.classList.remove("hidden");
+  const canGoBack = pageHistory.length > 1;
+  backBtn.classList.toggle("hidden", !canGoBack);
+  backBtn.disabled = !canGoBack;
   if (pageTitleEl) pageTitleEl.textContent = getPageTitle(currentRender);
   if (eventHomeBtn) eventHomeBtn.classList.toggle("hidden", !ctx || currentRender === renderEventPage);
   const pulse = document.getElementById("eventPulse");
@@ -186,7 +231,10 @@ function updateBackButton() {
   const headerLive = document.getElementById("headerLive");
   if (headerLive) headerLive.classList.toggle("hidden", !ctx || ctx.mode === "archive");
   document.body.classList.toggle("in-event", !!ctx);
-  updateNow();
+
+  // ヘッダー更新ではNOW/NEXTだけを更新し、重いタイムライン再構築は行わない
+  try { updateNow({ refreshTimeline: false }); }
+  catch (error) { console.warn("ヘッダーのスケジュール表示を更新できませんでした:", error); }
 }
 
 function goEventHome() {
@@ -207,8 +255,15 @@ function goEventHome() {
   updateBackButton();
 }
 
-backBtn.addEventListener("click", back);
-if (eventHomeBtn) eventHomeBtn.addEventListener("click", goEventHome);
+backBtn.addEventListener("click", event => {
+  event.preventDefault();
+  event.stopPropagation();
+  back();
+}, { capture: true });
+if (eventHomeBtn) eventHomeBtn.addEventListener("click", event => {
+  event.preventDefault();
+  goEventHome();
+});
 
 function tallyString(count) {
 
@@ -2552,8 +2607,15 @@ function applyRemote(rem) {
   }
   saveLocalDb();
   if (before !== dbSig() && !(ctx && ctx.dirty)) {
-    const safe = [renderEventList, renderEventPage, renderHome, renderHistory, renderResult, renderBarHome, renderTimetable, renderMembers];
-    if (safe.includes(currentRender)) currentRender();
+    // タイムテーブル編集中に同期が走っても、入力欄やクリック対象を丸ごと破棄しない
+    const safe = [renderEventList, renderEventPage, renderHome, renderHistory, renderResult, renderBarHome, renderMembers];
+    if (safe.includes(currentRender)) {
+      try { currentRender(); renderReceptionTabs(); updateBackButton(); }
+      catch (error) { showNavigationError(error); }
+    } else if (currentRender === renderTimetable) {
+      // 進行中表示だけを追従させる。登録フォーム・一覧は操作を邪魔しない
+      updateNow();
+    }
   }
 }
 
@@ -3292,10 +3354,14 @@ function renderBarHome() {
 function createTt() { return { acts: [], shifts: [], offsetMinutes: 0 }; }
 // 旧バージョンや一部端末から同期された不完全なタイムテーブルでも画面遷移できるよう正規化
 function ensureTt(value) {
-  const tt = value && typeof value === "object" ? value : {};
+  const tt = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   if (!Array.isArray(tt.acts)) tt.acts = [];
   if (!Array.isArray(tt.shifts)) tt.shifts = [];
-  if (!Number.isFinite(Number(tt.offsetMinutes))) tt.offsetMinutes = 0;
+  // 同期データや旧データに null / 不正行が混入していても描画処理を止めない
+  tt.acts = tt.acts.filter(item => item && typeof item === "object");
+  tt.shifts = tt.shifts.filter(item => item && typeof item === "object");
+  const offset = Number(tt.offsetMinutes || 0);
+  tt.offsetMinutes = Number.isFinite(offset) ? offset : 0;
   return tt;
 }
 function saveTt() {
@@ -3315,15 +3381,15 @@ function isValidTimeRange(start, end) {
   return toMin(end) > toMin(start);
 }
 function recordMemberDisplay(item) {
-  const rawIds = item && item.memberIds;
-  const ids = Array.isArray(rawIds) ? rawIds : [];
-  const savedNames = String(item?.name || "").split("、");
-  if (!ids.length) return String(item?.name || "");
+  const ids = Array.isArray(item?.memberIds) ? item.memberIds : [];
+  const savedNames = String(item?.name ?? "").split("、").map(name => name.trim()).filter(Boolean);
+  if (!ids.length) return savedNames.join("、");
+  const members = Array.isArray(db?.members) ? db.members : [];
   const names = ids.map((id, index) => {
-    const member = (db.members || []).find(m => m.id === id);
+    const member = members.find(m => m && m.id === id);
     return member ? memberDisplayName(member) : (savedNames[index] || "登録外メンバー");
   });
-  const freeNames = savedNames.slice(ids.length).filter(Boolean);
+  const freeNames = savedNames.slice(ids.length);
   return [...names, ...freeNames].filter(Boolean).join("、");
 }
 
@@ -3356,14 +3422,21 @@ function nowHtml(tt, ev) {
   html += `</div>`;
   return html;
 }
-function updateNow() {
-  if (!ctx) return;
-  const html = nowHtml(ctx.tt || createTt(), ctx.ev);
-  const el = document.getElementById("nowBox");
-  if (el) el.innerHTML = html;
-  const global = document.getElementById("globalNowBox");
-  if (global) global.innerHTML = html;
-  if (currentRender === renderTimetable) renderEventTimeline();
+function updateNow(options = {}) {
+  if (!ctx || !ctx.ev) return;
+  try {
+    const tt = ensureTt(ctx.tt || ctx.ev.tt || createTt());
+    ctx.tt = tt;
+    const html = nowHtml(tt, ctx.ev);
+    const el = document.getElementById("nowBox");
+    if (el) el.innerHTML = html;
+    const global = document.getElementById("globalNowBox");
+    if (global) global.innerHTML = html;
+    if (options.refreshTimeline !== false && currentRender === renderTimetable) renderEventTimeline();
+  } catch (error) {
+    // 定期更新の例外で、ヘッダーやページ遷移まで止めない
+    console.error("NOW/NEXT更新エラー:", error);
+  }
 }
 function renderEventTimeline(){
  const host=document.getElementById("eventTimeline");if(!host)return;const tt=ctx.tt,all=(tt.acts||[]).map(a=>({...a,_kind:"act"})).sort((a,b)=>actSlotRange(a)[0]-actSlotRange(b)[0]);
@@ -3374,7 +3447,14 @@ function renderEventTimeline(){
 }
 
 function renderTimetable() {
-  if (!ctx) { navigate(renderEventList); return; }
+  if (!ctx) {
+    pageHistory = [renderEventList];
+    currentRender = renderEventList;
+    renderEventList();
+    renderReceptionTabs();
+    updateBackButton();
+    return;
+  }
   const tt = ctx.tt = ensureTt(ctx.tt);
   const sorted = l => l.slice().sort((a, b) => slotRange(a)[0] - slotRange(b)[0]);
   screen.innerHTML = `
