@@ -1045,11 +1045,18 @@ function renderReceptionInput() {
 
     listContainer.querySelectorAll(".tmp-member-search").forEach(input => {
       input.addEventListener("input", e => {
-        const i = Number(e.target.dataset.index), old = tmpNames[i];
+        const i = Number(e.target.dataset.index);
         tmpNames[i] = { name: e.target.value, memberId: "" };
+        const box = listContainer.querySelector(`.tmp-member-results[data-index="${i}"]`);
+        if (box) { box.hidden = false; box.classList.remove("is-closed"); }
         showMemberResults(i, e.target.value);
       });
-      input.addEventListener("focus", e => showMemberResults(Number(e.target.dataset.index), e.target.value));
+      input.addEventListener("focus", e => {
+        const i = Number(e.target.dataset.index);
+        const box = listContainer.querySelector(`.tmp-member-results[data-index="${i}"]`);
+        if (box) box.classList.remove("is-closed");
+        showMemberResults(i, e.target.value);
+      });
       input.addEventListener("keydown", e => { if (e.key === "Escape") { const box=listContainer.querySelector(`.tmp-member-results[data-index="${e.target.dataset.index}"]`); if(box) box.hidden=true; } });
     });
     listContainer.querySelectorAll(".tmp-member-result").forEach(btn => btn.addEventListener("click", () => {
@@ -1059,7 +1066,8 @@ function renderReceptionInput() {
       const input = listContainer.querySelector(`.tmp-member-search[data-index="${i}"]`);
       if (input) input.value = memberDisplayName(m);
       const box = listContainer.querySelector(`.tmp-member-results[data-index="${i}"]`);
-      if (box) box.hidden = true;
+      if (box) { box.hidden = true; box.classList.add("is-closed"); }
+      if (input) input.blur();
     }));
     listContainer.querySelectorAll(".tmp-name-delete").forEach(btn => btn.addEventListener("click", e => {
       const index = Number(e.currentTarget.dataset.index);
@@ -2456,6 +2464,8 @@ let pushTimer = null;
 let barCart = [];
 let barCartEventId = null;
 let barCheckoutPage = false;
+let barOrderComplete = false;
+let barOrderCompleteTimer = null;
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -3151,7 +3161,7 @@ function renderBarHome() {
   b.products = sharedLineup.map(p => ({ ...p, soldOut: Boolean(previousProducts.find(x => x.id === p.id)?.soldOut) }));
   ctx.bar = b;
   if (ctx.mode === "live") { ev.bar = b; }
-  if (barCartEventId !== ev.id) { barCart = []; barCartEventId = ev.id; barCheckoutPage = false; }
+  if (barCartEventId !== ev.id) { barCart = []; barCartEventId = ev.id; barCheckoutPage = false; barOrderComplete = false; if (barOrderCompleteTimer) clearTimeout(barOrderCompleteTimer); }
   const dt = new Date(ev.date + "T00:00:00"), md = `${dt.getMonth() + 1}/${dt.getDate()}`;
   const yen = n => "¥" + formatMoney(n);
   const sales = summarizeBarSales(b);
@@ -3162,6 +3172,31 @@ function renderBarHome() {
   const productRows = Object.entries(sales.byProduct).map(([id, p]) => `
     <div class="sales-product-row"><strong>${esc(p.name)}</strong><span>${p.totalUnits}杯</span><span>現金 ${p.cashUnits}杯</span><span>チケ ${p.ticketUnits}杯</span><b>${yen(p.cashRevenue)}</b></div>
   `).join("");
+  if (barOrderComplete) {
+    screen.innerHTML = `
+      <section class="bar-order-complete" role="status" aria-live="polite">
+        <div class="bar-order-complete-icon" aria-hidden="true">✓</div>
+        <h2>ご注文ありがとうございました！</h2>
+        <p>会計が完了しました。</p>
+        <div class="bar-order-complete-countdown"><strong>3</strong>秒後に商品選択画面へ戻ります</div>
+        <button type="button" class="btn btn-primary" id="barOrderCompleteNext">次の注文へ進む</button>
+      </section>`;
+    const returnToProducts = () => {
+      if (!barOrderComplete) return;
+      barOrderComplete = false;
+      if (barOrderCompleteTimer) clearTimeout(barOrderCompleteTimer);
+      barOrderCompleteTimer = null;
+      barCheckoutPage = false;
+      barPage = "sales";
+      renderBarHome();
+    };
+    const nextButton = $("barOrderCompleteNext");
+    if (nextButton) nextButton.onclick = returnToProducts;
+    if (barOrderCompleteTimer) clearTimeout(barOrderCompleteTimer);
+    barOrderCompleteTimer = setTimeout(returnToProducts, 3000);
+    return;
+  }
+
   const latestOrders = (b.sales || [])
     .slice()
     .sort((a, z) => Number(z.timestamp || 0) - Number(a.timestamp || 0))
@@ -3416,7 +3451,7 @@ function renderBarHome() {
     $("barCashierCancel").onclick = () => $("barCashierOverlay").remove();
     confirmBtn.onclick = () => {
       b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "cash", items: structuredClone(barCart), totalAmount: total, paidAmount: paid, change: paid - total });
-      barCart = []; barCheckoutPage = false; saveBar(); renderBarHome();
+      barCart = []; barCheckoutPage = false; barOrderComplete = true; saveBar(); renderBarHome();
     };
     refreshPayment();
   };
@@ -3445,7 +3480,7 @@ function renderBarHome() {
       button.disabled = true;
       button.textContent = "会計を記録しています…";
       b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "ticket", items: structuredClone(barCart), totalAmount: total, paidAmount: 0, change: 0 });
-      barCart = []; barCheckoutPage = false; saveBar(); renderBarHome();
+      barCart = []; barCheckoutPage = false; barOrderComplete = true; saveBar(); renderBarHome();
     };
   };
 
@@ -3615,7 +3650,7 @@ function renderBarHome() {
     const products = structuredClone(b.products);
     const deletedSales = pruneDeletionLog(b.deletedSales || []);
     Object.assign(b, createBar(), { products, sales: [], resetAt: Date.now(), voidedSales: [], deletedSales });
-    barCart = []; barCheckoutPage = false; saveBar(); renderBarHome();
+    barCart = []; barCheckoutPage = false; barOrderComplete = false; saveBar(); renderBarHome();
   };
   refreshCart();
   recalc();

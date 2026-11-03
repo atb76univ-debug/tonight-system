@@ -1972,3 +1972,16 @@ button { max-width:100%; }
  .bar-checkout-cart .cart-line-actions{width:100%; justify-content:flex-end}
  .bar-checkout-cart .checkout-actions{grid-template-columns:1fr; gap:8px}
 }
+
+
+/* バーカウンター注文完了画面 */
+.bar-order-complete{min-height:52vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:32px 20px;margin:16px auto;max-width:560px;background:var(--card-bg, #fff);border:1px solid var(--border, #e5e7eb);border-radius:18px;box-sizing:border-box}
+.bar-order-complete-icon{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;background:#e7f7ed;color:#168344;font-size:44px;font-weight:800}
+.bar-order-complete h2{margin:4px 0 0;font-size:clamp(21px,5vw,28px);line-height:1.35}
+.bar-order-complete p{margin:0;color:var(--muted, #666)}
+.bar-order-complete-countdown{margin:8px 0 4px;color:var(--muted, #666);font-size:14px}
+.bar-order-complete-countdown strong{font-size:24px;color:var(--text, #222);margin-right:4px}
+.bar-order-complete .btn{width:min(100%,320px);min-height:48px}
+
+/* TMP名簿候補：選択後は確実に閉じ、次へボタンとの重なりを防ぐ */
+.tmp-member-results[hidden], .tmp-member-results.is-closed{display:none!important;visibility:hidden!important;pointer-events:none!important}
