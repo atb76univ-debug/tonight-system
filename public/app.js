@@ -2918,44 +2918,98 @@ function renderMembers() {
         const sheet=wb.Sheets[wb.SheetNames[0]];
         table=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false});
       }
-      const norm=x=>String(x??"").normalize("NFKC").toLowerCase().replace(/[\s　_*・:：()（）「」【】\[\]\-]/g,"");
+
+      const norm=x=>String(x??"").replace(/^\uFEFF/,"").normalize("NFKC").toLowerCase().replace(/[\s　_*・:：()（）「」【】\[\]\-]/g,"");
       const findHeader=(headers, kind)=>{
         const hs=headers.map(norm);
         const exact = kind==="name"
           ? ["名前","氏名","name","メンバー","member","fullname","氏名漢字","名前漢字"]
-          : kind==="grade" ? ["学年","年次","学籍年次","grade","year","学年(例3年)","学年例3年"]
-          : ["ニックネーム","djネーム","dj名","nickname","djname","artistname","活動名"];
+          : kind==="grade"
+            ? ["学年","年次","学籍年次","grade","year","学年(例3年)","学年例3年"]
+            : kind==="studentId"
+              ? ["学籍番号","学籍id","studentid","studentnumber","id"]
+              : ["ニックネーム","djネーム","dj名","nickname","djname","artistname","活動名"];
         let i=hs.findIndex(h=>exact.map(norm).includes(h));
         if(i>=0)return i;
-        if(kind==="grade") i=hs.findIndex(h=>h.includes("学年") || h==="年次" || h.includes("年次") || h.includes("grade"));
-        if(kind==="name") i=hs.findIndex(h=>h.includes("氏名") || h.includes("名前") || h==="name" || h.includes("fullname"));
-        if(kind==="nickname") i=hs.findIndex(h=>h.includes("ニックネーム") || h.includes("djネーム") || h.includes("dj名") || h.includes("nickname") || h.includes("活動名"));
-        return i;
+        if(kind==="grade") return hs.findIndex(h=>h.includes("学年") || h.includes("年次") || h==="grade" || h==="year");
+        if(kind==="name") return hs.findIndex(h=>h.includes("氏名") || h.includes("名前") || h==="name" || h.includes("fullname"));
+        if(kind==="studentId") return hs.findIndex(h=>h.includes("学籍番号") || h==="studentid" || h==="studentnumber");
+        if(kind==="nickname") return hs.findIndex(h=>h.includes("ニックネーム") || h.includes("djネーム") || h.includes("dj名") || h.includes("nickname") || h.includes("活動名"));
+        return -1;
       };
-      // 先頭にタイトル行・空行があるExcelにも対応し、名前と学年の見出しが揃う行を探す
-      let headerIndex=-1, col={name:-1,grade:-1,nickname:-1};
-      const scanLimit=Math.min(table.length,30);
-      for(let r=0;r<scanLimit;r++){
+
+      let headerIndex=-1, col={name:-1,grade:-1,nickname:-1,studentId:-1};
+      for(let r=0;r<Math.min(table.length,30);r++){
         const h=table[r]||[];
-        const candidate={name:findHeader(h,"name"),grade:findHeader(h,"grade"),nickname:findHeader(h,"nickname")};
-        if(candidate.name>=0 && (candidate.grade>=0 || candidate.nickname>=0)) {headerIndex=r;col=candidate;break;}
+        const candidate={
+          name:findHeader(h,"name"),
+          grade:findHeader(h,"grade"),
+          nickname:findHeader(h,"nickname"),
+          studentId:findHeader(h,"studentId")
+        };
+        if(candidate.name>=0 && (candidate.grade>=0 || candidate.nickname>=0)){
+          headerIndex=r; col=candidate; break;
+        }
       }
-      if(headerIndex<0) throw new Error("名前・氏名の列見出しを特定できませんでした。1行目などに「名前」「氏名」「学年」の見出しがあるか確認してください。");
-      const cleanCell=v=>String(v??"").trim();
-      let added=0,updated=0,skipped=0;
+      if(headerIndex<0) {
+        const preview=(table[0]||[]).map(x=>String(x??"").trim()).filter(Boolean).join(" / ");
+        throw new Error(`見出し行を特定できませんでした。検出した1行目：${preview||"空行"}。氏名・年次（または学年）の列見出しを確認してください。`);
+      }
+
+      const cleanCell=v=>String(v??"").replace(/^\uFEFF/,"").trim();
+      const normalizeGrade=v=>{
+        const value=cleanCell(v);
+        if(!value) return "";
+        return /^\d+$/.test(value) ? `${value}年` : value;
+      };
+      const matchName=v=>norm(v).replace(/[　\s]/g,"");
+      let added=0,updated=0,skipped=0,gradeImported=0,gradeBlank=0;
+      const imported=[];
       for(const row of table.slice(headerIndex+1)){
         const name=cleanCell(row[col.name]);
-        const grade=col.grade>=0?cleanCell(row[col.grade]):"";
+        const rawGrade=col.grade>=0?cleanCell(row[col.grade]):"";
+        const grade=normalizeGrade(rawGrade);
         const nickname=col.nickname>=0?cleanCell(row[col.nickname]):"";
+        const studentId=col.studentId>=0?cleanCell(row[col.studentId]):"";
         if(!name){skipped++;continue;}
-        const found=(db.members||[]).find(m=>norm(m.name)===norm(name));
-        if(found){let changed=false;if(grade && found.grade!==grade){found.grade=grade;changed=true;}if(col.nickname>=0 && found.nickname!==(nickname||"")){found.nickname=nickname||"";changed=true;}if(changed)updated++;}
-        else {db.members.push({id:uid(),name,grade,nickname});added++;}
+        const found=(db.members||[]).find(m=>
+          (studentId && m.studentId && norm(m.studentId)===norm(studentId)) ||
+          matchName(m.name)===matchName(name)
+        );
+        if(found){
+          let changed=false;
+          if(grade && found.grade!==grade){found.grade=grade;changed=true;}
+          if(studentId && found.studentId!==studentId){found.studentId=studentId;changed=true;}
+          if(col.nickname>=0 && found.nickname!==(nickname||"")){found.nickname=nickname||"";changed=true;}
+          if(changed)updated++;
+        } else {
+          db.members.push({id:uid(),name,grade,nickname,studentId});
+          added++;
+        }
+        if(grade) gradeImported++; else gradeBlank++;
+        imported.push({name,grade,studentId});
       }
-      db.membersUpdated=Date.now();persistDb();
-      alert(`取り込み完了：新規 ${added}名／更新 ${updated}名${skipped?`／名前なし等 ${skipped}行をスキップ`:""}`);
+      db.membersUpdated=Date.now();
+      persistDb();
+      const gradeColumn=col.grade>=0 ? (table[headerIndex][col.grade]||"（列名不明）") : "未検出";
+      alert(
+        `取り込み完了\n`+
+        `氏名列：${table[headerIndex][col.name]}\n`+
+        `学年列：${gradeColumn}\n`+
+        `学年取得：${gradeImported}名／空欄：${gradeBlank}名\n`+
+        `新規：${added}名／更新：${updated}名`+
+        `${skipped?`／名前なし等 ${skipped}行をスキップ`:""}`
+      );
+      console.info("[名簿インポート診断]",{
+        file:file.name,headerIndex,headers:table[headerIndex],columns:col,
+        total:imported.length,gradeImported,gradeBlank,added,updated,skipped,
+        sample:imported.slice(0,5)
+      });
       renderMembers();
-    } catch(err) { alert(`読み込みに失敗しました：${err.message}`); }
+    } catch(err) {
+      console.error("[名簿インポート失敗]",err);
+      alert(`読み込みに失敗しました：${err.message}`);
+    }
     e.target.value="";
   };
 }
