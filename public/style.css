@@ -1985,3 +1985,12 @@ button { max-width:100%; }
 
 /* TMP名簿候補：選択後は確実に閉じ、次へボタンとの重なりを防ぐ */
 .tmp-member-results[hidden], .tmp-member-results.is-closed{display:none!important;visibility:hidden!important;pointer-events:none!important}
+
+/* 商品選択画面でも数量を直接増減できる */
+.product-tile-card{min-width:0;display:flex;flex-direction:column;gap:6px}
+.product-tile-card .product-tile{width:100%;box-sizing:border-box}
+.product-selection-qty{display:flex;align-items:center;justify-content:center;gap:14px;min-height:38px;padding:2px 4px;border:1px solid #e4e6eb;border-radius:10px;background:#f8f9fb;box-sizing:border-box}
+.product-selection-qty[hidden]{display:none!important}
+.product-selection-qty .qty-btn{width:34px;height:32px;min-width:34px;border:0;border-radius:8px;background:#e9edf3;color:#20242b;font-size:20px;font-weight:800;line-height:1;cursor:pointer}
+.product-selection-qty strong{min-width:18px;text-align:center;font-size:15px;font-variant-numeric:tabular-nums}
+@media(max-width:420px){.product-selection-qty{gap:10px}.product-selection-qty .qty-btn{width:32px;height:32px;min-width:32px}}

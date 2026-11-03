@@ -3204,8 +3204,13 @@ function renderBarHome() {
     };
     const nextButton = $("barOrderCompleteNext");
     if (nextButton) nextButton.onclick = returnToProducts;
-    if (barOrderCompleteTimer) clearTimeout(barOrderCompleteTimer);
-    barOrderCompleteTimer = setTimeout(returnToProducts, 3000);
+    // 同期などで renderBarHome が再実行されても、3秒タイマーをリセットしない。
+    if (!barOrderCompleteTimer) {
+      barOrderCompleteTimer = setTimeout(() => {
+        barOrderCompleteTimer = null;
+        returnToProducts();
+      }, 3000);
+    }
     return;
   }
 
@@ -3265,7 +3270,20 @@ function renderBarHome() {
     ` : `
       <div class="section-label">商品をタップして注文に追加</div>
       <div class="product-grid">
-        ${b.products.map(p => `<button class="product-tile ${p.soldOut ? "sold-out" : ""}" data-add-product="${esc(p.id)}" ${p.soldOut ? "disabled aria-disabled=\"true\"" : ""}><span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>${p.soldOut ? "売切れ" : "＋ 注文に追加"}</small></button>`).join("") || `<div class="sub-text">商品がありません。「商品・価格の設定」から追加してください。</div>`}
+        ${b.products.map(p => {
+          const selected = barCart.find(x => x.productId === p.id);
+          const qty = selected ? selected.qty : 0;
+          return `<div class="product-tile-card" data-product-card="${esc(p.id)}">
+            <button type="button" class="product-tile ${p.soldOut ? "sold-out" : ""}" data-add-product="${esc(p.id)}" ${p.soldOut ? "disabled aria-disabled=\"true\"" : ""}>
+              <span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>${p.soldOut ? "売切れ" : "＋ 注文に追加"}</small>
+            </button>
+            <div class="product-selection-qty" data-selection-qty="${esc(p.id)}" ${qty ? "" : "hidden"}>
+              <button type="button" class="qty-btn" data-selection-dec="${esc(p.id)}" aria-label="${esc(p.name)}を1つ減らす">−</button>
+              <strong>${qty}</strong>
+              <button type="button" class="qty-btn" data-selection-inc="${esc(p.id)}" aria-label="${esc(p.name)}を1つ増やす">＋</button>
+            </div>
+          </div>`;
+        }).join("") || `<div class="sub-text">商品がありません。「商品・価格の設定」から追加してください。</div>`}
       </div>
       <div class="bar-cart-dock ${barCart.length ? "has-items" : ""}" id="barCartDock" aria-live="polite">
         <div class="bar-cart-dock-info"><strong id="barCartDockItems">${barCart.length ? barCart.map(x => `${esc(x.name)} ×${x.qty}`).join("　") : "商品を選択してください"}</strong><span id="barCartDockTotal">${yen(barCart.reduce((n,x)=>n+x.price*x.qty,0))}</span></div>
@@ -3394,6 +3412,13 @@ function renderBarHome() {
       dock.classList.toggle("has-items", barCart.length > 0);
       $("barGoCheckout").disabled = !barCart.length;
     }
+    screen.querySelectorAll("[data-selection-qty]").forEach(el => {
+      const id = el.dataset.selectionQty;
+      const line = barCart.find(x => x.productId === id);
+      el.hidden = !line || line.qty <= 0;
+      const count = el.querySelector("strong");
+      if (count) count.textContent = String(line ? line.qty : 0);
+    });
     if (!lines) return;
     lines.innerHTML = barCart.map(x => `<div class="cart-line">
       <div class="cart-line-title"><strong>${esc(x.name)}</strong><small>${yen(x.price)} × ${x.qty}</small></div>
@@ -3423,6 +3448,17 @@ function renderBarHome() {
     let line = barCart.find(x => x.productId === p.id);
     if (!line) { line = { productId: p.id, name: p.name, price: Number(p.price || 0), qty: 0 }; barCart.push(line); }
     line.qty++;
+    refreshCart();
+  });
+  screen.querySelectorAll("[data-selection-inc]").forEach(btn => btn.onclick = () => {
+    const line = barCart.find(x => x.productId === btn.dataset.selectionInc);
+    if (line) line.qty++;
+    refreshCart();
+  });
+  screen.querySelectorAll("[data-selection-dec]").forEach(btn => btn.onclick = () => {
+    const line = barCart.find(x => x.productId === btn.dataset.selectionDec);
+    if (line) line.qty--;
+    barCart = barCart.filter(x => x.qty > 0);
     refreshCart();
   });
   const clearCartButton = $("clearBarCart");
