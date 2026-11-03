@@ -19,6 +19,7 @@ const eventHomeBtn = document.getElementById("eventHomeBtn");
 const pageTitleEl = document.getElementById("pageTitle");
 
 let pageHistory = [];
+let barPage = "pos";
 
 let state = createInitialState();
 let currentRender = null;
@@ -131,6 +132,7 @@ function getPageTitle(renderFunc) {
     [renderEditStartCash, "初期金庫額"], [renderEditDrinkTickets, "ドリチケ設定"],
     [renderBarHome, "バーカウンター"], [renderTimetable, "タイムテーブル・シフト"]
   ]);
+  if (renderFunc === renderBarHome) return ({pos:"ドリンク販売",products:"商品管理",history:"販売履歴・集計",cash:"金庫・精算"})[barPage] || "バーカウンター";
   return titles.get(renderFunc) || "tonight!";
 }
 
@@ -2851,7 +2853,7 @@ function renderBarSetup() {
     let valid = true;
     screen.querySelectorAll('[data-bc="start"]').forEach(inp => { const n=Number(inp.value||0); if(!Number.isInteger(n)||n<0) valid=false; else b.startBreakdown[inp.dataset.v]=n; });
     if(!valid){alert("金種の枚数は0以上の整数で入力してください");return;}
-    b.started = true; b.startedAt = Date.now(); saveBar(); navigate(renderBarHome);
+    b.started = true; b.startedAt = Date.now(); barPage = "pos"; saveBar(); navigate(renderBarHome);
   };
 }
 
@@ -2881,7 +2883,13 @@ function renderBarHome() {
   }).join("");
 
   screen.innerHTML = `
-  <div class="card pos-card">
+  <div class="bar-page-nav">
+    <button class="bar-page-tab ${barPage === "pos" ? "active" : ""}" data-bar-page="pos">販売</button>
+    <button class="bar-page-tab ${barPage === "products" ? "active" : ""}" data-bar-page="products">商品管理</button>
+    <button class="bar-page-tab ${barPage === "history" ? "active" : ""}" data-bar-page="history">販売履歴・集計</button>
+    <button class="bar-page-tab ${barPage === "cash" ? "active" : ""}" data-bar-page="cash">金庫・精算</button>
+  </div>
+  <div class="card pos-card" data-bar-section="pos">
     <div class="pos-heading"><div><div class="eyebrow">DRINK POS</div><div class="card-title">ドリンク販売</div></div><span class="pos-live"><i></i> SALES LIVE</span></div>
     <div class="pos-summary-grid">
       <div><small>販売数</small><strong>${sales.totalUnits}<em>杯</em></strong></div>
@@ -2905,7 +2913,7 @@ function renderBarHome() {
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" data-bar-section="history">
     <div class="card-title">販売集計</div>
     <div class="pos-summary-grid report-summary">
       <div><small>現金販売</small><strong>${sales.cashUnits}<em>杯</em></strong></div>
@@ -2916,7 +2924,7 @@ function renderBarHome() {
     ${productRows || `<div class="sub-text">まだ販売記録がありません。</div>`}
   </div>
 
-  <div class="card">
+  <div class="card" data-bar-section="products">
     <details class="product-management">
       <summary>商品・価格の設定</summary>
       <p class="sub-text">商品名と販売価格を登録します。販売済みの記録には、その時点の商品名・価格が残ります。</p>
@@ -2937,18 +2945,18 @@ function renderBarHome() {
     </details>
   </div>
 
-  <div class="card">
+  <div class="card" data-bar-section="history">
     <div class="card-title">直近の販売</div>
     ${recent || `<div class="sub-text">販売履歴はまだありません。</div>`}
   </div>
 
-  <div class="card">
+  <div class="card" data-bar-section="cash">
     <div class="card-title">① 開始時の金庫</div>
     ${barCashRows("start", b.startBreakdown)}
     <div class="money-display"><div class="label">開始時の金額</div><div class="amount" id="bStart"></div></div>
   </div>
 
-  <div class="card">
+  <div class="card" data-bar-section="cash">
     <div class="card-title">ドリンク精算</div>
     <div class="section-label"><span class="step">②</span>金庫内のお金を手で数える</div>
     ${barCashRows("end", b.endBreakdown)}
@@ -2961,7 +2969,7 @@ function renderBarHome() {
     <button class="btn btn-secondary" id="bCopy">文面をコピー</button>
   </div>
 
-  <div class="card">
+  <div class="card" data-bar-section="cash">
     <div class="card-title">確認・チケット照合</div>
     <div class="form-row"><label>カウンターで受け取ったドリチケ枚数</label>
       <input id="bTickets" type="number" min="0" step="1" inputmode="numeric" value="${Number(b.tickets || 0)}"></div>
@@ -2976,9 +2984,12 @@ function renderBarHome() {
       <label><input type="checkbox" data-ck="fridge" ${b.checks.fridge ? "checked" : ""}><span>封筒を冷蔵庫に入れた</span></label>
     </div>
   </div>
-  <button class="btn btn-danger btn-large" id="clearBarAccounting">バーカウンターの会計データを一括削除</button>
+  <button class="btn btn-danger btn-large" data-bar-section="cash" id="clearBarAccounting">バーカウンターの会計データを一括削除</button>
   `;
 
+  screen.querySelectorAll("[data-bar-page]").forEach(btn => btn.onclick = () => { barPage = btn.dataset.barPage; renderBarHome(); });
+  screen.querySelectorAll("[data-bar-section]").forEach(el => { el.hidden = el.dataset.barSection !== barPage; });
+  updateBackButton();
   const $ = id => document.getElementById(id);
   const cartTotal = () => barCart.reduce((sum, x) => sum + x.price * x.qty, 0);
   const cartUnits = () => barCart.reduce((sum, x) => sum + x.qty, 0);
@@ -3139,23 +3150,22 @@ function nowHtml(tt, ev) {
   const curAct = current(tt.acts)[0], nextAct = next(tt.acts);
   const eventState = t < 0 ? "開催前" : (t > 30 * 60 ? "開催終了" : "LIVE");
   const actHtml = curAct
-    ? `<strong class="now-main">${esc(curAct.name)}</strong><span class="sub-text">${esc(curAct.start)}–${esc(curAct.end)} ・ 出演中</span>`
+    ? `<span class="schedule-tag current">NOW</span><strong class="now-main">${esc(curAct.name)}</strong><span class="sub-text">${esc(curAct.start)}–${esc(curAct.end)} ・ 出演中</span>`
     : nextAct
-      ? `<strong class="now-main">${esc(nextAct.name)}</strong><span class="sub-text">次の出番 ${esc(nextAct.start)}–${esc(nextAct.end)}</span>`
+      ? `<span class="schedule-tag next">NEXT</span><strong class="now-main">${esc(nextAct.name)}</strong><span class="sub-text">${esc(nextAct.start)}–${esc(nextAct.end)}</span>`
       : `<span class="sub-text">${tt.acts.length ? "この後の出番はありません" : "出番は未登録です"}</span>`;
   let html = `<div class="schedule-status"><span class="live-orb"></span><span>${eventState}</span><small>${esc(ev.date)}</small></div>
     <div class="now-row"><span class="now-label">出番</span><div class="now-detail">${actHtml}</div></div>`;
   const roles = [...new Set((tt.shifts || []).map(s => s.role))];
   if (roles.length) {
     html += `<div class="schedule-shifts"><div class="section-label">シフト</div>` + roles.map(role => {
-      const active = current(tt.shifts.filter(s => s.role === role));
-      const upcoming = next(tt.shifts.filter(s => s.role === role));
-      const names = active.length ? active.map(s => esc(s.name)).join("、") : (upcoming ? `${esc(upcoming.name)}（${esc(upcoming.start)}〜）` : "—");
-      return `<div class="schedule-shift-row"><span>${esc(role)}</span><strong>${names}</strong></div>`;
+      const list = tt.shifts.filter(s => s.role === role);
+      const active = current(list), upcoming = next(list);
+      if (active.length) return active.map(s => `<div class="schedule-shift-row"><span class="schedule-tag current">NOW</span><strong>${esc(role)}：${esc(s.name)}</strong><small>${esc(s.start)}–${esc(s.end)}</small></div>`).join("");
+      if (upcoming) return `<div class="schedule-shift-row"><span class="schedule-tag next">NEXT</span><strong>${esc(role)}：${esc(upcoming.name)}</strong><small>${esc(upcoming.start)}–${esc(upcoming.end)}</small></div>`;
+      return `<div class="schedule-shift-row"><span>${esc(role)}</span><strong>予定なし</strong></div>`;
     }).join("") + `</div>`;
-  } else {
-    html += `<div class="sub-text schedule-empty">シフトは未登録です</div>`;
-  }
+  } else html += `<div class="sub-text schedule-empty">シフトは未登録です</div>`;
   return html;
 }
 function updateNow() {
@@ -3178,7 +3188,7 @@ function renderTimetable() {
     <div class="inline-form">
       <input type="time" id="aStart" value="20:00"><input type="time" id="aEnd" value="20:30">
       <input class="full" id="aName" placeholder="出演者名">
-      <button class="btn btn-primary full" id="aAdd">追加</button>
+      <button class="btn btn-primary full" id="aAdd">追加</button><button class="btn btn-secondary full" id="aCancel" hidden>編集をキャンセル</button>
     </div>
     <p class="sub-text">登録済みの行をタップすると編集できます。23:00〜翌1:00のような日付またぎは登録できます。</p>
   </div>
@@ -3189,8 +3199,8 @@ function renderTimetable() {
     <div class="inline-form">
       <input type="time" id="sStart" value="19:00"><input type="time" id="sEnd" value="21:00">
       <input id="sRole" list="roleList" placeholder="役割（受付・バーなど）"><input id="sName" placeholder="担当者名">
-      <datalist id="roleList"><option>受付</option><option>バーカウンター</option><option>音響</option><option>照明</option><option>物販</option></datalist>
-      <button class="btn btn-primary full" id="sAdd">追加</button>
+      <datalist id="roleList"><option>受付</option><option>バーカウンター</option><option>音響</option><option>照明</option><option>物販</option><option>VJ</option></datalist>
+      <button class="btn btn-primary full" id="sAdd">追加</button><button class="btn btn-secondary full" id="sCancel" hidden>編集をキャンセル</button>
     </div>
   </div>`;
   const $ = id => document.getElementById(id);
@@ -3211,12 +3221,14 @@ function renderTimetable() {
   };
   screen.querySelectorAll("[data-ea]").forEach(el => el.onclick = () => {
     const a = tt.acts.find(x => x.id === el.dataset.ea); if (!a) return;
-    editA = a.id; $("aStart").value = a.start; $("aEnd").value = a.end; $("aName").value = a.name; $("aAdd").textContent = "更新";
+    editA = a.id; $("aStart").value = a.start; $("aEnd").value = a.end; $("aName").value = a.name; $("aAdd").textContent = "更新"; $("aCancel").hidden = false;
   });
   screen.querySelectorAll("[data-es]").forEach(el => el.onclick = () => {
     const s = tt.shifts.find(x => x.id === el.dataset.es); if (!s) return;
-    editS = s.id; $("sStart").value = s.start; $("sEnd").value = s.end; $("sRole").value = s.role; $("sName").value = s.name; $("sAdd").textContent = "更新";
+    editS = s.id; $("sStart").value = s.start; $("sEnd").value = s.end; $("sRole").value = s.role; $("sName").value = s.name; $("sAdd").textContent = "更新"; $("sCancel").hidden = false;
   });
+  $("aCancel").onclick = () => { editA = null; $("aStart").value = "20:00"; $("aEnd").value = "20:30"; $("aName").value = ""; $("aAdd").textContent = "追加"; $("aCancel").hidden = true; };
+  $("sCancel").onclick = () => { editS = null; $("sStart").value = "19:00"; $("sEnd").value = "21:00"; $("sRole").value = ""; $("sName").value = ""; $("sAdd").textContent = "追加"; $("sCancel").hidden = true; };
   screen.querySelectorAll("[data-da]").forEach(btn => btn.onclick = () => {
     if (!confirm("この出番を削除しますか？")) return;
     tt.acts = tt.acts.filter(x => x.id !== btn.dataset.da); saveTt(); renderTimetable();
