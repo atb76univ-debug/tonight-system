@@ -1650,11 +1650,3 @@ button { max-width:100%; }
 .member-bulk-toolbar button:disabled{opacity:.45;cursor:not-allowed}
 .member-record .member-row-select{margin:0 3px 0 0}
 @media(max-width:520px){.member-bulk-toolbar{align-items:flex-start}.member-bulk-toolbar button{width:100%}.member-bulk-toolbar small{margin-left:0}}
-
-
-/* ナビゲーション操作の安定化 */
-.topbar{z-index:200;isolation:isolate}
-#backBtn{position:relative;z-index:201;flex:0 0 42px;touch-action:manipulation;pointer-events:auto;cursor:pointer}
-#backBtn:disabled{opacity:.45;cursor:default}
-.event-pulse{z-index:90}
-.navigation-error{margin:0 0 12px;padding:12px 14px;border:1px solid #e6b9b9;border-radius:12px;background:#fff4f4;color:#9f2424;font-size:13px;font-weight:700}
