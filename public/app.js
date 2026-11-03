@@ -2478,7 +2478,7 @@ function defaultBarProducts() {
   return [{ id: uid(), name: "ドリンク", price: 500 }];
 }
 function createBar() {
-  return { started: false, startBreakdown: {}, endBreakdown: {}, tally: 0, tickets: 0, remain: "", checks: {}, products: defaultBarProducts(), sales: [], resetAt: 0, voidedSales: [], deletedSales: [] };
+  return { started: false, startBreakdown: {}, endBreakdown: {}, tally: 0, tickets: 0, ticketCollected: "", receptionTicketRemaining: "", ticketChecks: {}, remain: "", checks: {}, products: defaultBarProducts(), sales: [], resetAt: 0, voidedSales: [], deletedSales: [] };
 }
 function ensureBar(bar) {
   const b = bar || createBar();
@@ -2488,6 +2488,7 @@ function ensureBar(bar) {
   b.tally = Number(b.tally || 0);
   b.tickets = Number(b.tickets || 0); // 旧データ互換用
   b.ticketCollected = b.ticketCollected ?? "";
+  b.receptionTicketRemaining = b.receptionTicketRemaining ?? "";
   b.ticketChecks = b.ticketChecks || {};
   b.remain = b.remain ?? "";
   b.checks = b.checks || {};
@@ -3209,7 +3210,7 @@ function renderBarHome() {
     </div>
     <div class="section-label">商品をタップして注文に追加</div>
     <div class="product-grid">
-      ${b.products.map(p => `<button class="product-tile" data-add-product="${esc(p.id)}"><span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>＋ 注文に追加</small></button>`).join("") || `<div class="sub-text">商品がありません。「商品・価格の設定」から追加してください。</div>`}
+      ${b.products.map(p => `<button class="product-tile ${p.soldOut ? "sold-out" : ""}" data-add-product="${esc(p.id)}" ${p.soldOut ? "disabled aria-disabled=\"true\"" : ""}><span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>${p.soldOut ? "売切れ" : "＋ 注文に追加"}</small></button>`).join("") || `<div class="sub-text">商品がありません。「商品・価格の設定」から追加してください。</div>`}
     </div>
     <div class="cart-panel">
       <div class="cart-heading"><strong>注文カート</strong><button class="text-button" id="clearBarCart">クリア</button></div>
@@ -3298,17 +3299,22 @@ function renderBarHome() {
       <div class="ticket-reconciliation-grid">
         <div><small>受付で配布した枚数</small><strong id="bTickets">${issuedTickets}枚</strong></div>
         <div><small>販売記録上の使用枚数</small><strong id="bTicketSales">${sales.ticketUnits}枚</strong></div>
-        <div><small>未使用の可能性がある枚数</small><strong id="bTicketExpected">${expectedUnusedTickets}枚</strong></div>
+        <div><small>配布予定数と販売数の差</small><strong id="bTicketExpected">${expectedUnusedTickets}枚</strong></div>
       </div>
-      <p class="sub-text">受付履歴の人数を配布枚数として自動集計します。受付履歴や販売履歴の追加・取消・復元は再集計に反映されます。</p>
+      <p class="sub-text">受付履歴の人数を配布予定枚数として集計します。受付履歴や販売履歴の追加・取消・復元は再集計に反映されます。</p>
+      <div class="row ticket-stock-theory"><span>受付システム上の残数（理論値）</span><strong>${Math.max(0, Number((ev.state || state).drinkTickets || 0))}枚</strong></div>
     </div>
+    <div class="form-row" style="margin-top:14px"><label>受付に実際に残っているドリチケ枚数</label>
+      <input id="bReceptionTicketRemaining" type="number" min="0" step="1" inputmode="numeric" value="${esc(b.receptionTicketRemaining)}" placeholder="受付に残っている現物を数えて入力"></div>
+    <div class="row"><span>受付の残数照合</span><strong id="bReceptionTicketSt"></strong></div>
     <div class="form-row" style="margin-top:14px"><label>バーカウンターで実際に回収したドリチケ枚数</label>
       <input id="bTicketCollected" type="number" min="0" step="1" inputmode="numeric" value="${esc(b.ticketCollected)}" placeholder="回収した現物を数えて入力"></div>
     <div class="row"><span>販売記録と回収枚数の照合</span><strong id="bTicketSt"></strong></div>
     <div class="ticket-checklist checklist">
       <label><input type="checkbox" data-ticket-check="reception" ${b.ticketChecks.reception ? "checked" : ""}><span>受付の配布記録を確認した</span></label>
+      <label><input type="checkbox" data-ticket-check="receptionPhysical" ${b.ticketChecks.receptionPhysical ? "checked" : ""}><span>受付に残っているドリチケの現物を数えた</span></label>
       <label><input type="checkbox" data-ticket-check="sales" ${b.ticketChecks.sales ? "checked" : ""}><span>ドリチケの販売記録を確認した</span></label>
-      <label><input type="checkbox" data-ticket-check="physical" ${b.ticketChecks.physical ? "checked" : ""}><span>回収したドリチケの現物を数えた</span></label>
+      <label><input type="checkbox" data-ticket-check="physical" ${b.ticketChecks.physical ? "checked" : ""}><span>バーカウンターで回収したドリチケの現物を数えた</span></label>
     </div>
     <div class="ticket-result-note" id="bTicketDiagnosis" aria-live="polite"></div>
     <div class="form-row" style="margin-top:14px"><label>（念のため）封筒を出した後、金庫に残った金額</label>
@@ -3498,35 +3504,65 @@ function renderBarHome() {
     $("bEnv").textContent = c.hasEnd ? `キャッシュドリンク：${formatMoney(s.cashRevenue)}円\nファーストドリンク(ドリチケ)：${s.ticketUnits}杯` : "（金庫内の金額を入力すると表示されます）";
     const rem = b.remain === "" ? null : Number(b.remain);
     $("bRemainSt").innerHTML = rem === null ? "-" : (rem === c.start ? `<span class="ok">一致 ✓</span>` : `<span class="ng">不一致（差 ${formatSignedMoney(rem - c.start)}）</span>`);
-    const issued = getIssuedDrinkTicketCount(ev.state || state);
+    const receptionState = ev.state || state;
+    const issued = getIssuedDrinkTicketCount(receptionState);
+    const receptionExpectedRemaining = Math.max(0, Number(receptionState.drinkTickets || 0));
     const expectedUnused = issued - Number(s.ticketUnits || 0);
     $("bTickets").textContent = `${issued}枚`;
     $("bTicketSales").textContent = `${s.ticketUnits}枚`;
     $("bTicketExpected").textContent = `${expectedUnused}枚`;
+    const receptionActualRemaining = b.receptionTicketRemaining === "" ? null : Number(b.receptionTicketRemaining);
     const collected = b.ticketCollected === "" ? null : Number(b.ticketCollected);
     const diagnosis = $("bTicketDiagnosis");
+    const receptionStatus = $("bReceptionTicketSt");
+    const barStatus = $("bTicketSt");
+    const notes = [];
+    let hasWarning = false;
+    if (receptionActualRemaining === null) {
+      receptionStatus.innerHTML = `<span class="sub-text">受付の現物枚数を入力してください</span>`;
+      notes.push("受付に残っているドリチケを数えて入力してください。");
+    } else {
+      const receptionDiff = receptionActualRemaining - receptionExpectedRemaining;
+      if (receptionDiff > 0) {
+        receptionStatus.innerHTML = `<span class="ng">理論値より${receptionDiff}枚多い</span>`;
+        notes.push(`受付の現物は理論上の残数より${receptionDiff}枚多く残っています。受付で${receptionDiff}枚を渡し忘れた可能性があります。`);
+        hasWarning = true;
+      } else if (receptionDiff < 0) {
+        receptionStatus.innerHTML = `<span class="ng">理論値より${Math.abs(receptionDiff)}枚少ない</span>`;
+        notes.push(`受付の現物は理論上の残数より${Math.abs(receptionDiff)}枚少なくなっています。余分な配布・紛失・数え間違いなどを確認してください。`);
+        hasWarning = true;
+      } else {
+        receptionStatus.innerHTML = `<span class="ok">一致 ✓</span>`;
+      }
+    }
     if (collected === null) {
-      $("bTicketSt").innerHTML = `<span class="sub-text">現物の回収枚数を入力してください</span>`;
-      diagnosis.className = "ticket-result-note";
-      diagnosis.textContent = "回収したドリチケを数えて入力すると、販売記録と照合できます。";
+      barStatus.innerHTML = `<span class="sub-text">回収した現物枚数を入力してください</span>`;
+      notes.push("バーカウンターで回収したドリチケも数えて入力してください。");
     } else if (collected !== Number(s.ticketUnits || 0)) {
       const diff = collected - Number(s.ticketUnits || 0);
-      $("bTicketSt").innerHTML = `<span class="ng">不一致（${diff > 0 ? "+" : ""}${diff}枚）</span>`;
-      diagnosis.className = "ticket-result-note is-warning";
-      diagnosis.textContent = "記録上のミス、回収漏れ、数え間違いなどの可能性があります。受付・販売履歴と現物を再確認してください。";
-    } else if (issued > Number(s.ticketUnits || 0)) {
-      $("bTicketSt").innerHTML = `<span class="ok">一致 ✓</span>`;
-      diagnosis.className = "ticket-result-note is-ok";
-      diagnosis.textContent = `販売記録と回収枚数は一致しています。受付で配布した枚数との差 ${expectedUnused}枚は、ドリチケを使わなかった来場者がいる可能性があります。`;
-    } else if (issued === Number(s.ticketUnits || 0)) {
-      $("bTicketSt").innerHTML = `<span class="ok">一致 ✓</span>`;
-      diagnosis.className = "ticket-result-note is-ok";
-      diagnosis.textContent = "受付の配布枚数・販売記録・回収枚数が一致しています。";
+      barStatus.innerHTML = `<span class="ng">不一致（${diff > 0 ? "+" : ""}${diff}枚）</span>`;
+      notes.push(`バーカウンターの現物枚数と販売記録が${Math.abs(diff)}枚ずれています。販売記録・回収漏れ・数え間違いを確認してください。`);
+      hasWarning = true;
     } else {
-      $("bTicketSt").innerHTML = `<span class="ng">配布枚数を超過</span>`;
-      diagnosis.className = "ticket-result-note is-warning";
-      diagnosis.textContent = "ドリチケの販売記録が受付の配布枚数を上回っています。受付履歴や販売履歴を再確認してください。";
+      barStatus.innerHTML = `<span class="ok">一致 ✓</span>`;
     }
+    if (receptionActualRemaining !== null && collected !== null && collected === Number(s.ticketUnits || 0)) {
+      const missedHandout = Math.max(0, receptionActualRemaining - receptionExpectedRemaining);
+      const handedOutActual = Math.max(0, issued - missedHandout);
+      const possiblyUnused = handedOutActual - Number(s.ticketUnits || 0);
+      if (possiblyUnused > 0 && missedHandout === 0) {
+        notes.push(`受付の残数と販売記録も整合しています。実際に渡したと考えられる枚数との差${possiblyUnused}枚は、ドリチケを使わなかった来場者がいる可能性があります。`);
+      } else if (missedHandout > 0 && possiblyUnused === 0) {
+        notes.push(`受付で渡し忘れた可能性のある${missedHandout}枚を考慮すると、実際に渡したと考えられる枚数と販売記録は一致しています。未使用者がいるとは限りません。`);
+      } else if (possiblyUnused < 0) {
+        notes.push("販売記録上の使用枚数が、実際に渡したと考えられる枚数を上回っています。受付・販売の記録を再確認してください。");
+        hasWarning = true;
+      } else if (possiblyUnused === 0 && !hasWarning && missedHandout === 0) {
+        notes.push("受付・バーカウンターの現物枚数と販売記録に大きなずれはありません。");
+      }
+    }
+    diagnosis.className = `ticket-result-note${hasWarning ? " is-warning" : notes.length && receptionActualRemaining !== null && collected !== null ? " is-ok" : ""}`;
+    diagnosis.textContent = notes.join(" ");
     if (!c.hasEnd) $("bDiff").textContent = "-";
     else {
       const diff = c.revenue - s.cashRevenue;
@@ -3542,6 +3578,7 @@ function renderBarHome() {
   });
   $("bRemain").onchange = e => { const n = e.target.value === "" ? "" : Number(e.target.value); if (n !== "" && (!Number.isInteger(n) || n < 0)) { alert("0以上の整数を入力してください"); e.target.value = ""; return; } b.remain = e.target.value; saveBar(); recalc(); };
   $("bTicketCollected").onchange = e => { const n = e.target.value === "" ? "" : Number(e.target.value); if (n !== "" && (!Number.isInteger(n) || n < 0)) { alert("0以上の整数を入力してください"); e.target.value = b.ticketCollected; return; } b.ticketCollected = n; saveBar(); recalc(); };
+  $("bReceptionTicketRemaining").onchange = e => { const n = e.target.value === "" ? "" : Number(e.target.value); if (n !== "" && (!Number.isInteger(n) || n < 0)) { alert("0以上の整数を入力してください"); e.target.value = b.receptionTicketRemaining; return; } b.receptionTicketRemaining = n; saveBar(); recalc(); };
   screen.querySelectorAll("[data-ticket-check]").forEach(cb => cb.onchange = () => { b.ticketChecks[cb.dataset.ticketCheck] = cb.checked; saveBar(); });
   screen.querySelectorAll("[data-ck]").forEach(cb => cb.onchange = () => { b.checks[cb.dataset.ck] = cb.checked; saveBar(); });
   $("bCopy").onclick = () => {
@@ -3550,7 +3587,7 @@ function renderBarHome() {
     else { alert("この環境ではコピーできませんでした"); }
   };
   $("clearBarAccounting").onclick = () => {
-    if (!confirm("この回のバーカウンター会計データを一括削除しますか？\n販売履歴・金庫の開始／終了額・回収チケット枚数・チケット照合チェックをリセットします。\n商品名と価格の設定、受付データ、出番／シフトは残ります。")) return;
+    if (!confirm("この回のバーカウンター会計データを一括削除しますか？\n販売履歴・金庫の開始／終了額・受付に残っているチケット枚数・回収チケット枚数・チケット照合チェックをリセットします。\n商品名と価格の設定、受付データ、出番／シフトは残ります。")) return;
     const products = structuredClone(b.products);
     const deletedSales = pruneDeletionLog(b.deletedSales || []);
     Object.assign(b, createBar(), { products, sales: [], resetAt: Date.now(), voidedSales: [], deletedSales });
