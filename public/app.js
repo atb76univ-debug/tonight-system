@@ -1998,11 +1998,14 @@ function deleteHistory(id) {
 }
 function restoreHistory(id) {
   ensureDeletionLogs();
-  const index = state.deletedReceptionHistory.findIndex(x => x.entry?.id === id);
+  const index = state.deletedReceptionHistory.findIndex(x => String(x.entry?.id) === String(id));
   if (index < 0) return;
   const record = state.deletedReceptionHistory[index];
   const entry = structuredClone(record.entry);
-  if (state.receptionHistory.some(x => x.id === entry.id)) return;
+  if (state.receptionHistory.some(x => String(x.id) === String(entry.id))) {
+    console.warn("この受付履歴はすでに復元されています:", id);
+    return;
+  }
   record.restoredAt = Date.now();
   const people = Number(entry.general || 0) + Number(entry.tmp || 0);
   state.drinkTickets = Math.max(0, Number(state.drinkTickets || 0) - people);
