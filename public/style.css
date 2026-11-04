@@ -2308,3 +2308,47 @@ body{-webkit-tap-highlight-color:transparent;overflow-x:hidden;padding-bottom:ca
     column-gap: 6px;
   }
 }
+
+
+/* v31: Side-by-side lanes for overlapping timetable acts */
+.timeline-track {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.timeline-item {
+  min-width: 0;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+.timeline-item.parallel {
+  padding: 6px 7px;
+  gap: 2px;
+}
+.timeline-item.parallel .timeline-time {
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.timeline-item.parallel strong {
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.timeline-item.parallel-crowded {
+  padding: 5px 4px;
+}
+.timeline-item.parallel-crowded .timeline-time {
+  font-size: 9px;
+}
+.timeline-item.parallel-crowded strong {
+  font-size: 10px;
+}
+@media (max-width: 600px) {
+  .timeline-item.parallel { padding: 5px 5px; }
+  .timeline-item.parallel strong { font-size: 11px; }
+  .timeline-item.parallel-crowded strong { font-size: 9px; }
+}

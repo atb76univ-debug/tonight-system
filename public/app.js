@@ -4038,14 +4038,77 @@ function updateNow(options = {}) {
   }
 }
 function renderEventTimeline(){
- const host=document.getElementById("eventTimeline");if(!host)return;const tt=ctx.tt,all=(tt.acts||[]).map(a=>({...a,_kind:"act"})).sort((a,b)=>actSlotRange(a)[0]-actSlotRange(b)[0]);
- if(!all.length){host.innerHTML='<p class="sub-text">出番を登録するとタイムラインが表示されます。</p>';return;}
- const now=(Date.now()-new Date(ctx.ev.date+"T00:00:00").getTime())/60000,starts=all.map(a=>actSlotRange(a)[0]),ends=all.map(a=>actSlotRange(a)[1]);const scheduleMin=Math.min(...starts),scheduleMax=Math.max(...ends);const min=now>=scheduleMin&&now<=scheduleMax?Math.min(scheduleMin,Math.floor(now/60)*60):scheduleMin;const max=Math.max(scheduleMax,min+60);const span=Math.max(60,max-min);
- // 短い出番が多い場合もカード同士が重ならないよう、各枠に最低限の縦幅を確保する
+ const host=document.getElementById("eventTimeline");
+ if(!host)return;
+ const tt=ctx.tt;
+ const all=(tt.acts||[]).map(a=>({...a,_kind:"act"}))
+   .sort((a,b)=>actSlotRange(a)[0]-actSlotRange(b)[0] || actSlotRange(a)[1]-actSlotRange(b)[1]);
+
+ if(!all.length){
+   host.innerHTML='<p class="sub-text">出番を登録するとタイムラインが表示されます。</p>';
+   return;
+ }
+
+ // 重なり合う時間帯ごとにグループ化し、各項目へ横並び用のレーンを割り当てる
+ const components=[];
+ let component=null;
+ all.forEach(item=>{
+   const [start,end]=actSlotRange(item);
+   if(!component || start>=component.end){
+     component={items:[],end};
+     components.push(component);
+   }else{
+     component.end=Math.max(component.end,end);
+   }
+   component.items.push(item);
+ });
+
+ const laneById=new Map();
+ components.forEach(group=>{
+   const laneEnds=[];
+   group.items.forEach(item=>{
+     const [start,end]=actSlotRange(item);
+     let lane=laneEnds.findIndex(lastEnd=>lastEnd<=start);
+     if(lane<0)lane=laneEnds.length;
+     laneEnds[lane]=end;
+     laneById.set(item.id,{lane,count:0});
+   });
+   group.items.forEach(item=>{
+     const slot=laneById.get(item.id);
+     slot.count=laneEnds.length;
+   });
+ });
+
+ const now=(Date.now()-new Date(ctx.ev.date+"T00:00:00").getTime())/60000;
+ const starts=all.map(a=>actSlotRange(a)[0]);
+ const ends=all.map(a=>actSlotRange(a)[1]);
+ const scheduleMin=Math.min(...starts);
+ const scheduleMax=Math.max(...ends);
+ const min=now>=scheduleMin&&now<=scheduleMax?Math.min(scheduleMin,Math.floor(now/60)*60):scheduleMin;
+ const max=Math.max(scheduleMax,min+60);
+ const span=Math.max(60,max-min);
+
+ // 短い出番でもカードが読める高さを確保し、同時刻のカードは同じ縦位置で横に並べる
  const pxPerMinute=Math.max(1.2,...all.map(a=>60/Math.max(1,actSlotRange(a)[1]-actSlotRange(a)[0])));
  const trackHeight=Math.max(380,Math.ceil(span*pxPerMinute));
  const marker=Math.max(0,Math.min(100,(now-min)/span*100));
- host.innerHTML=`<div class="timeline-axis"><span>${formatOffsetTime(min)}</span><span>${formatOffsetTime(max)}</span></div><div class="timeline-track" style="height:${trackHeight}px"><div class="timeline-now-line" style="top:${marker}%"><span>NOW</span></div>${all.map(a=>{const [st,en]=actSlotRange(a),top=(st-min)/span*100,height=Math.max(3,(en-st)/span*100),active=now>=st&&now<en,x=adjustedTime(a);return `<div class="timeline-item ${active?"active":""}" style="top:${top}%;height:${height}%"><span class="timeline-time">${esc(x.start)}–${esc(x.end)}</span><strong>${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))}：${esc(recordMemberDisplay(a))}</strong></div>`}).join("")}</div>`;
+
+ const cards=all.map(a=>{
+   const [st,en]=actSlotRange(a);
+   const top=(st-min)/span*100;
+   const height=Math.max(3,(en-st)/span*100);
+   const active=now>=st&&now<en;
+   const x=adjustedTime(a);
+   const lane=laneById.get(a.id)||{lane:0,count:1};
+   const parallel=lane.count>1;
+   const gap=8;
+   const left=parallel?`calc(16px + ${lane.lane*100/lane.count}%)`:"16px";
+   const width=parallel?`calc(${100/lane.count}% - ${16+gap}px)`:"auto";
+   const style=`top:${top}%;height:${height}%;left:${left};${parallel?`width:${width};right:auto;`:"right:0;"}`;
+   return `<div class="timeline-item ${active?"active":""} ${parallel?"parallel":""} ${lane.count>2?"parallel-crowded":""}" style="${style}" aria-label="${esc(x.start)}から${esc(x.end)} ${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))} ${esc(recordMemberDisplay(a))}"><span class="timeline-time">${esc(x.start)}–${esc(x.end)}</span><strong>${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))}：${esc(recordMemberDisplay(a))}</strong></div>`;
+ }).join("");
+
+ host.innerHTML=`<div class="timeline-axis"><span>${formatOffsetTime(min)}</span><span>${formatOffsetTime(max)}</span></div><div class="timeline-track" style="height:${trackHeight}px"><div class="timeline-now-line" style="top:${marker}%"><span>NOW</span></div>${cards}</div>`;
 }
 
 function renderTimetable() {
