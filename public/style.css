@@ -2228,3 +2228,83 @@ body{-webkit-tap-highlight-color:transparent;overflow-x:hidden;padding-bottom:ca
   .tt-form-panel .inline-form { grid-template-columns: minmax(0, 1fr); }
   .tt-form-panel .inline-form .full { grid-column: 1; }
 }
+
+
+/* v30: Keep timetable date/time inputs in two columns on iPad.
+   Constrain the grid tracks and Safari native date/time controls independently. */
+.tt-form-panel {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+}
+.tt-form-panel > .inline-form {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  grid-auto-flow: row;
+  column-gap: 12px;
+  row-gap: 10px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.tt-form-panel > .inline-form > .date-time-field {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0 !important;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.tt-form-panel .date-time-field input[type="date"],
+.tt-form-panel .date-time-field input[type="time"] {
+  display: block;
+  width: 100% !important;
+  inline-size: 100% !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  max-width: 100% !important;
+  max-inline-size: 100% !important;
+  box-sizing: border-box !important;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.tt-form-panel > .inline-form > .full,
+.tt-form-panel > .inline-form > .member-picker,
+.tt-form-panel > .inline-form > button {
+  grid-column: 1 / -1;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.tt-form-panel .act-type-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  min-width: 0;
+  max-width: 100%;
+}
+@media (max-width: 700px) {
+  #app { padding-left: 10px; padding-right: 10px; }
+  .tt-form-panel { padding: 11px; }
+  .tt-form-panel > .inline-form { column-gap: 8px; }
+  .tt-form-panel .date-time-field { font-size: 11px; }
+  .tt-form-panel .date-time-field input[type="date"],
+  .tt-form-panel .date-time-field input[type="time"] {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+}
+@media (max-width: 360px) {
+  /* Very narrow phones only; iPad remains two columns. */
+  .tt-form-panel > .inline-form {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    column-gap: 6px;
+  }
+}
