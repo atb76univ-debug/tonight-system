@@ -3575,7 +3575,7 @@ function renderBarHome() {
   </div>
 
   <div class="card" data-bar-section="cash">
-    <div class="card-title">確認・ドリチケ照合</div>
+    <div class="card-title">確認・ドリチケ照合(試行運用)</div>
     <div class="ticket-reconciliation">
       <div class="ticket-reconciliation-heading"><strong>受付・販売記録から自動集計</strong><span>クラウド同期</span></div>
       <div class="ticket-reconciliation-grid">
