@@ -2176,3 +2176,10 @@ body{-webkit-tap-highlight-color:transparent;overflow-x:hidden;padding-bottom:ca
 @media (min-width:700px) and (orientation:portrait){
   .cashier-dialog{width:min(100%,680px)}
 }
+
+/* TMPメンバー候補：検索欄（候補を上端に固定してスクロールしても見える） */
+.tmp-member-results .tmp-member-search-row{position:sticky;top:0;z-index:2;padding:6px 6px 8px;background:#fff;border-bottom:1px solid #edf0f4}
+.tmp-member-results .tmp-member-search-input{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border:1px solid var(--border,#d8dee8);border-radius:9px;background:#fff;color:var(--text,#202938);font:inherit;font-size:16px;-webkit-appearance:none;appearance:none}
+.tmp-member-results .tmp-member-search-input:focus{outline:2px solid #d9e4f5;border-color:var(--primary,#526d9b)}
+#tmpNamesList .tmp-member-entry .tmp-member-results{max-height:min(60vh,420px)}
+@media(max-width:600px){#tmpNamesList .tmp-member-entry .tmp-member-results{max-height:min(46vh,320px)}}

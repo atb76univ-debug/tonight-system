@@ -1149,18 +1149,35 @@ function renderReceptionInput() {
     }).join("");
 
     const normalizeMemberSearch = value => String(value || "").normalize("NFKC").toLocaleLowerCase("ja").replace(/[ァ-ン]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)).replace(/[　\s・ー‐‑–—]/g, "");
+    // 候補一覧：全員を表示（件数の上限なし）。上部の検索欄で絞り込み（ひらがな／カタカナ・全角半角・空白の揺れに対応）
     const showMemberResults = (index, query = "") => {
       const resultBox = listContainer.querySelector(`.tmp-member-results[data-index="${index}"]`);
       if (!resultBox) return;
-      const q = normalizeMemberSearch(query);
       const allMembers = [...(db.members || [])].sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b), "ja"));
-      const matches = allMembers.filter(m => !q || normalizeMemberSearch([m.name, m.nickname, memberDisplayName(m)].filter(Boolean).join(" ")).includes(q)).slice(0, 40);
-      resultBox.innerHTML = matches.length
-        ? `${!q ? '<div class="tmp-member-results-hint">メンバーを選択してください</div>' : ''}${matches.map(m => `<button type="button" role="option" class="tmp-member-result" data-member-id="${esc(m.id)}" data-index="${index}"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname ? `<small>本名：${esc(m.name)}</small>` : ""}${m.grade ? `<small>${esc(m.grade)}</small>` : ""}</button>`).join("")}`
-        : `<div class="tmp-member-no-result">該当するメンバーがいません。</div>`;
+      const justOpened = resultBox.hidden || !resultBox.querySelector(".tmp-member-search-input");
+      if (!resultBox.querySelector(".tmp-member-search-input")) {
+        resultBox.innerHTML = `
+          <div class="tmp-member-search-row">
+            <input type="search" class="tmp-member-search-input" data-index="${index}" placeholder="名前・DJネームで検索（ひらがなOK）" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="TMPメンバーを検索">
+          </div>
+          <div class="tmp-member-results-list"></div>`;
+        resultBox.querySelector(".tmp-member-search-input").addEventListener("input", e => renderList(e.target.value));
+      }
+      const searchInput = resultBox.querySelector(".tmp-member-search-input");
+      const renderList = value => {
+        const q = normalizeMemberSearch(value);
+        const matches = allMembers.filter(m => !q || normalizeMemberSearch([m.name, m.nickname, memberDisplayName(m)].filter(Boolean).join(" ")).includes(q));
+        const list = resultBox.querySelector(".tmp-member-results-list");
+        list.innerHTML = matches.length
+          ? `<div class="tmp-member-results-hint">${q ? `${matches.length}名が該当（全${allMembers.length}名）` : `メンバーを選択してください（全${allMembers.length}名）`}</div>${matches.map(m => `<button type="button" role="option" class="tmp-member-result" data-member-id="${esc(m.id)}" data-index="${index}"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname ? `<small>本名：${esc(m.name)}</small>` : ""}${m.grade ? `<small>${esc(m.grade)}</small>` : ""}</button>`).join("")}`
+          : `<div class="tmp-member-no-result">該当するメンバーがいません。名簿にない場合は下の自由入力をお使いください。</div>`;
+      };
+      if (justOpened) searchInput.value = query;
+      renderList(searchInput.value);
       resultBox.hidden = false;
       const toggle = listContainer.querySelector(`.tmp-member-toggle[data-index="${index}"]`);
       if (toggle) toggle.setAttribute("aria-expanded", "true");
+      if (justOpened) searchInput.focus({ preventScroll: false });
     };
 
     listContainer.querySelectorAll(".tmp-member-toggle").forEach(button => button.addEventListener("click", () => {
