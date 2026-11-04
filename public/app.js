@@ -1,8 +1,14 @@
 const STORAGE_KEY = "tonight_reception_v1";
 
-const BOX_FEE = 10000;
-const ENTRY_FEE = 1000;
-const DRINK_FEE = 500;
+const DEFAULT_PRICING = Object.freeze({ entryFee: 1000, drinkFee: 500, boxFee: 10000, discount1: 500, discount2: 1000 });
+function normalizePricing(pricing) {
+  const p = { ...DEFAULT_PRICING, ...(pricing || {}) };
+  for (const key of Object.keys(DEFAULT_PRICING)) p[key] = Math.max(0, Math.round(Number(p[key] ?? DEFAULT_PRICING[key]) || 0));
+  return p;
+}
+function getPricing() {
+  return ctx?.pricing ? normalizePricing(ctx.pricing) : normalizePricing(ctx?.ev?.pricing);
+}
 const CASH_DENOMINATIONS = [
   10000,
   5000,
@@ -52,7 +58,7 @@ function createInitialState() {
 const DELETION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /* ---------- 受付履歴のマージ（履歴1件ごとに削除／復元の新しい方を採用） ---------- */
-const RECEPTION_PER_PERSON = ENTRY_FEE + DRINK_FEE;
+const RECEPTION_PER_PERSON = DEFAULT_PRICING.entryFee + DEFAULT_PRICING.drinkFee;
 function receptionTombVersion(t) { return Math.max(Number(t?.deletedAt || 0), Number(t?.restoredAt || 0)); }
 function receptionTombRestored(t) { return Number(t?.restoredAt || 0) > Number(t?.deletedAt || 0); }
 function applyReceptionEntryEffect(st, entry, sign) {
@@ -1426,43 +1432,10 @@ function renderDiscountScreen() {
 
           </div>
 
-          <div
-            class="discount-option"
-          >
-
-            <button
-              class="${guest.discount === 500 ? "active" : ""}"
-              onclick="
-              setDiscount(
-              ${index},
-              500
-              )"
-            >
-
-              -500
-
-            </button>
-
-          </div>
-
-          <div
-            class="discount-option"
-          >
-
-            <button
-              class="${guest.discount === 1000 ? "active" : ""}"
-              onclick="
-              setDiscount(
-              ${index},
-              1000
-              )"
-            >
-
-              -1000
-
-            </button>
-
-          </div>
+          ${[getPricing().discount1, getPricing().discount2].filter((v, i, arr) => v > 0 && arr.indexOf(v) === i).map(amount => `
+            <div class="discount-option">
+              <button class="${guest.discount === amount ? "active" : ""}" onclick="setDiscount(${index}, ${amount})">-${formatMoney(amount)}</button>
+            </div>`).join("")}
 
         </div>
 
@@ -1523,7 +1496,8 @@ function setDiscount(
 
 function renderPaymentScreen() {
   const guests = state.currentReception.guests;
-  const total = guests.reduce((sum, guest) => sum + ENTRY_FEE + DRINK_FEE - guest.discount, 0);
+  const pricing = getPricing();
+  const total = guests.reduce((sum, guest) => sum + pricing.entryFee + pricing.drinkFee - guest.discount, 0);
   state.currentReception.totalAmount = total;
   let paid = 0;
   screen.innerHTML = `
@@ -1640,9 +1614,10 @@ function completeReception() {
   const reception =
     state.currentReception;
 
+  const pricing = getPricing();
   const grossEntrance =
     reception.guests.length *
-    (ENTRY_FEE + DRINK_FEE);
+    (pricing.entryFee + pricing.drinkFee);
 
   const totalDiscount =
     reception.guests.reduce(
@@ -2003,7 +1978,7 @@ function deleteHistory(id) {
     target.grossEntrance ||
     (
       (target.general + target.tmp) *
-      (ENTRY_FEE + DRINK_FEE)
+      (getPricing().entryFee + getPricing().drinkFee)
     );
 
   state.totals.totalDiscount -=
@@ -2039,7 +2014,7 @@ function restoreHistory(id) {
   state.drinkTickets = Math.max(0, Number(state.drinkTickets || 0) - people);
   state.totals.general += Number(entry.general || 0);
   state.totals.tmp += Number(entry.tmp || 0);
-  state.totals.grossEntrance += Number(entry.grossEntrance || (people * (ENTRY_FEE + DRINK_FEE)));
+  state.totals.grossEntrance += Number(entry.grossEntrance || (people * (getPricing().entryFee + getPricing().drinkFee)));
   state.totals.totalDiscount += Number(entry.totalDiscount || 0);
   state.receptionHistory.unshift(entry);
   state.receptionHistory.sort((x, y) => Number(y.id || 0) - Number(x.id || 0));
@@ -2097,11 +2072,8 @@ function clearReceptionAccountingData() {
 
 function renderResult() {
 
-  const people =
-
-    state.totals.general +
-
-    state.totals.tmp;
+  const people = state.totals.general + state.totals.tmp;
+  const pricing = getPricing();
 
   // TMP来場者一覧を集計
   const allTmpGuests = state.receptionHistory
@@ -2120,7 +2092,7 @@ function renderResult() {
             r.grossEntrance ||
             (
               (r.general + r.tmp) *
-              (ENTRY_FEE + DRINK_FEE)
+              (pricing.entryFee + pricing.drinkFee)
             )
           ),
         0
@@ -2152,8 +2124,7 @@ function renderResult() {
   const drinkTicketAmount =
 
     people *
-
-    DRINK_FEE;
+    pricing.drinkFee;
 
   const profitTargetIncome =
 
@@ -2162,10 +2133,8 @@ function renderResult() {
     drinkTicketAmount;
 
   const profit =
-
     profitTargetIncome -
-
-    BOX_FEE;
+    pricing.boxFee;
 
   const theoreticalCash =
 
@@ -2294,11 +2263,11 @@ function renderResult() {
       精算額
     </div>
     <div style="font-size: 64px; font-weight: 900; margin-bottom: 8px; line-height: 1;">
-      ¥${formatMoney(drinkTicketAmount + BOX_FEE)}
+      ¥${formatMoney(drinkTicketAmount + getPricing().boxFee)}
     </div>
     <div style="font-size: 13px; opacity: 0.8; line-height: 1.6;">
       <div>1D(ドリチケ)分：¥${formatMoney(drinkTicketAmount)}</div>
-      <div style="margin-top: 8px;">箱代：¥10,000</div>
+      <div style="margin-top: 8px;">箱代：¥${formatMoney(pricing.boxFee)}</div>
     </div>
   </div>
 
@@ -2418,7 +2387,7 @@ function renderResult() {
       <strong>
 
         ¥${formatMoney(
-          theoreticalCash - drinkTicketAmount - 10000
+          theoreticalCash - drinkTicketAmount - getPricing().boxFee
         )}
         (${formatSignedMoney(
           cashIncrease - drinkTicketAmount - 10000
@@ -2553,7 +2522,7 @@ function calculateCashCheck() {
     state.totals.tmp;
 
   const drinkTicketAmount =
-    people * DRINK_FEE;
+    people * getPricing().drinkFee;
 
   const theoreticalCash =
     state.startCash +
@@ -2565,11 +2534,11 @@ function calculateCashCheck() {
       );
 
   const diff =
-    actualCash - theoreticalCash + drinkTicketAmount + 10000;
+    actualCash - theoreticalCash + drinkTicketAmount + getPricing().boxFee;
 
   alert(
     `実金庫額: ¥${formatMoney(actualCash)}\n` +
-    `理論金庫額: ¥${formatMoney(theoreticalCash - drinkTicketAmount - 10000)}\n` +
+    `理論金庫額: ¥${formatMoney(theoreticalCash - drinkTicketAmount - getPricing().boxFee)}\n` +
     `差額: ¥${formatMoney(diff)}`
   );
 }
@@ -2631,7 +2600,7 @@ function newEvent(name, date, st) {
   const t = Date.now();
   return {
     id: uid(), name, date, flyer: 0, archived: false, deleted: false, participants: [],
-    state: st || createInitialState(), bar: createBar(), tt: createTt(),
+    state: st || createInitialState(), pricing: { ...DEFAULT_PRICING }, bar: createBar(), tt: createTt(),
     u: { meta: t, rec: t, bar: t, tt: t }
   };
 }
@@ -2642,6 +2611,7 @@ function loadDb() {
       const d = JSON.parse(r); d.events = d.events || []; d.members = Array.isArray(d.members) ? d.members : [];
       for (const e of d.events) {
         e.state = e.state || createInitialState();
+        e.pricing = normalizePricing(e.pricing);
         e.state.deletedReceptionHistory = pruneDeletionLog(e.state.deletedReceptionHistory || []);
         e.bar = ensureBar(e.bar);
       }
@@ -2804,9 +2774,10 @@ function saveBar() {
 function commitCtx() {
   const ev = ctx.ev, t = Date.now();
   ev.state = structuredClone(state);
+  ev.pricing = normalizePricing(ctx.pricing);
   ev.bar = structuredClone(ctx.bar);
   ev.tt = structuredClone(ctx.tt);
-  ev.u.rec = t; ev.u.bar = t; ev.u.tt = t;
+  ev.u.rec = t; ev.u.bar = t; ev.u.tt = t; ev.u.meta = t;
   ctx.dirty = false;
   persistDb();
 }
@@ -2889,14 +2860,13 @@ function summarizeBarSales(bar) {
   return summary;
 }
 
-function evStats(st, bar) {
+function evStats(st, bar, pricing = getPricing()) {
   const h = st.receptionHistory || [];
   const people = st.totals.general + st.totals.tmp;
-  const gross = h.reduce((s, r) => s + (r.grossEntrance || ((r.general + r.tmp) * (ENTRY_FEE + DRINK_FEE))), 0);
+  const gross = h.reduce((s, r) => s + (r.grossEntrance || ((r.general + r.tmp) * (pricing.entryFee + pricing.drinkFee))), 0);
   const disc = h.reduce((s, r) => s + (r.totalDiscount || 0), 0);
-  // grossEntrance は割引前の定価合計なので、割引を一度だけ差し引いて実収入を算出
   const actualReceptionRevenue = gross - disc;
-  const profit = people ? actualReceptionRevenue - people * DRINK_FEE - BOX_FEE : 0;
+  const profit = people ? actualReceptionRevenue - people * pricing.drinkFee - pricing.boxFee : 0;
   return { people, profit, bar: barCalc(bar || createBar()) };
 }
 
@@ -2914,7 +2884,7 @@ function renderEventList() {
 
   Object.keys(months).sort((a, b) => b.localeCompare(a)).forEach(m => {
     const list = months[m];
-    const stats = list.map(e => evStats(e.state, e.bar));
+    const stats = list.map(e => evStats(e.state, e.bar, normalizePricing(e.pricing)));
     const people = stats.reduce((s, x) => s + x.people, 0);
     const profit = stats.reduce((s, x) => s + x.profit, 0);
     const [y, mo] = m.split("-");
@@ -2993,10 +2963,10 @@ function openEvent(id) {
   ev.tt = ensureTt(ev.tt);
   ev.u.tt = ev.u.tt || 0;
   if (ev.archived) {
-    ctx = { ev, mode: "archive", dirty: false, bar: structuredClone(ev.bar), tt: structuredClone(ev.tt) };
+    ctx = { ev, mode: "archive", dirty: false, pricing: normalizePricing(ev.pricing), bar: structuredClone(ev.bar), tt: structuredClone(ev.tt) };
     state = structuredClone(ev.state);
   } else {
-    ctx = { ev, mode: "live", dirty: false, bar: ev.bar, tt: ev.tt };
+    ctx = { ev, mode: "live", dirty: false, pricing: normalizePricing(ev.pricing), bar: ev.bar, tt: ev.tt };
     state = ev.state;
   }
   navigate(renderEventPage);
@@ -3013,6 +2983,7 @@ function downloadCurrentEventCsv() {
   const eventState = state || ev.state || createInitialState();
   const bar = ensureBar(ctx.bar || ev.bar || createBar());
   const tt = ensureTt(ctx.tt || ev.tt || createTt());
+  const pricing = getPricing();
   const headers = ["データ種別", "イベント名", "開催日", "日時", "開始日", "開始時刻", "終了日", "終了時刻", "区分", "名前・内容", "数量", "金額", "支払方法", "割引額", "預かり金", "お釣り", "備考"];
   const rows = [];
   const add = values => rows.push(headers.map((_, i) => csvCell(values[i] ?? "")));
@@ -3024,6 +2995,7 @@ function downloadCurrentEventCsv() {
   const totalDrinkUnits = activeSales.reduce((sum, sale) => sum + (sale.items || []).reduce((n, item) => n + Number(item.qty || 0), 0), 0);
   const drinkSalesSummary = summarizeBarSales(bar);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "来場者", "", totalPeople, "", "", "", "", "", `一般 ${Number(eventState.totals?.general || 0)}名／TMP ${Number(eventState.totals?.tmp || 0)}名`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "料金設定", "", "", "", "", "", "", "", `エントランス ¥${formatMoney(pricing.entryFee)}／1stドリンク ¥${formatMoney(pricing.drinkFee)}／箱代 ¥${formatMoney(pricing.boxFee)}／割引 ¥${formatMoney(pricing.discount1)}・¥${formatMoney(pricing.discount2)}`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付売上", "", "", Number(eventState.totals?.grossEntrance || 0), "", Number(eventState.totals?.totalDiscount || 0), "", "", `受付履歴 ${receptionHistory.length}件`]);
   const discountAmount = Number(eventState.totals?.totalDiscount || 0);
   const actualReceptionRevenue = Math.max(0, Number(eventState.totals?.grossEntrance || 0) - discountAmount);
@@ -3031,13 +3003,13 @@ function downloadCurrentEventCsv() {
     const guests = Array.isArray(record.guests) ? record.guests : [];
     return sum + guests.filter(guest => Number(guest.discount || 0) > 0).length;
   }, 0);
-  const firstDrinkRevenue = totalPeople * DRINK_FEE;
-  const eventProfit = totalPeople ? actualReceptionRevenue - firstDrinkRevenue - BOX_FEE : 0;
+  const firstDrinkRevenue = totalPeople * pricing.drinkFee;
+  const eventProfit = totalPeople ? actualReceptionRevenue - firstDrinkRevenue - pricing.boxFee : 0;
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "割引人数", "", discountPeople, "", "", "", "", "", "割引が適用された来場者数"]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "割引総額", "", "", discountAmount, "", "", "", "", ""]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付売上（割引後）", "", "", actualReceptionRevenue, "", "", "", "", `割引前受付売上 ¥${formatMoney(Number(eventState.totals?.grossEntrance || 0))} − 割引総額 ¥${formatMoney(discountAmount)}`]);
-  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "1stドリンク売上額", "", totalPeople, firstDrinkRevenue, "", "", "", "", `来場者数 ${totalPeople}名 × 1stドリンク料金 ¥${formatMoney(DRINK_FEE)}`]);
-  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "利益", "", "", eventProfit, "", "", "", "", `割引後受付売上 − 1stドリンク売上額 − 箱代（¥${formatMoney(BOX_FEE)}）`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "1stドリンク売上額", "", totalPeople, firstDrinkRevenue, "", "", "", "", `来場者数 ${totalPeople}名 × 1stドリンク料金 ¥${formatMoney(pricing.drinkFee)}`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "利益", "", "", eventProfit, "", "", "", "", `割引後受付売上 − 1stドリンク売上額 − 箱代（¥${formatMoney(pricing.boxFee)}）`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "ドリンク販売", "", totalDrinkUnits, "", "", "", "", "", `販売履歴 ${activeSales.length}件`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "キャッシュドリンク売上", "", drinkSalesSummary.cashUnits, drinkSalesSummary.cashRevenue, "現金", "", "", "", `現金販売 ${drinkSalesSummary.cashUnits}杯`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "進行時間調整", "", "", "", "", "", "", "", `${Number(tt.offsetMinutes || 0)}分`]);
@@ -3079,7 +3051,7 @@ function downloadCurrentEventCsv() {
 
 function renderEventPage() {
   const ev = ctx.ev, arc = ctx.mode === "archive";
-  const s = evStats(state, ctx.bar), url = flyerUrl(ev);
+  const s = evStats(state, ctx.bar, getPricing()), url = flyerUrl(ev);
   const sales = summarizeBarSales(ctx.bar);
   screen.innerHTML = `
     ${url ? `<img class="flyer-hero" src="${url}" alt="フライヤー">` : `<div class="flyer-empty">フライヤー未登録</div>`}
@@ -3103,7 +3075,7 @@ function renderEventPage() {
     <div class="card"><div class="card-title">参加予定メンバー</div><div class="sub-text">${(ev.participants||[]).length}名登録</div><div class="participant-home-list">${(ev.participants||[]).map(id=>{const m=(db.members||[]).find(x=>x.id===id);const done=(state.receptionHistory||[]).some(r=>(r.guests||[]).some(g=>g.type==="tmp"&&(g.memberId===id||(!g.memberId&&g.name===m?.name))));return `<span>${esc(m?memberDisplayName(m):"名簿から削除済み")} <b class="${done?"checked":"pending"}">${done?"受付済み":"未受付"}</b></span>`}).join("")||`<span class="sub-text">参加予定はまだ登録されていません。</span>`}</div></div>
     
     ${arc && ctx.dirty ? `<button class="btn btn-secondary" id="saveEv">変更を保存</button><div class="gap"></div>` : ""}
-    <button class="btn btn-secondary" id="goMembers">メンバー名簿・参加予定</button><div class="gap"></div><button class="btn btn-secondary" id="editEv">名前・日付・フライヤーを編集</button><div class="gap"></div>
+    <button class="btn btn-secondary" id="goMembers">メンバー名簿・参加予定</button><div class="gap"></div><button class="btn btn-secondary" id="editPricing">料金設定（この回）</button><div class="gap"></div><button class="btn btn-secondary" id="editEv">名前・日付・フライヤーを編集</button><div class="gap"></div>
     <button class="btn btn-secondary" id="arcEv">${arc ? "アーカイブを解除（開催中に戻す）" : "この回をアーカイブする"}</button><div class="gap"></div>
     <button class="btn btn-danger" id="delEv">この回を削除</button>`;
   document.getElementById("goRec").onclick = () => navigate(state.initialized ? renderHome : renderSetup);
@@ -3112,16 +3084,17 @@ function renderEventPage() {
   document.getElementById("goMembers").onclick = () => navigate(renderMembers);
   document.getElementById("exportEventCsv").onclick = downloadCurrentEventCsv;
   document.getElementById("editEv").onclick = () => navigate(renderEventEdit);
+  document.getElementById("editPricing").onclick = () => navigate(renderEventPricing);
   const sv = document.getElementById("saveEv");
   if (sv) sv.onclick = () => { if (confirm("変更を保存しますか？")) { commitCtx(); renderEventPage(); updateBackButton(); } };
   document.getElementById("arcEv").onclick = () => {
     if (ctx.dirty && !confirm("未保存の変更があります。保存して切り替えますか？")) return;
     if (ctx.dirty) commitCtx();
     if (arc) {
-      ev.archived = false; ctx.mode = "live"; state = ev.state; ctx.bar = ev.bar; ctx.tt = ev.tt;
+      ev.archived = false; ctx.mode = "live"; state = ev.state; ctx.pricing = normalizePricing(ev.pricing); ctx.bar = ev.bar; ctx.tt = ev.tt;
     } else {
       if (!confirm("この回をアーカイブしますか？\n以降の編集時は保存確認が出ます。")) return;
-      ev.archived = true; ctx.mode = "archive"; state = structuredClone(ev.state); ctx.bar = structuredClone(ev.bar); ctx.tt = structuredClone(ev.tt);
+      ev.archived = true; ctx.mode = "archive"; state = structuredClone(ev.state); ctx.pricing = normalizePricing(ev.pricing); ctx.bar = structuredClone(ev.bar); ctx.tt = structuredClone(ev.tt);
     }
     ev.u.meta = Date.now(); persistDb(); renderEventPage(); updateBackButton();
   };
@@ -3130,6 +3103,39 @@ function renderEventPage() {
     ev.deleted = true; ev.u.meta = Date.now(); ctx = null; persistDb();
     pageHistory = []; navigate(renderEventList);
   };
+}
+
+
+function renderEventPricing() {
+  const p = getPricing();
+  screen.innerHTML = `
+    <div class="card">
+      <div class="eyebrow">EVENT / PRICING</div>
+      <div class="card-title">このイベントの料金設定</div>
+      <p class="sub-text">変更した金額は、このイベントの受付・割引・精算・利益計算・CSV出力に反映されます。他のイベントには影響しません。</p>
+      <div class="form-row"><label for="priceEntry">エントランス代（円）</label><input id="priceEntry" type="number" min="0" step="1" value="${p.entryFee}"></div>
+      <div class="form-row"><label for="priceDrink">ドリンクチケット代（円）</label><input id="priceDrink" type="number" min="0" step="1" value="${p.drinkFee}"></div>
+      <div class="form-row"><label for="priceBox">箱代（円）</label><input id="priceBox" type="number" min="0" step="1" value="${p.boxFee}"></div>
+      <div class="form-row"><label for="priceDiscount1">割引額 1（円）</label><input id="priceDiscount1" type="number" min="0" step="1" value="${p.discount1}"></div>
+      <div class="form-row"><label for="priceDiscount2">割引額 2（円）</label><input id="priceDiscount2" type="number" min="0" step="1" value="${p.discount2}"></div>
+      <p class="sub-text">割引額を0円にすると、その割引ボタンは受付画面に表示されません。</p>
+      <div class="gap"></div>
+      <button class="btn btn-primary btn-large" id="savePricing">料金設定を保存</button>
+      <div class="gap"></div>
+      <button class="btn btn-secondary" id="cancelPricing">キャンセル</button>
+    </div>`;
+  document.getElementById("savePricing").onclick = () => {
+    const read = id => Math.max(0, Math.round(Number(document.getElementById(id).value || 0)));
+    const next = { entryFee: read("priceEntry"), drinkFee: read("priceDrink"), boxFee: read("priceBox"), discount1: read("priceDiscount1"), discount2: read("priceDiscount2") };
+    if (next.discount1 > next.entryFee + next.drinkFee || next.discount2 > next.entryFee + next.drinkFee) {
+      if (!confirm("割引額が入場料金の合計を上回っています。このまま保存しますか？")) return;
+    }
+    ctx.pricing = next;
+    if (ctx.mode === "archive") ctx.dirty = true;
+    else { ctx.ev.pricing = normalizePricing(next); ctx.ev.u.meta = Date.now(); persistDb(); }
+    navigate(renderEventPage);
+  };
+  document.getElementById("cancelPricing").onclick = () => navigate(renderEventPage);
 }
 
 function memberDisplayName(member) { const nickname = String(member?.nickname ?? "").trim(); return nickname || String(member?.name ?? "登録外メンバー"); }

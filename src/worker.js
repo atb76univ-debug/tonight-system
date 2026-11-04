@@ -113,7 +113,7 @@ function mergeInto(target, source) {
     const versions = incoming.u || {};
 
     if (Number(versions.meta || 0) > Number(existing.u.meta || 0)) {
-      for (const key of ['name', 'date', 'flyer', 'archived', 'deleted', 'participants']) {
+      for (const key of ['name', 'date', 'flyer', 'archived', 'deleted', 'participants', 'pricing']) {
         if (Object.prototype.hasOwnProperty.call(incoming, key)) existing[key] = structuredClone(incoming[key]);
       }
       existing.u.meta = Number(versions.meta || 0);
