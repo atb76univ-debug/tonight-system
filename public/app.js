@@ -2894,7 +2894,9 @@ function evStats(st, bar) {
   const people = st.totals.general + st.totals.tmp;
   const gross = h.reduce((s, r) => s + (r.grossEntrance || ((r.general + r.tmp) * (ENTRY_FEE + DRINK_FEE))), 0);
   const disc = h.reduce((s, r) => s + (r.totalDiscount || 0), 0);
-  const profit = people ? gross - disc - people * DRINK_FEE - BOX_FEE : 0;
+  // grossEntrance は割引前の定価合計なので、割引を一度だけ差し引いて実収入を算出
+  const actualReceptionRevenue = gross - disc;
+  const profit = people ? actualReceptionRevenue - people * DRINK_FEE - BOX_FEE : 0;
   return { people, profit, bar: barCalc(bar || createBar()) };
 }
 
@@ -3022,6 +3024,19 @@ function downloadCurrentEventCsv() {
   const totalDrinkUnits = activeSales.reduce((sum, sale) => sum + (sale.items || []).reduce((n, item) => n + Number(item.qty || 0), 0), 0);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "来場者", "", totalPeople, "", "", "", "", "", `一般 ${Number(eventState.totals?.general || 0)}名／TMP ${Number(eventState.totals?.tmp || 0)}名`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付売上", "", "", Number(eventState.totals?.grossEntrance || 0), "", Number(eventState.totals?.totalDiscount || 0), "", "", `受付履歴 ${receptionHistory.length}件`]);
+  const discountAmount = Number(eventState.totals?.totalDiscount || 0);
+  const actualReceptionRevenue = Math.max(0, Number(eventState.totals?.grossEntrance || 0) - discountAmount);
+  const discountPeople = receptionHistory.reduce((sum, record) => {
+    const guests = Array.isArray(record.guests) ? record.guests : [];
+    return sum + guests.filter(guest => Number(guest.discount || 0) > 0).length;
+  }, 0);
+  const firstDrinkRevenue = totalPeople * DRINK_FEE;
+  const eventProfit = totalPeople ? actualReceptionRevenue - firstDrinkRevenue - BOX_FEE : 0;
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "割引人数", "", discountPeople, "", "", "", "", "", "割引が適用された来場者数"]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "割引総額", "", "", discountAmount, "", "", "", "", ""]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付売上（割引後）", "", "", actualReceptionRevenue, "", "", "", "", `割引前受付売上 ¥${formatMoney(Number(eventState.totals?.grossEntrance || 0))} − 割引総額 ¥${formatMoney(discountAmount)}`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "1stドリンク売上額", "", totalPeople, firstDrinkRevenue, "", "", "", "", `来場者数 ${totalPeople}名 × 1stドリンク料金 ¥${formatMoney(DRINK_FEE)}`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "利益", "", "", eventProfit, "", "", "", "", `割引後受付売上 − 1stドリンク売上額 − 箱代（¥${formatMoney(BOX_FEE)}）`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "ドリンク販売", "", totalDrinkUnits, "", "", "", "", "", `販売履歴 ${activeSales.length}件`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "進行時間調整", "", "", "", "", "", "", "", `${Number(tt.offsetMinutes || 0)}分`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付金庫初期金額", "", "", Number(eventState.startCash || 0), "", "", "", "", ""]);
