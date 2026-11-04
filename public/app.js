@@ -50,6 +50,72 @@ function createInitialState() {
 }
 
 const DELETION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/* ---------- 受付履歴のマージ（履歴1件ごとに削除／復元の新しい方を採用） ---------- */
+const RECEPTION_PER_PERSON = ENTRY_FEE + DRINK_FEE;
+function receptionTombVersion(t) { return Math.max(Number(t?.deletedAt || 0), Number(t?.restoredAt || 0)); }
+function receptionTombRestored(t) { return Number(t?.restoredAt || 0) > Number(t?.deletedAt || 0); }
+function applyReceptionEntryEffect(st, entry, sign) {
+  const people = Number(entry.general || 0) + Number(entry.tmp || 0);
+  st.totals.general += sign * Number(entry.general || 0);
+  st.totals.tmp += sign * Number(entry.tmp || 0);
+  st.totals.grossEntrance += sign * Number(entry.grossEntrance || people * RECEPTION_PER_PERSON);
+  st.totals.totalDiscount += sign * Number(entry.totalDiscount || 0);
+  st.drinkTickets = Math.max(0, Number(st.drinkTickets || 0) - sign * people);
+}
+// newer: u.rec が新しい側（金額・設定など単独値はこちらを採用）／older: 古い側
+function mergeReceptionStates(older, newer) {
+  const base = structuredClone(newer || older || {});
+  base.totals = { general: 0, tmp: 0, grossEntrance: 0, totalDiscount: 0, ...(base.totals || {}) };
+  const cutoff = Date.now() - DELETION_RETENTION_MS;
+  const tombs = new Map(), live = new Map();
+  for (const side of [newer, older]) {
+    if (!side) continue;
+    for (const t of (side.deletedReceptionHistory || [])) {
+      if (t?.entry?.id == null) continue;
+      const id = String(t.entry.id), prev = tombs.get(id);
+      if (!prev || receptionTombVersion(t) > receptionTombVersion(prev)) tombs.set(id, t);
+    }
+    for (const e of (side.receptionHistory || [])) {
+      if (e?.id == null) continue;
+      if (!live.has(String(e.id))) live.set(String(e.id), e);
+    }
+  }
+  const entries = [];
+  for (const [id, e] of live) {
+    const t = tombs.get(id);
+    if (t && !receptionTombRestored(t)) continue;      // 削除が最新 → 履歴に出さない
+    entries.push(structuredClone(e));
+  }
+  for (const [id, t] of tombs) {
+    if (receptionTombRestored(t) && !live.has(id)) entries.push(structuredClone(t.entry)); // 復元が最新
+  }
+  entries.sort((x, y) => Number(y.id || 0) - Number(x.id || 0));
+  const outIds = new Set(entries.map(e => String(e.id)));
+  const baseList = Array.isArray(base.receptionHistory) ? base.receptionHistory : [];
+  const baseIds = new Set(baseList.map(e => String(e.id)));
+  for (const e of entries) if (!baseIds.has(String(e.id))) applyReceptionEntryEffect(base, e, +1);
+  for (const e of baseList) if (!outIds.has(String(e.id))) applyReceptionEntryEffect(base, e, -1);
+  base.receptionHistory = entries;
+  base.deletedReceptionHistory = [...tombs.values()]
+    .filter(t => Number(t.deletedAt || 0) >= cutoff)
+    .sort((x, y) => receptionTombVersion(y) - receptionTombVersion(x))
+    .map(t => structuredClone(t));
+  return base;
+}
+function logReceptionDeletion(entry, at) {
+  ensureDeletionLogs();
+  const id = String(entry.id);
+  const floor = state.deletedReceptionHistory.filter(x => String(x.entry?.id) === id)
+    .reduce((m, x) => Math.max(m, receptionTombVersion(x)), 0);
+  state.deletedReceptionHistory = state.deletedReceptionHistory.filter(x => String(x.entry?.id) !== id);
+  state.deletedReceptionHistory.unshift({ entry: structuredClone(entry), deletedAt: Math.max(at || Date.now(), floor + 1), restoredAt: 0 });
+}
+function refreshCurrentView() {
+  try { currentRender(); renderReceptionTabs(); updateBackButton(); }
+  catch (error) { showNavigationError(error); }
+}
+
 function pruneDeletionLog(items) {
   const cutoff = Date.now() - DELETION_RETENTION_MS;
   return (Array.isArray(items) ? items : []).filter(x => Number(x.deletedAt || 0) >= cutoff);
@@ -1125,6 +1191,9 @@ function renderReceptionInput() {
         if (!member) return;
         tmpNames[index].name = memberDisplayName(member);
         tmpNames[index].memberId = member.id;
+        tmpNames[index].customName = "";
+        const freeInput = listContainer.querySelector(`.tmp-member-free-input[data-index="${index}"]`);
+        if (freeInput) freeInput.value = "";
         const toggle = listContainer.querySelector(`.tmp-member-toggle[data-index="${index}"]`);
         if (toggle) {
           toggle.innerHTML = `${esc(memberDisplayName(member))} <span aria-hidden="true">▾</span>`;
@@ -1138,14 +1207,16 @@ function renderReceptionInput() {
     // 外側をタップすると候補を閉じる。自由入力欄は常に表示したまま。
     if (!listContainer.dataset.outsideCloseBound) {
       listContainer.dataset.outsideCloseBound = "1";
-      document.addEventListener("click", e => {
+      if (window.__tmpOutsideClose) document.removeEventListener("click", window.__tmpOutsideClose);
+      window.__tmpOutsideClose = e => {
         if (listContainer.contains(e.target)) return;
         listContainer.querySelectorAll(".tmp-member-results:not([hidden])").forEach(box => {
           box.hidden = true;
           const toggle = listContainer.querySelector(`.tmp-member-toggle[data-index="${box.dataset.index}"]`);
           if (toggle) toggle.setAttribute("aria-expanded", "false");
         });
-      });
+      };
+      document.addEventListener("click", window.__tmpOutsideClose);
     }
 
     listContainer.querySelectorAll(".tmp-name-delete").forEach(btn => btn.addEventListener("click", e => {
@@ -1296,7 +1367,7 @@ function renderDiscountScreen() {
 
             ${
               guest.type === "tmp"
-                ? guest.name || "TMP来場者"
+                ? esc(guest.name || "TMP来場者")
                 : `来場者 ${index + 1}`
             }
 
@@ -1868,7 +1939,7 @@ function renderHistory() {
                   .filter(g => g.type === "tmp")
                   .map(g => `
                     <div style="padding:8px 0; border-bottom:1px solid var(--border);">
-                      <span style="font-weight:600;">${g.name || "名前未記入"}</span>
+                      <span style="font-weight:600;">${esc(g.name || "名前未記入")}</span>
                     </div>
                   `)
                   .join("")}
@@ -1987,35 +2058,36 @@ function deleteHistory(id) {
     target.general +
     target.tmp;
 
-  ensureDeletionLogs();
-  state.deletedReceptionHistory.unshift({ entry: structuredClone(target), deletedAt: Date.now() });
+  logReceptionDeletion(target, Date.now());
   state.receptionHistory =
     state.receptionHistory.filter(x => x.id !== id);
 
   saveState();
 
-  renderHistory();
+  refreshCurrentView();
 }
 function restoreHistory(id) {
   ensureDeletionLogs();
-  const index = state.deletedReceptionHistory.findIndex(x => String(x.entry?.id) === String(id));
-  if (index < 0) return;
-  const record = state.deletedReceptionHistory[index];
+  const record = state.deletedReceptionHistory.find(x => String(x.entry?.id) === String(id) && !receptionTombRestored(x));
+  if (!record) return;
   const entry = structuredClone(record.entry);
+  // 端末の時計がずれていても「削除より後」の復元として扱われるようにする
+  record.restoredAt = Math.max(Date.now(), Number(record.deletedAt || 0) + 1);
   if (state.receptionHistory.some(x => String(x.id) === String(entry.id))) {
-    console.warn("この受付履歴はすでに復元されています:", id);
+    saveState();
+    refreshCurrentView();
     return;
   }
-  record.restoredAt = Date.now();
   const people = Number(entry.general || 0) + Number(entry.tmp || 0);
   state.drinkTickets = Math.max(0, Number(state.drinkTickets || 0) - people);
   state.totals.general += Number(entry.general || 0);
   state.totals.tmp += Number(entry.tmp || 0);
-  state.totals.grossEntrance += Number(entry.grossEntrance || ((people) * (ENTRY_FEE + DRINK_FEE)));
+  state.totals.grossEntrance += Number(entry.grossEntrance || (people * (ENTRY_FEE + DRINK_FEE)));
   state.totals.totalDiscount += Number(entry.totalDiscount || 0);
   state.receptionHistory.unshift(entry);
+  state.receptionHistory.sort((x, y) => Number(y.id || 0) - Number(x.id || 0));
   saveState();
-  renderHistory();
+  refreshCurrentView();
 }
 
 function clearReceptionHistory() {
@@ -2035,10 +2107,7 @@ function clearReceptionHistory() {
   state.drinkTickets += totalPeople;
   ensureDeletionLogs();
   const deletedAt = Date.now();
-  state.deletedReceptionHistory = [
-    ...state.receptionHistory.map(entry => ({ entry: structuredClone(entry), deletedAt })),
-    ...state.deletedReceptionHistory
-  ];
+  state.receptionHistory.forEach(entry => logReceptionDeletion(entry, deletedAt));
   state.receptionHistory = [];
 
   state.totals = {
@@ -2050,7 +2119,7 @@ function clearReceptionHistory() {
 
   saveState();
 
-  renderHistory();
+  refreshCurrentView();
 }
 
 function clearReceptionAccountingData() {
@@ -2058,9 +2127,12 @@ function clearReceptionAccountingData() {
     "この回の受付会計データを一括削除しますか？\n受付履歴・来場者数・初期金庫額・ドリチケ残数をリセットします。\nイベント情報、出番／シフト、バーカウンターの会計データは削除されません。"
   )) return;
 
+  const oldEntries = state.receptionHistory.slice();
   const deletedReceptionHistory = pruneDeletionLog(state.deletedReceptionHistory || []);
   state = createInitialState();
   state.deletedReceptionHistory = deletedReceptionHistory;
+  const resetAt = Date.now();
+  oldEntries.forEach(entry => logReceptionDeletion(entry, resetAt));
   saveState();
   pageHistory = [renderEventList, renderEventPage];
   navigate(renderSetup);
@@ -2248,7 +2320,7 @@ function renderResult() {
               justify-content:space-between;
               align-items:center;
             ">
-              <span style="font-weight:600;">${guest.name}</span>
+              <span style="font-weight:600;">${esc(guest.name)}</span>
               <span style="font-size:12px; color:var(--sub);">
                 ${guest.timestamp}
               </span>
@@ -2681,7 +2753,21 @@ function mergeInto(t, s) {
       for (const k of ["name", "date", "flyer", "archived", "deleted", "participants"]) o[k] = e[k];
       o.u.meta = eu.meta;
     }
-    if ((eu.rec || 0) > (o.u.rec || 0)) { o.state = structuredClone(e.state); o.u.rec = eu.rec; }
+    {
+      const incomingNewer = (eu.rec || 0) > (o.u.rec || 0);
+      if (e.state || o.state) {
+        const localCurrent = o.state ? o.state.currentReception : null;
+        const merged = incomingNewer ? mergeReceptionStates(o.state, e.state) : mergeReceptionStates(e.state, o.state);
+        merged.currentReception = localCurrent || null;   // 入力途中の受付は自端末のもの（同じオブジェクト）を残す
+        if (o.state && typeof o.state === "object") {
+          if (JSON.stringify(o.state) !== JSON.stringify(merged)) {   // 変化があるときだけ更新
+            for (const k of Object.keys(o.state)) delete o.state[k];
+            Object.assign(o.state, merged);
+          }
+        } else o.state = merged;
+      }
+      if (incomingNewer) o.u.rec = eu.rec;
+    }
     const mergedBarTransactions = mergeBarTransactions(o.bar || {}, e.bar || {});
     if ((eu.bar || 0) > (o.u.bar || 0)) { o.bar = structuredClone(e.bar); o.u.bar = eu.bar; }
     o.bar = o.bar || {};
@@ -2694,7 +2780,7 @@ function mergeInto(t, s) {
   return t;
 }
 function dbSig() {
-  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
+  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
 }
 function setSync(t) { const e = document.getElementById("sync"); if (e) e.textContent = t; }
 function saveLocalDb() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {} }
@@ -3563,48 +3649,64 @@ function renderBarHome() {
     if (!barCart.length) { alert("商品をカートに追加してください"); return; }
     const total = cartTotal();
     let paid = 0;
-    screen.insertAdjacentHTML("beforeend", `
-      <div class="cashier-overlay" id="barCashierOverlay">
-        <div class="cashier-dialog">
-          <div class="cashier-head"><h2>預かり金額</h2><button class="cashier-cancel" id="barCashierCancel">中断</button></div>
-          <div class="cashier-total-row"><span>合計</span><strong>¥${formatMoney(total)}</strong></div>
-          <div class="cashier-paid" id="barCashierPaid">¥0</div>
-          <div class="cashier-status short" id="barCashierStatus">受け取ったお札・硬貨のボタンを押して積み上げてください</div>
-          <button type="button" class="cashier-exact-button" id="barCashierExact">ちょうど受け取った</button>
-          <div class="cashier-keypad">
-            <button data-bar-add-cash="100">+100</button><button data-bar-add-cash="500">+500</button><button data-bar-add-cash="1000">+1000</button>
-            <button data-bar-add-cash="5000">+5000</button><button data-bar-add-cash="10000">+10000</button><button id="barCashierClear">C</button>
-          </div>
-          <p class="cashier-help">受け取ったお札・硬貨のボタンを押して積み上げてください（押し間違いはC）</p>
-          <div class="bar-payment-checklist" aria-label="現金受け取り確認">
-            <label><input type="checkbox" id="barCashReceivedCheck"><span>現金を受け取った</span></label>
-            <label><input type="checkbox" id="barChangeGivenCheck"><span>お釣りを渡した</span></label>
-          </div>
-          <button class="cashier-confirm" id="barCashierConfirm" disabled>会計を確定</button>
+    screen.insertAdjacentHTML("beforeend", `<div class="cashier-overlay" id="barCashierOverlay"><div class="cashier-dialog" id="barCashierDialog"></div></div>`);
+    const overlay = $("barCashierOverlay"), dialog = $("barCashierDialog");
+
+    // 手順1：預かり金額（受付と同じ。チェックボックスは出さない）
+    const renderAmountStep = () => {
+      dialog.innerHTML = `
+        <div class="cashier-head"><h2>預かり金額</h2><button class="cashier-cancel" id="barCashierCancel">中断</button></div>
+        <div class="cashier-total-row"><span>合計</span><strong>${yen(total)}</strong></div>
+        <div class="cashier-paid" id="barCashierPaid">¥0</div>
+        <div class="cashier-status short" id="barCashierStatus">受け取ったお札・硬貨のボタンを押して積み上げてください</div>
+        <button type="button" class="cashier-exact-button" id="barCashierExact">ちょうど受け取った</button>
+        <div class="cashier-keypad">
+          <button data-bar-add-cash="100">+100</button><button data-bar-add-cash="500">+500</button><button data-bar-add-cash="1000">+1000</button>
+          <button data-bar-add-cash="5000">+5000</button><button data-bar-add-cash="10000">+10000</button><button id="barCashierClear">C</button>
         </div>
-      </div>`);
-    const paidEl = $("barCashierPaid"), statusEl = $("barCashierStatus"), confirmBtn = $("barCashierConfirm");
-    const refreshPayment = () => {
-      paidEl.textContent = yen(paid);
-      const diff = paid - total;
-      if (paid === total) { statusEl.textContent = "💵 ちょうど頂きました"; statusEl.className = "cashier-status exact"; }
-      else if (paid > total) { statusEl.textContent = `お釣り ${yen(diff)}`; statusEl.className = "cashier-status change"; }
-      else { statusEl.textContent = `あと ${yen(total - paid)} 不足しています`; statusEl.className = "cashier-status short"; }
-      const cashReceived = $("barCashReceivedCheck")?.checked === true;
-      const changeGiven = $("barChangeGivenCheck")?.checked === true;
-      confirmBtn.disabled = paid < total || !cashReceived || !changeGiven;
+        <p class="cashier-help">受け取ったお札・硬貨のボタンを押して積み上げてください（押し間違いはC）</p>
+        <button class="cashier-confirm" id="barCashierConfirm" disabled>確認へ</button>`;
+      const paidEl = $("barCashierPaid"), statusEl = $("barCashierStatus"), confirmBtn = $("barCashierConfirm");
+      const refreshPayment = () => {
+        paidEl.textContent = yen(paid);
+        const diff = paid - total;
+        if (paid === total) { statusEl.textContent = "💵 ちょうど頂きました"; statusEl.className = "cashier-status exact"; }
+        else if (paid > total) { statusEl.textContent = `お釣り ${yen(diff)}`; statusEl.className = "cashier-status change"; }
+        else { statusEl.textContent = `あと ${yen(total - paid)} 不足しています`; statusEl.className = "cashier-status short"; }
+        confirmBtn.disabled = paid < total;
+      };
+      dialog.querySelectorAll("[data-bar-add-cash]").forEach(btn => btn.onclick = () => { paid += Number(btn.dataset.barAddCash); refreshPayment(); });
+      $("barCashierExact").onclick = () => { paid = total; refreshPayment(); };
+      $("barCashierClear").onclick = () => { paid = 0; refreshPayment(); };
+      $("barCashierCancel").onclick = () => overlay.remove();
+      confirmBtn.onclick = () => { if (paid >= total) renderChecklistStep(); };
+      refreshPayment();
     };
-    $("barCashReceivedCheck").onchange = refreshPayment;
-    $("barChangeGivenCheck").onchange = refreshPayment;
-    screen.querySelectorAll("[data-bar-add-cash]").forEach(btn => btn.onclick = () => { paid += Number(btn.dataset.barAddCash); refreshPayment(); });
-    $("barCashierExact").onclick = () => { paid = total; refreshPayment(); };
-    $("barCashierClear").onclick = () => { paid = 0; refreshPayment(); };
-    $("barCashierCancel").onclick = () => $("barCashierOverlay").remove();
-    confirmBtn.onclick = () => {
-      b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "cash", items: structuredClone(barCart), totalAmount: total, paidAmount: paid, change: paid - total });
-      barCart = []; barCheckoutPage = false; barOrderComplete = true; saveBar(); renderBarHome();
+
+    // 手順2：会計確認（受付と同じ。金額確定後にチェックボックスを表示）
+    const renderChecklistStep = () => {
+      dialog.innerHTML = `
+        <div class="cashier-head"><h2>会計確認</h2><button class="cashier-cancel" id="barCashierBack">戻る</button></div>
+        <div class="cashier-total-row"><span>合計</span><strong>${yen(total)}</strong></div>
+        <div class="cashier-total-row"><span>預かり</span><strong>${yen(paid)}</strong></div>
+        <div class="cashier-status change" id="barChangeDisplay">お釣り ${yen(paid - total)}</div>
+        <div class="bar-payment-checklist" aria-label="現金受け取り確認">
+          <label><input type="checkbox" id="barCashReceivedCheck"><span>現金を受け取った</span></label>
+          <label><input type="checkbox" id="barChangeGivenCheck"><span>お釣りを渡した</span></label>
+        </div>
+        <button class="cashier-confirm" id="barCashierSubmit" disabled>会計を確定</button>`;
+      const submit = $("barCashierSubmit"), c1 = $("barCashReceivedCheck"), c2 = $("barChangeGivenCheck");
+      const refreshChecks = () => { submit.disabled = !(c1.checked && c2.checked); };
+      c1.onchange = refreshChecks; c2.onchange = refreshChecks;
+      $("barCashierBack").onclick = renderAmountStep;
+      submit.onclick = () => {
+        if (submit.disabled) return;
+        submit.disabled = true;                      // 二重確定防止
+        b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "cash", items: structuredClone(barCart), totalAmount: total, paidAmount: paid, change: paid - total });
+        barCart = []; barCheckoutPage = false; barOrderComplete = true; saveBar(); renderBarHome();
+      };
     };
-    refreshPayment();
+    renderAmountStep();
   };
   const ticketCheckoutButton = $("barTicketCheckout");
   if (ticketCheckoutButton) ticketCheckoutButton.onclick = () => {
@@ -3689,7 +3791,9 @@ function renderBarHome() {
     const sale = b.sales.find(x => x.id === saleId);
     if (!sale) return;
     b.deletedSales = pruneDeletionLog(b.deletedSales || []);
-    b.deletedSales.unshift({ sale: structuredClone(sale), deletedAt: Date.now(), restoredAt: 0 });
+    const prevFloor = b.deletedSales.filter(x => x.sale?.id === saleId).reduce((m, x) => Math.max(m, Number(x.deletedAt||0), Number(x.restoredAt||0)), 0);
+    b.deletedSales = b.deletedSales.filter(x => x.sale?.id !== saleId);
+    b.deletedSales.unshift({ sale: structuredClone(sale), deletedAt: Math.max(Date.now(), prevFloor + 1), restoredAt: 0 });
     b.voidedSales = [...new Set([...(b.voidedSales || []), saleId])];
     b.sales = b.sales.filter(x => x.id !== saleId);
     saveBar(); renderBarHome();
@@ -3698,7 +3802,7 @@ function renderBarHome() {
     if (!confirm("この販売履歴を復元しますか？売上集計にも再び反映されます。")) return;
     const item = b.deletedSales.find(x => x.sale?.id === btn.dataset.restoreSale && Number(x.restoredAt||0) <= Number(x.deletedAt||0));
     if (!item) return;
-    item.restoredAt = Date.now();
+    item.restoredAt = Math.max(Date.now(), Number(item.deletedAt || 0) + 1);
     if (!b.sales.some(x => x.id === item.sale.id)) b.sales.unshift(structuredClone(item.sale));
     b.voidedSales = (b.voidedSales || []).filter(id => id !== item.sale.id);
     saveBar(); renderBarHome();
@@ -3893,7 +3997,7 @@ function nowHtml(tt, ev) {
   html += `</div></div>`;
   html += `<div class="schedule-section"><div class="now-label">シフト</div><div class="schedule-columns">`;
   html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${shiftNow.length ? shiftNow.map(item => `<div class="schedule-item"><strong>${esc(item.role)}：${esc(recordMemberDisplay(item))}</strong><small>${esc(scheduleRangeLabel(item))}</small></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
-  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(recordMemberDisplay(shiftNext))}</strong><small>${esc(shiftNext.start)}–${esc(shiftNext.end)}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
+  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(recordMemberDisplay(shiftNext))}</strong><small>${esc(scheduleRangeLabel(shiftNext))}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `</div></div>`;
   html += `</div>`;
   return html;

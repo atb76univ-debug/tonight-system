@@ -2086,3 +2086,93 @@ button { max-width:100%; }
 .bar-payment-checklist label{display:flex;align-items:center;gap:12px;min-height:34px;font-size:16px;font-weight:750;line-height:1.45;cursor:pointer}
 .bar-payment-checklist input[type="checkbox"]{width:22px;height:22px;flex:0 0 22px;margin:0;accent-color:#263b5b}
 .bar-payment-checklist span{min-width:0;overflow-wrap:anywhere}
+
+/* =====================================================================
+   iPad / タブレット対応（スマホ用・PC用の中間サイズと、タッチ操作の最適化）
+   ===================================================================== */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{-webkit-tap-highlight-color:transparent;overflow-x:hidden;padding-bottom:calc(120px + env(safe-area-inset-bottom,0px))}
+/* ホーム画面に追加したとき・横向き時のステータスバー／ノッチ避け */
+.topbar{padding-top:calc(16px + env(safe-area-inset-top,0px));padding-left:calc(16px + env(safe-area-inset-left,0px));padding-right:calc(16px + env(safe-area-inset-right,0px))}
+.event-pulse{top:var(--topbar-h,68px)}
+#app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+/* 会計ダイアログ：内容が画面より高くても上端が切れない（中央寄せ＋はみ出し時はスクロール） */
+.cashier-overlay{align-items:flex-start;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:max(18px,env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) max(18px,env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px))}
+.cashier-dialog{margin:auto}
+.cashier-head h2{overflow-wrap:anywhere}
+/* 会計確認ステップ（バーカウンター）の表示を受付の確認画面と揃える */
+.cashier-dialog .bar-payment-checklist{margin:18px 0}
+.cashier-dialog .bar-payment-checklist label{min-height:48px;font-size:18px}
+.cashier-dialog .bar-payment-checklist input[type="checkbox"]{width:28px;height:28px;flex-basis:28px}
+.cashier-dialog>.cashier-total-row + .cashier-total-row{margin-top:12px}
+.cashier-dialog>.cashier-total-row + .cashier-status,.cashier-dialog>.cashier-total-row + .cashier-total-row + .cashier-status{margin-top:16px}
+
+/* タッチ端末：ホバーで要素が浮いたまま戻らない問題を防ぐ */
+@media (hover:none){
+  .btn:hover,.icon-btn:hover,.event-home-btn:hover,.product-tile:hover,.bar-page-tab:hover,.reception-page-tab:hover,.cashier-keypad button:hover{transform:none}
+  .btn:hover{box-shadow:0 4px 10px rgba(0,0,0,.06)}
+  .cashier-keypad button:hover{background:#eef1f6}
+}
+/* タッチ端末：押しやすい大きさにし、入力欄でのiOS自動ズームを防ぐ */
+@media (pointer:coarse){
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,textarea{font-size:16px!important}
+  .btn,.icon-btn,.event-home-btn,.bar-page-tab,.reception-page-tab,.mini-danger,.text-button{min-height:44px}
+  .qty-btn{width:44px;height:44px}
+  .mini-danger,.text-button{padding:10px 12px}
+  .pulse-control{min-height:34px;padding-left:12px;padding-right:12px}
+  .cash-entry-input-wrap input{height:46px}
+}
+
+/* iPad（縦・横）：スマホ寄りの小さい文字・細いタブを広い画面向けに */
+@media (min-width:700px) and (max-width:1180px){
+  #app{padding-top:20px;padding-bottom:20px}
+  .reception-page-nav,.bar-page-nav{gap:10px;margin-bottom:18px}
+  .reception-page-tab,.bar-page-tab{font-size:15px;min-height:52px;border-radius:13px}
+  .card-title{font-size:19px}
+  .product-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  .product-tile{min-height:116px;padding:12px 10px}
+  .product-tile-name{font-size:16px}
+  .product-tile strong{font-size:21px}
+  .product-tile small{font-size:11px}
+  .cart-panel{padding:18px}
+  .cart-line-title strong{font-size:16px}
+  .cart-total strong{font-size:30px}
+  .checkout-actions{gap:12px}
+  .checkout-actions .btn{padding:19px 10px;font-size:17px}
+  .bar-checkout-cart{max-width:680px;margin-left:auto;margin-right:auto}
+  .sales-product-row{font-size:13px;padding:12px 4px}
+  .sales-product-row strong,.sales-product-row b{font-size:14px}
+  .sale-history-row{padding:14px 0}
+  .sale-history-row strong{font-size:14px}
+  .sale-history-row small{font-size:13px}
+  .event-action-grid .btn{min-height:96px}
+  .event-action-grid .btn span{font-size:18px}
+  .event-action-grid .btn small{font-size:13px}
+  .stats-grid{gap:14px}
+  .stats{gap:14px}
+  .tt-record-main strong{font-size:17px}
+  .tt-record-time{font-size:15px}
+  .schedule-shift-row{font-size:14px}
+  .event-pulse .now-main{font-size:18px}
+  .event-pulse .schedule-shift-row{font-size:13px}
+  .event-pulse-title,.event-pulse-hint,.event-pulse .schedule-status{font-size:12px}
+}
+@media (min-width:1000px){.event-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+
+/* iPad 横向き（高さが足りない）：預かり金額ダイアログを2列にして1画面に収める */
+@media (min-width:700px) and (max-height:860px) and (orientation:landscape){
+  .cashier-dialog:has(.cashier-keypad){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px;width:min(100%,940px);padding:20px 28px}
+  .cashier-dialog:has(.cashier-keypad) .cashier-head{grid-column:1/-1;grid-row:1;margin-bottom:14px}
+  .cashier-dialog:has(.cashier-keypad) .cashier-total-row{grid-column:1;grid-row:2}
+  .cashier-dialog:has(.cashier-keypad) .cashier-paid{grid-column:1;grid-row:3;font-size:44px;padding:8px 0 12px}
+  .cashier-dialog:has(.cashier-keypad) .cashier-status{grid-column:1;grid-row:4;min-height:64px;font-size:19px;margin-bottom:10px}
+  .cashier-dialog:has(.cashier-keypad) .cashier-exact-button{grid-column:1;grid-row:5}
+  .cashier-dialog:has(.cashier-keypad) .cashier-help{grid-column:1;grid-row:6;margin:10px 2px 0;font-size:12px}
+  .cashier-dialog:has(.cashier-keypad) .cashier-keypad{grid-column:2;grid-row:2 / span 5;align-self:stretch;grid-auto-rows:1fr}
+  .cashier-dialog:has(.cashier-keypad) .cashier-keypad button{min-height:64px}
+  .cashier-dialog:has(.cashier-keypad) .cashier-confirm{grid-column:1/-1;grid-row:7;min-height:66px;margin-top:14px}
+}
+/* 縦向きiPad：会計ダイアログが横に間延びしないように */
+@media (min-width:700px) and (orientation:portrait){
+  .cashier-dialog{width:min(100%,680px)}
+}
