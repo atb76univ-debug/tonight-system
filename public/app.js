@@ -439,58 +439,25 @@ function getReceptionTotal() {
 }
 
 function getDiscountCounts(receptions) {
-
-  const counts = {
-    500: 0,
-    1000: 0
-  };
-
-  receptions.forEach(
-    reception => {
-
-      (reception.guests || [])
-        .forEach(
-          guest => {
-
-            if (
-              guest.discount === 500 ||
-              guest.discount === 1000
-            ) {
-              counts[guest.discount]++;
-            }
-          }
-        );
-    }
-  );
-
+  const counts = {};
+  (receptions || []).forEach(reception => {
+    (reception.guests || []).forEach(guest => {
+      const amount = Number(guest.discount || 0);
+      if (amount > 0) counts[amount] = (counts[amount] || 0) + 1;
+    });
+  });
   return counts;
 }
 
 function renderDiscountCounts(counts) {
-
-  if (
-    counts[500] === 0 &&
-    counts[1000] === 0
-  ) {
-    return `
-      <div class="sub-text">
-        割引なし
-      </div>
-    `;
-  }
-
-  return `
-    <div class="discount-counts">
-      <div>
-        <span>¥500OFF</span>
-        <strong>${counts[500]}人</strong>
-      </div>
-      <div>
-        <span>¥1,000OFF</span>
-        <strong>${counts[1000]}人</strong>
-      </div>
-    </div>
-  `;
+  const entries = Object.entries(counts || {})
+    .map(([amount, count]) => [Number(amount), Number(count)])
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => a[0] - b[0]);
+  if (!entries.length) return `<div class="sub-text">割引なし</div>`;
+  return `<div class="discount-counts">${entries.map(([amount, count]) => `
+    <div><span>¥${formatMoney(amount)}OFF</span><strong>${count}人</strong></div>
+  `).join("")}</div>`;
 }
 
 function renderCashBreakdown(breakdown) {
@@ -1978,7 +1945,7 @@ function deleteHistory(id) {
     target.grossEntrance ||
     (
       (target.general + target.tmp) *
-      (getPricing().entryFee + getPricing().drinkFee)
+      (DEFAULT_PRICING.entryFee + DEFAULT_PRICING.drinkFee)
     );
 
   state.totals.totalDiscount -=
@@ -2014,7 +1981,7 @@ function restoreHistory(id) {
   state.drinkTickets = Math.max(0, Number(state.drinkTickets || 0) - people);
   state.totals.general += Number(entry.general || 0);
   state.totals.tmp += Number(entry.tmp || 0);
-  state.totals.grossEntrance += Number(entry.grossEntrance || (people * (getPricing().entryFee + getPricing().drinkFee)));
+  state.totals.grossEntrance += Number(entry.grossEntrance || (people * (DEFAULT_PRICING.entryFee + DEFAULT_PRICING.drinkFee)));
   state.totals.totalDiscount += Number(entry.totalDiscount || 0);
   state.receptionHistory.unshift(entry);
   state.receptionHistory.sort((x, y) => Number(y.id || 0) - Number(x.id || 0));
@@ -2331,7 +2298,7 @@ function renderResult() {
 
       <strong class="highlight-blue">
 
-        -¥10,000
+        -¥${formatMoney(pricing.boxFee)}
 
       </strong>
 
@@ -2387,10 +2354,10 @@ function renderResult() {
       <strong>
 
         ¥${formatMoney(
-          theoreticalCash - drinkTicketAmount - getPricing().boxFee
+          theoreticalCash - drinkTicketAmount - pricing.boxFee
         )}
         (${formatSignedMoney(
-          cashIncrease - drinkTicketAmount - 10000
+          cashIncrease - drinkTicketAmount - pricing.boxFee
         )})
 
       </strong>
