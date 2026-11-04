@@ -3022,6 +3022,7 @@ function downloadCurrentEventCsv() {
   const activeSales = sales.filter(sale => Number(sale.timestamp || 0) > Number(bar.resetAt || 0));
   const totalPeople = Number(eventState.totals?.general || 0) + Number(eventState.totals?.tmp || 0);
   const totalDrinkUnits = activeSales.reduce((sum, sale) => sum + (sale.items || []).reduce((n, item) => n + Number(item.qty || 0), 0), 0);
+  const drinkSalesSummary = summarizeBarSales(bar);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "来場者", "", totalPeople, "", "", "", "", "", `一般 ${Number(eventState.totals?.general || 0)}名／TMP ${Number(eventState.totals?.tmp || 0)}名`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付売上", "", "", Number(eventState.totals?.grossEntrance || 0), "", Number(eventState.totals?.totalDiscount || 0), "", "", `受付履歴 ${receptionHistory.length}件`]);
   const discountAmount = Number(eventState.totals?.totalDiscount || 0);
@@ -3038,6 +3039,7 @@ function downloadCurrentEventCsv() {
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "1stドリンク売上額", "", totalPeople, firstDrinkRevenue, "", "", "", "", `来場者数 ${totalPeople}名 × 1stドリンク料金 ¥${formatMoney(DRINK_FEE)}`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "利益", "", "", eventProfit, "", "", "", "", `割引後受付売上 − 1stドリンク売上額 − 箱代（¥${formatMoney(BOX_FEE)}）`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "ドリンク販売", "", totalDrinkUnits, "", "", "", "", "", `販売履歴 ${activeSales.length}件`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "キャッシュドリンク売上", "", drinkSalesSummary.cashUnits, drinkSalesSummary.cashRevenue, "現金", "", "", "", `現金販売 ${drinkSalesSummary.cashUnits}杯`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "進行時間調整", "", "", "", "", "", "", "", `${Number(tt.offsetMinutes || 0)}分`]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付金庫初期金額", "", "", Number(eventState.startCash || 0), "", "", "", "", ""]);
   add(["イベント概要", eventName, eventDate, "", "", "", "", "", "ドリチケ残数", "", Number(eventState.drinkTickets || 0), "", "", "", "", "", ""]);
