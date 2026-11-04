@@ -1549,10 +1549,8 @@ function renderPaymentScreen() {
 }
 
 function renderChecklist() {
-
   const reception = state.currentReception;
-  // 受付データが完了処理などで破棄された後に古い履歴から戻ってきた場合は、
-  // null の受付データを参照せずホームへ戻す。
+  // 受付データが完了処理などで破棄された後に古い履歴から戻ってきた場合は、ホームへ戻す
   if (!reception) {
     clearTimeout(successReturnTimer);
     pageHistory = [renderHome];
@@ -1563,91 +1561,33 @@ function renderChecklist() {
     return;
   }
 
+  // ドリンク会計の「会計確認」と同じ見た目・手順（ダイアログ＋チェック全部で確定ボタンが有効）
   screen.innerHTML = `
-
-  <div class="card checklist-card">
-
-    <div class="card-title">
-      受付確認
-    </div>
-
-    <div class="money-display">
-
-      <div class="label">
-        お釣り
+    <div class="cashier-overlay">
+      <div class="cashier-dialog">
+        <div class="cashier-head"><h2>会計確認</h2><button type="button" class="cashier-cancel" id="receptionChecklistBack">戻る</button></div>
+        <div class="cashier-total-row"><span>合計</span><strong>¥${formatMoney(reception.totalAmount)}</strong></div>
+        <div class="cashier-total-row"><span>預かり</span><strong>¥${formatMoney(reception.paidAmount)}</strong></div>
+        <div class="cashier-status change">お釣り ¥${formatMoney(reception.change)}</div>
+        <div class="bar-payment-checklist" aria-label="受付確認">
+          <label><input type="checkbox" id="checkTicket"><span>ドリンクチケットを渡した</span></label>
+          <label><input type="checkbox" id="checkMoney"><span>お金を受け取った</span></label>
+          <label><input type="checkbox" id="checkChange"><span>お釣りを渡した</span></label>
+        </div>
+        <button type="button" class="cashier-confirm" id="completeReceptionBtn" disabled>会計を確定</button>
       </div>
+    </div>`;
 
-      <div class="amount">
-
-        ¥${formatMoney(
-          reception.change
-        )}
-
-      </div>
-
-    </div>
-
-    <div class="checklist">
-
-      <label>
-
-        <input
-          type="checkbox"
-          id="checkTicket"
-        >
-
-        <span>ドリンクチケットを渡した</span>
-
-      </label>
-
-      <label>
-
-        <input
-          type="checkbox"
-          id="checkMoney"
-        >
-
-        <span>お金を受け取った</span>
-
-      </label>
-
-      <label>
-
-        <input
-          type="checkbox"
-          id="checkChange"
-        >
-
-        <span>お釣りを渡した</span>
-
-      </label>
-
-    </div>
-
-    <br>
-
-    <button
-      class="
-      btn
-      btn-primary
-      btn-large
-      "
-      id="completeReceptionBtn"
-    >
-
-      受付完了
-
-    </button>
-
-  </div>
-  `;
-
-  document
-    .getElementById(
-      "completeReceptionBtn"
-    )
-    .onclick =
-      completeReception;
+  const checks = ["checkTicket", "checkMoney", "checkChange"].map(id => document.getElementById(id));
+  const confirmBtn = document.getElementById("completeReceptionBtn");
+  const refresh = () => { confirmBtn.disabled = !checks.every(c => c.checked); };
+  checks.forEach(c => c.onchange = refresh);
+  document.getElementById("receptionChecklistBack").onclick = back;
+  confirmBtn.onclick = () => {
+    if (confirmBtn.disabled) return;
+    confirmBtn.disabled = true;          // 二重確定防止
+    completeReception();
+  };
 }
 
 function completeReception() {
