@@ -3000,6 +3000,66 @@ function openEvent(id) {
   navigate(renderEventPage);
 }
 
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+function downloadCurrentEventCsv() {
+  if (!ctx?.ev) return;
+  const ev = ctx.ev;
+  const eventState = state || ev.state || createInitialState();
+  const bar = ensureBar(ctx.bar || ev.bar || createBar());
+  const tt = ensureTt(ctx.tt || ev.tt || createTt());
+  const headers = ["データ種別", "イベント名", "開催日", "日時", "開始日", "開始時刻", "終了日", "終了時刻", "区分", "名前・内容", "数量", "金額", "支払方法", "割引額", "預かり金", "お釣り", "備考"];
+  const rows = [];
+  const add = values => rows.push(headers.map((_, i) => csvCell(values[i] ?? "")));
+  const eventName = ev.name || "", eventDate = ev.date || "";
+  const receptionHistory = Array.isArray(eventState.receptionHistory) ? eventState.receptionHistory : [];
+  const sales = Array.isArray(bar.sales) ? bar.sales : [];
+  const activeSales = sales.filter(sale => Number(sale.timestamp || 0) > Number(bar.resetAt || 0));
+  const totalPeople = Number(eventState.totals?.general || 0) + Number(eventState.totals?.tmp || 0);
+  const totalDrinkUnits = activeSales.reduce((sum, sale) => sum + (sale.items || []).reduce((n, item) => n + Number(item.qty || 0), 0), 0);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "来場者", "", totalPeople, "", "", "", "", "", `一般 ${Number(eventState.totals?.general || 0)}名／TMP ${Number(eventState.totals?.tmp || 0)}名`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付売上", "", "", Number(eventState.totals?.grossEntrance || 0), "", Number(eventState.totals?.totalDiscount || 0), "", "", `受付履歴 ${receptionHistory.length}件`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "ドリンク販売", "", totalDrinkUnits, "", "", "", "", "", `販売履歴 ${activeSales.length}件`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "進行時間調整", "", "", "", "", "", "", "", `${Number(tt.offsetMinutes || 0)}分`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付金庫初期金額", "", "", Number(eventState.startCash || 0), "", "", "", "", ""]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "ドリチケ残数", "", Number(eventState.drinkTickets || 0), "", "", "", "", "", ""]);
+  const barCash = barCalc(bar);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "バー金庫開始額", "", "", barCash.start, "", "", "", "", ""]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "バー金庫終了額", "", "", barCash.hasEnd ? barCash.end : "", "", "", "", "", barCash.hasEnd ? "締め処理済み" : "未締め"]);
+  (ev.participants || []).forEach(id => {
+    const member = (db.members || []).find(m => String(m.id) === String(id));
+    add(["参加予定", eventName, eventDate, "", "", "", "", "", "参加予定メンバー", member ? memberDisplayName(member) : "名簿から削除済み", 1, "", "", "", "", "", `メンバーID: ${id}`]);
+  });
+  receptionHistory.forEach(entry => {
+    const guestNames = (entry.guests || []).map(g => `${g.type === "tmp" ? "TMP" : "一般"}:${g.name || ""}`).filter(Boolean).join(" / ");
+    add(["受付履歴", eventName, eventDate, entry.timestamp || "", "", "", "", "", `一般${Number(entry.general || 0)}名・TMP${Number(entry.tmp || 0)}名`, guestNames, Number(entry.general || 0) + Number(entry.tmp || 0), Number(entry.totalAmount || 0), "受付", Number(entry.totalDiscount || 0), Number(entry.paidAmount || 0), Number(entry.change || 0), `受付ID: ${entry.id ?? ""}`]);
+  });
+  activeSales.forEach(sale => {
+    const time = sale.timestamp ? new Date(Number(sale.timestamp)).toLocaleString("ja-JP") : "";
+    (sale.items || []).forEach(item => {
+      const qty = Number(item.qty || 0);
+      add(["ドリンク販売", eventName, eventDate, time, "", "", "", "", sale.paymentMethod === "ticket" ? "ドリチケ" : "現金", item.name || "", qty, Number(item.price || 0) * qty, sale.paymentMethod === "ticket" ? "ドリチケ" : "現金", "", Number(sale.paidAmount || 0), Number(sale.change || 0), `販売ID: ${sale.id ?? ""}／注文合計: ${Number(sale.totalAmount || 0)}円`]);
+    });
+  });
+  (tt.acts || []).slice().sort((a, b) => slotRange(a)[0] - slotRange(b)[0]).forEach(act => {
+    add(["タイムテーブル", eventName, eventDate, "", act.startDate || eventDate, act.start || "", act.endDate || eventDate, act.end || "", act.type === "その他" ? (act.customType || "その他") : (act.type || "DJ"), act.name || recordMemberDisplay(act), "", "", "", "", "", "", `出演者ID: ${(act.memberIds || []).join(" / ")}`]);
+  });
+  (tt.shifts || []).slice().sort((a, b) => slotRange(a)[0] - slotRange(b)[0]).forEach(shift => {
+    add(["シフト", eventName, eventDate, "", shift.startDate || eventDate, shift.start || "", shift.endDate || eventDate, shift.end || "", shift.role || "", shift.name || recordMemberDisplay(shift), "", "", "", "", "", "", `担当者ID: ${(shift.memberIds || []).join(" / ")}`]);
+  });
+  const csv = "\uFEFF" + [headers.map(csvCell), ...rows].map(row => row.join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const safeName = `${eventName}_${eventDate}`.replace(/[\\/:*?"<>|]/g, "_");
+  link.href = url; link.download = `${safeName || "event-data"}.csv`;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function renderEventPage() {
   const ev = ctx.ev, arc = ctx.mode === "archive";
   const s = evStats(state, ctx.bar), url = flyerUrl(ev);
@@ -3014,6 +3074,7 @@ function renderEventPage() {
       <div class="row"><span>受付利益</span><strong>¥${formatMoney(s.profit)}</strong></div>
       <div class="row"><span>ドリンク販売数</span><strong>${sales.totalUnits || (ctx.bar.tally || 0)}杯</strong></div>
       <div class="row"><span>ドリンク現金売上</span><strong>¥${formatMoney(sales.cashRevenue)}</strong></div>
+      <button class="btn btn-secondary full" id="exportEventCsv">この回のデータをCSV出力</button>
     </div>
     <div class="card"><div class="card-title">参加予定メンバー</div><div class="sub-text">${(ev.participants||[]).length}名登録</div><div class="participant-home-list">${(ev.participants||[]).map(id=>{const m=(db.members||[]).find(x=>x.id===id);const done=(state.receptionHistory||[]).some(r=>(r.guests||[]).some(g=>g.type==="tmp"&&(g.memberId===id||(!g.memberId&&g.name===m?.name))));return `<span>${esc(m?memberDisplayName(m):"名簿から削除済み")} <b class="${done?"checked":"pending"}">${done?"受付済み":"未受付"}</b></span>`}).join("")||`<span class="sub-text">参加予定はまだ登録されていません。</span>`}</div></div>
     <div class="event-action-grid">
@@ -3029,6 +3090,7 @@ function renderEventPage() {
   document.getElementById("goBar").onclick = () => navigate(ensureBar(ctx.bar).started ? renderBarHome : renderBarSetup);
   document.getElementById("goTt").onclick = () => navigate(renderTimetable);
   document.getElementById("goMembers").onclick = () => navigate(renderMembers);
+  document.getElementById("exportEventCsv").onclick = downloadCurrentEventCsv;
   document.getElementById("editEv").onclick = () => navigate(renderEventEdit);
   const sv = document.getElementById("saveEv");
   if (sv) sv.onclick = () => { if (confirm("変更を保存しますか？")) { commitCtx(); renderEventPage(); updateBackButton(); } };
@@ -3978,9 +4040,12 @@ function updateNow(options = {}) {
 function renderEventTimeline(){
  const host=document.getElementById("eventTimeline");if(!host)return;const tt=ctx.tt,all=(tt.acts||[]).map(a=>({...a,_kind:"act"})).sort((a,b)=>actSlotRange(a)[0]-actSlotRange(b)[0]);
  if(!all.length){host.innerHTML='<p class="sub-text">出番を登録するとタイムラインが表示されます。</p>';return;}
- const now=(Date.now()-new Date(ctx.ev.date+"T00:00:00").getTime())/60000,starts=all.map(a=>actSlotRange(a)[0]),ends=all.map(a=>actSlotRange(a)[1]);const min=Math.min(...starts,Math.floor(now/60)*60),max=Math.max(...ends,min+60);const span=Math.max(60,max-min);
+ const now=(Date.now()-new Date(ctx.ev.date+"T00:00:00").getTime())/60000,starts=all.map(a=>actSlotRange(a)[0]),ends=all.map(a=>actSlotRange(a)[1]);const scheduleMin=Math.min(...starts),scheduleMax=Math.max(...ends);const min=now>=scheduleMin&&now<=scheduleMax?Math.min(scheduleMin,Math.floor(now/60)*60):scheduleMin;const max=Math.max(scheduleMax,min+60);const span=Math.max(60,max-min);
+ // 短い出番が多い場合もカード同士が重ならないよう、各枠に最低限の縦幅を確保する
+ const pxPerMinute=Math.max(1.2,...all.map(a=>60/Math.max(1,actSlotRange(a)[1]-actSlotRange(a)[0])));
+ const trackHeight=Math.max(380,Math.ceil(span*pxPerMinute));
  const marker=Math.max(0,Math.min(100,(now-min)/span*100));
- host.innerHTML=`<div class="timeline-axis"><span>${formatOffsetTime(min)}</span><span>${formatOffsetTime(max)}</span></div><div class="timeline-track" style="height:${Math.max(380,Math.min(1200,span*1.2))}px"><div class="timeline-now-line" style="top:${marker}%"><span>NOW</span></div>${all.map(a=>{const [st,en]=actSlotRange(a),top=(st-min)/span*100,height=Math.max(3,(en-st)/span*100),active=now>=st&&now<en,x=adjustedTime(a);return `<div class="timeline-item ${active?"active":""}" style="top:${top}%;height:${height}%"><span class="timeline-time">${esc(x.start)}–${esc(x.end)}</span><strong>${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))}：${esc(recordMemberDisplay(a))}</strong></div>`}).join("")}</div>`;
+ host.innerHTML=`<div class="timeline-axis"><span>${formatOffsetTime(min)}</span><span>${formatOffsetTime(max)}</span></div><div class="timeline-track" style="height:${trackHeight}px"><div class="timeline-now-line" style="top:${marker}%"><span>NOW</span></div>${all.map(a=>{const [st,en]=actSlotRange(a),top=(st-min)/span*100,height=Math.max(3,(en-st)/span*100),active=now>=st&&now<en,x=adjustedTime(a);return `<div class="timeline-item ${active?"active":""}" style="top:${top}%;height:${height}%"><span class="timeline-time">${esc(x.start)}–${esc(x.end)}</span><strong>${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))}：${esc(recordMemberDisplay(a))}</strong></div>`}).join("")}</div>`;
 }
 
 function renderTimetable() {
