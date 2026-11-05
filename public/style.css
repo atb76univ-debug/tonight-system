@@ -2653,3 +2653,20 @@ button.x:active,
 
 /* 画面遷移時に前ページのスクロール位置を引き継がない */
 html{scroll-behavior:auto!important}
+
+
+/* NOW/NEXT 操作（更新間隔・縮小・しまう）を右端に配置 */
+.event-pulse-top{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  width:100%!important;
+}
+.event-pulse-controls{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:8px!important;
+  margin-left:auto!important;
+  width:max-content!important;
+}
