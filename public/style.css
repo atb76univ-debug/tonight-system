@@ -2669,3 +2669,133 @@ html{scroll-behavior:auto!important}
   gap:8px!important;
   margin-left:auto!important;
 }
+
+
+/* Unified Apple-inspired payment and confirmation UI */
+:root{
+  --ui-bg:#f5f5f7;--ui-surface:#fff;--ui-surface-2:#f2f2f5;
+  --ui-surface-3:#e8e8ed;--ui-border:rgba(60,60,67,.16);
+  --ui-text:#1d1d1f;--ui-secondary:#6e6e73;--ui-blue:#0071e3;
+  --ui-green:#248a3d;--ui-red:#d70015;
+}
+html,body,button,input,select,textarea{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif!important;
+  -webkit-font-smoothing:antialiased;
+}
+.cashier-overlay{
+  background:rgba(20,20,24,.38)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(140%);
+  backdrop-filter:blur(12px) saturate(140%);
+}
+.cashier-dialog{
+  width:min(100%,680px)!important;padding:30px!important;
+  border:1px solid rgba(255,255,255,.72)!important;border-radius:26px!important;
+  background:rgba(255,255,255,.97)!important;color:var(--ui-text)!important;
+  box-shadow:0 24px 80px rgba(0,0,0,.22)!important;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif!important;
+  letter-spacing:-.02em;
+}
+.cashier-head{align-items:center!important;margin-bottom:24px!important}
+.cashier-head h2{color:var(--ui-text)!important;font-size:25px!important;font-weight:700!important;letter-spacing:-.045em!important}
+.cashier-cancel{
+  min-height:40px!important;padding:9px 17px!important;border:1px solid var(--ui-border)!important;
+  border-radius:999px!important;background:var(--ui-surface-2)!important;color:#424248!important;
+  font-size:14px!important;font-weight:600!important;box-shadow:none!important;
+}
+.cashier-cancel:hover{background:var(--ui-surface-3)!important}
+.cashier-total-row{
+  padding:13px 0!important;border-bottom:1px solid var(--ui-border)!important;
+  color:var(--ui-secondary)!important;font-size:16px!important;font-weight:500!important;
+}
+.cashier-total-row strong{
+  color:var(--ui-text)!important;font-size:21px!important;font-weight:700!important;
+  font-variant-numeric:tabular-nums;letter-spacing:-.035em;
+}
+.cashier-paid{
+  padding:22px 0!important;color:var(--ui-text)!important;
+  font-size:clamp(42px,7vw,58px)!important;font-weight:700!important;
+  letter-spacing:-.055em!important;font-variant-numeric:tabular-nums;
+}
+.cashier-status{
+  min-height:58px!important;margin:4px 0 18px!important;padding:14px 18px!important;
+  border:1px solid var(--ui-border)!important;border-radius:16px!important;
+  background:var(--ui-surface-2)!important;color:var(--ui-text)!important;
+  font-size:16px!important;font-weight:600!important;letter-spacing:-.02em!important;
+}
+.cashier-status.exact{border-color:rgba(36,138,61,.18)!important;background:#edf7ef!important;color:#216e35!important}
+.cashier-status.change{border-color:rgba(0,113,227,.15)!important;background:#eef5fc!important;color:#0759a5!important}
+.cashier-status.short{border-color:var(--ui-border)!important;background:#f2f2f5!important;color:#55555b!important}
+.cashier-keypad{gap:10px!important}
+.cashier-keypad button{
+  min-height:62px!important;border:1px solid var(--ui-border)!important;border-radius:15px!important;
+  background:#f2f2f5!important;color:var(--ui-text)!important;font-size:21px!important;
+  font-weight:650!important;letter-spacing:-.025em;box-shadow:0 1px 2px rgba(0,0,0,.025)!important;
+}
+.cashier-keypad button:hover{background:#e8e8ed!important;transform:translateY(-1px)}
+.cashier-keypad button:active{transform:scale(.975)}
+.cashier-exact-button{
+  min-height:52px!important;margin:0 0 12px!important;border:1px solid rgba(36,138,61,.20)!important;
+  border-radius:14px!important;background:#edf7ef!important;color:#216e35!important;
+  font-size:16px!important;font-weight:650!important;
+}
+.cashier-exact-button:hover{background:#e3f2e6!important}
+.cashier-help{margin:12px 2px 20px!important;color:var(--ui-secondary)!important;font-size:13px!important;font-weight:450!important;line-height:1.6!important}
+.cashier-confirm{
+  min-height:56px!important;border:0!important;border-radius:15px!important;
+  background:var(--ui-blue)!important;color:#fff!important;font-size:17px!important;
+  font-weight:650!important;letter-spacing:-.02em!important;
+  box-shadow:0 3px 8px rgba(0,113,227,.18)!important;
+}
+.cashier-confirm:hover:not(:disabled){background:#0077ed!important}
+.cashier-confirm:disabled{background:#d1d1d6!important;color:#fff!important;box-shadow:none!important;cursor:not-allowed!important;opacity:1!important}
+
+/* Checklist rows */
+.cashier-dialog .bar-payment-checklist{
+  display:grid!important;gap:9px!important;margin:18px 0 22px!important;padding:0!important;
+  border:0!important;border-radius:0!important;background:transparent!important;
+}
+.cashier-dialog .bar-payment-checklist label{
+  display:flex!important;align-items:center!important;gap:13px!important;min-height:58px!important;
+  padding:13px 16px!important;border:1px solid var(--ui-border)!important;border-radius:15px!important;
+  background:#f7f7f9!important;color:var(--ui-text)!important;font-size:16px!important;
+  font-weight:600!important;line-height:1.4!important;letter-spacing:-.02em!important;cursor:pointer;
+  transition:background .16s,border-color .16s,box-shadow .16s;
+}
+.cashier-dialog .bar-payment-checklist label:has(input:checked){
+  border-color:rgba(36,138,61,.25)!important;background:#f0f7f1!important;
+}
+.cashier-dialog .bar-payment-checklist input[type="checkbox"]{
+  appearance:none!important;-webkit-appearance:none!important;display:grid!important;place-content:center!important;
+  flex:0 0 23px!important;width:23px!important;height:23px!important;min-height:23px!important;
+  margin:0!important;padding:0!important;border:1.5px solid #a1a1a6!important;border-radius:7px!important;
+  background:#fff!important;box-shadow:none!important;cursor:pointer;
+}
+.cashier-dialog .bar-payment-checklist input[type="checkbox"]::before{
+  content:"";width:11px;height:6px;border-left:2px solid #fff;border-bottom:2px solid #fff;
+  transform:rotate(-45deg) scale(0);transform-origin:center;transition:transform .12s ease-in-out;
+}
+.cashier-dialog .bar-payment-checklist input[type="checkbox"]:checked{border-color:var(--ui-green)!important;background:var(--ui-green)!important}
+.cashier-dialog .bar-payment-checklist input[type="checkbox"]:checked::before{transform:rotate(-45deg) scale(1)}
+.cashier-dialog .bar-payment-checklist input[type="checkbox"]:focus-visible{outline:3px solid rgba(0,113,227,.22)!important;outline-offset:2px}
+.cashier-dialog .bar-payment-checklist span{color:var(--ui-text)!important;font-size:16px!important;font-weight:600!important}
+.ticket-confirm-items{display:grid;gap:8px;margin:16px 0}
+.ticket-confirm-item{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 15px;
+  border:1px solid var(--ui-border);border-radius:14px;background:#f7f7f9;color:var(--ui-text);
+  font-size:15px;font-weight:550;
+}
+.ticket-confirm-item strong{font-variant-numeric:tabular-nums;font-weight:700}
+.ticket-confirm-warning{min-height:auto!important;text-align:left!important;justify-content:flex-start!important;font-size:14px!important;line-height:1.55!important}
+.cashier-dialog button,.cashier-dialog input,.cashier-dialog label,.cashier-dialog p,.cashier-dialog span{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif!important;
+}
+.cashier-dialog button:focus-visible{outline:3px solid rgba(0,113,227,.24)!important;outline-offset:2px}
+@media(max-width:520px){
+  .cashier-dialog{padding:21px!important;border-radius:23px!important}
+  .cashier-head h2{font-size:21px!important}
+  .cashier-total-row{font-size:14px!important}
+  .cashier-total-row strong{font-size:19px!important}
+  .cashier-dialog .bar-payment-checklist label{min-height:54px!important;padding:12px!important;font-size:15px!important}
+  .cashier-dialog .bar-payment-checklist span{font-size:15px!important}
+  .cashier-confirm{min-height:54px!important;font-size:16px!important}
+}
