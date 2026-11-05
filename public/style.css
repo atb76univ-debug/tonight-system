@@ -2868,60 +2868,282 @@ button,input,select,textarea,optgroup,option{
 
 
 /* =========================================================
-   tonight! unified Apple-inspired palette
-   Color-only overrides: preserve all original layout rules.
+   tonight! Apple palette — layout-safe application
+   Original layout rules are preserved; only color treatments are unified.
    ========================================================= */
 :root {
+color-scheme: light;
+
+  /* Core surfaces */
   --bg: #f5f5f7;
   --card: #ffffff;
   --surface: #ffffff;
   --surface-secondary: #f5f5f7;
   --surface-tertiary: #eaeaef;
-  --border: rgba(60, 60, 67, .16);
-  --ui-border: rgba(60, 60, 67, .16);
+
+  /* Text */
   --text: #1d1d1f;
   --sub: #6e6e73;
+  --text-tertiary: #86868b;
+
+  /* Actions */
   --primary: #0071e3;
   --accent: #0071e3;
   --ui-blue: #0071e3;
   --success: #248a3d;
-  --ui-green: #248a3d;
   --danger: #d70015;
-  --ui-red: #d70015;
+  --warning: #9a6700;
+
+  /* Structure */
+  --border: rgba(60, 60, 67, .16);
+  --ui-border: rgba(60, 60, 67, .16);
+  --radius: 18px;
+  --radius-sm: 12px;
+  --radius-lg: 22px;
+  --shadow: 0 2px 8px rgba(0,0,0,.035), 0 10px 28px rgba(0,0,0,.035);
+  --shadow-raised: 0 8px 28px rgba(0,0,0,.09);
+  --apple-ease: cubic-bezier(.2,.8,.2,1);
+
   --ui-bg: #f5f5f7;
-  --ui-surface: #ffffff;
+  --ui-surface: #fff;
   --ui-surface-2: #f5f5f7;
   --ui-surface-3: #eaeaef;
   --ui-text: #1d1d1f;
   --ui-secondary: #6e6e73;
+  --ui-green: #248a3d;
+  --ui-red: #d70015;
+}
+html, body {
+  color: var(--text) !important;
 }
 
-/* Shared palette for components that use legacy hard-coded colors.
-   These declarations intentionally change color properties only. */
-.btn-primary,
-.cashier-confirm,
-.bar-page-tab.active,
-.reception-page-tab.active,
-.discount-option button.active {
-  background-color: #0071e3;
-  border-color: #0071e3;
-  color: #ffffff;
+/* App chrome */
+.topbar {
+  color: var(--text) !important;
+  box-shadow: 0 1px 8px rgba(0,0,0,.035) !important;
 }
-.btn-danger,
-.danger-button {
-  background-color: #d70015;
-  border-color: #d70015;
-  color: #ffffff;
+
+.topbar h1, #pageTitle, .header-main {
+  color: var(--text) !important;
 }
-.ok,
-.success-text {
-  color: #248a3d;
+
+.brand-mini, .sub-text, .section-label, .sync-state,
+.event-pulse-hint, .schedule-status {
+  color: var(--sub) !important;
 }
-.ng,
-.error,
-.highlight-red {
-  color: #d70015;
+
+#app {
+  color: var(--text);
 }
-.highlight-blue {
-  color: #0071e3;
+
+.card, .panel, .settings-card, .member-card, .product-card,
+.history-card, .summary-card, .schedule-card, .result-card,
+.stat, .stat-card {
+  color: var(--text) !important;
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.card-title, .section-title, .page-section-title {
+  color: var(--text) !important;
+}
+
+/* Neutral controls — same treatment throughout the app */
+input:not([type="checkbox"]):not([type="radio"]),
+select, textarea,
+.tmp-member-toggle, .tmp-member-free-input,
+.tmp-member-search-input {
+  color: var(--text) !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.015);
+}
+
+input::placeholder, textarea::placeholder {
+  color: #98989d !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: rgba(0,113,227,.55) !important;
+  box-shadow: 0 0 0 4px rgba(0,113,227,.10) !important;
+}
+
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--primary) !important;
+}
+
+/* Primary / secondary / destructive actions */
+.btn-primary, .primary-button, .button-primary,
+.cashier-confirm, .confirm-button, .submit-button,
+button.primary, button.is-primary {
+  border-color: var(--primary) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(0,113,227,.16) !important;
+}
+
+.btn-primary:hover, .primary-button:hover, .button-primary:hover,
+.cashier-confirm:hover:not(:disabled), .confirm-button:hover,
+.submit-button:hover {
+  border-color: #0077ed !important;
+}
+
+.btn-secondary, .secondary-button, .button-secondary,
+button.secondary, .cashier-cancel {
+  color: var(--text) !important;
+  box-shadow: none !important;
+}
+
+.btn-danger, .danger-button, .button-danger,
+button.danger {
+  border-color: var(--danger) !important;
+  color: #fff !important;
+}
+
+button:disabled, .btn:disabled, .cashier-confirm:disabled {
+  border-color: #d1d1d6 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+/* Navigation and selected states */
+.bar-page-tab, .reception-page-tab {
+  color: var(--sub) !important;
+  box-shadow: none !important;
+}
+
+.bar-page-tab.active, .reception-page-tab.active,
+.schedule-switch-btn,
+.tab.active, .nav-tab.active, .filter-tab.active {
+  color: #fff !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 2px 7px rgba(0,113,227,.16) !important;
+}
+
+.schedule-switch-btn {
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+
+/* Repeated information blocks */
+.stat, .stat-card, .counter-row, .discount-card,
+.money-display, .success-summary, .ticket-confirm-item,
+.env, .history-item, .member-record, .product-row,
+.cashier-keypad button, .bar-payment-checklist label {
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+.stat-label, .counter-label small, .money-display .label,
+.success-summary span, .form-row label {
+  color: var(--sub) !important;
+}
+
+.stat-value, .money, .money-display .amount,
+.counter-value, .ticket-count, .cashier-paid {
+  color: var(--text) !important;
+}
+
+/* Event pulse / NOW-NEXT */
+.event-pulse {
+  color: var(--text) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,.045) !important;
+}
+
+.event-pulse .now-label {
+  color: #424248 !important;
+}
+
+.event-pulse .now-main,
+.event-pulse .schedule-shift-row strong {
+  color: var(--text) !important;
+}
+
+.event-pulse .schedule-shift-row {
+  color: var(--text) !important;
+}
+
+.cashier-dialog, .modal, .dialog {
+  color: var(--text) !important;
+  box-shadow: var(--shadow-raised) !important;
+}
+
+.cashier-dialog h1, .cashier-dialog h2, .cashier-dialog h3,
+.modal h1, .modal h2, .modal h3 {
+  color: var(--text) !important;
+}
+
+.cashier-keypad button {
+  color: var(--text) !important;
+}
+
+.cashier-status {
+  color: var(--text) !important;
+}
+
+.cashier-status.exact {
+  border-color: rgba(36,138,61,.18) !important;
+  color: #216e35 !important;
+}
+
+.cashier-status.change {
+  border-color: rgba(0,113,227,.15) !important;
+  color: #0759a5 !important;
+}
+
+.ok, .success, .success-text, .highlight-green {
+  color: var(--success) !important;
+}
+
+.ng, .error, .danger, .highlight-red {
+  color: var(--danger) !important;
+}
+
+.highlight-blue, .link, a {
+  color: var(--primary);
+}
+
+.banner, .warning, .notice {
+  border-color: #f0d28a !important;
+  color: #76520c !important;
+}
+
+.badge.arc {
+  color: var(--sub) !important;
+}
+
+/* Remove legacy purple / navy identity from shared interactive controls */
+.bar-page-tab.active, .reception-page-tab.active,
+.cashier-confirm, .bar-cart-dock-next,
+button[style*="#263b5b"], button[style*="#7357ff"] {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+}
+
+.cashier-dialog .bar-payment-checklist input[type="checkbox"]:checked {
+  border-color: var(--success) !important;
+}
+
+.icon-btn, .event-home-btn, .pulse-control {
+  color: var(--text) !important;
+  box-shadow: none !important;
+}
+
+/* Final component-specific palette alignment */
+.member-chip {
+  border-color: rgba(0,113,227,.18) !important;
+  color: #0759a5 !important;
+}
+
+.member-chip button {
+  color: #0759a5 !important;
+}
+
+/* Prevent long names, URLs and imported text from escaping their containers.
+   These rules do not change the original component dimensions or layout. */
+#app, #app * {
+  overflow-wrap: anywhere;
+}
+#app img, #app input, #app select, #app textarea {
+  max-width: 100%;
 }
