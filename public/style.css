@@ -3139,11 +3139,3 @@ button[style*="#263b5b"], button[style*="#7357ff"] {
   color: #0759a5 !important;
 }
 
-/* Prevent long names, URLs and imported text from escaping their containers.
-   These rules do not change the original component dimensions or layout. */
-#app, #app * {
-  overflow-wrap: anywhere;
-}
-#app img, #app input, #app select, #app textarea {
-  max-width: 100%;
-}
