@@ -1808,7 +1808,7 @@ function renderHistory() {
               <div class="section-label">
                 TMPメンバー受付済
               </div>
-              <div style="background:#fafafa; padding:12px; border-radius:12px; border:1px solid var(--border);">
+              <div style="background:#FFFFFF; padding:12px; border-radius:12px; border:1px solid var(--border);">
                 ${(entry.guests || [])
                   .filter(g => g.type === "tmp")
                   .map(g => `
@@ -2172,7 +2172,7 @@ function renderResult() {
       </div>
 
       <div style="
-        background:#fafafa;
+        background:#FFFFFF;
         padding:12px;
         border-radius:12px;
         border:1px solid var(--border);
@@ -2200,7 +2200,7 @@ function renderResult() {
   ` : ""}
 </div>
 
-  <div class="card" style="text-align: center; padding: 40px 20px; background:#0071e3; color: white; border-radius: 20px;">
+  <div class="card" style="text-align: center; padding: 40px 20px; background:#0071E3; color: white; border-radius: 20px;">
     <div style="font-size: 14px; font-weight: 700; opacity: 0.8; margin-bottom: 16px;">
       精算額
     </div>
@@ -2855,10 +2855,10 @@ function renderEventList() {
 function guideIllustration(kind) {
   const common = `viewBox="0 0 320 150" role="img" aria-hidden="true"`;
   const svg = {
-    event: `<svg ${common}><rect x="18" y="18" width="284" height="114" rx="15" fill="#f3f5f9"/><rect x="34" y="34" width="74" height="82" rx="9" fill="#0071e3"/><path d="M48 57h46M48 69h36M48 81h42" stroke="white" stroke-width="5" stroke-linecap="round"/><rect x="121" y="34" width="164" height="34" rx="8" fill="white" stroke="#dce2ec"/><path d="M136 51h72" stroke="#0071e3" stroke-width="6" stroke-linecap="round"/><rect x="121" y="78" width="164" height="38" rx="8" fill="white" stroke="#dce2ec"/><circle cx="143" cy="97" r="8" fill="#27b77a"/><path d="M160 97h93" stroke="#aeb8c8" stroke-width="5" stroke-linecap="round"/></svg>`,
-    reception: `<svg ${common}><rect x="24" y="18" width="272" height="114" rx="15" fill="#f3f5f9"/><rect x="43" y="31" width="104" height="88" rx="10" fill="white" stroke="#dce2ec"/><circle cx="95" cy="56" r="13" fill="#dce8f8"/><path d="M68 91h54M78 104h34" stroke="#0071e3" stroke-width="6" stroke-linecap="round"/><rect x="164" y="31" width="113" height="88" rx="10" fill="white" stroke="#dce2ec"/><path d="M179 50h82M179 69h82M179 88h82" stroke="#c4ccda" stroke-width="7" stroke-linecap="round"/><circle cx="246" cy="104" r="8" fill="#27b77a"/></svg>`,
-    bar: `<svg ${common}><rect x="22" y="18" width="276" height="114" rx="15" fill="#f3f5f9"/><rect x="39" y="32" width="115" height="84" rx="10" fill="white" stroke="#dce2ec"/><rect x="52" y="45" width="38" height="28" rx="5" fill="#e5edf8"/><rect x="101" y="45" width="38" height="28" rx="5" fill="#e5edf8"/><path d="M52 88h87" stroke="#c4ccda" stroke-width="7" stroke-linecap="round"/><rect x="171" y="32" width="110" height="84" rx="10" fill="#0071e3"/><path d="M187 51h78M187 68h78" stroke="#b8c7dc" stroke-width="6" stroke-linecap="round"/><rect x="187" y="82" width="78" height="21" rx="6" fill="#27b77a"/></svg>`,
-    schedule: `<svg ${common}><rect x="22" y="18" width="276" height="114" rx="15" fill="#f3f5f9"/><rect x="38" y="31" width="244" height="88" rx="10" fill="white" stroke="#dce2ec"/><rect x="50" y="43" width="94" height="28" rx="7" fill="#e8f0ff"/><rect x="155" y="43" width="113" height="28" rx="7" fill="#e8f8ef"/><path d="M60 57h70M165 57h88" stroke="#526f9c" stroke-width="5" stroke-linecap="round"/><path d="M50 87h218" stroke="#dce2ec" stroke-width="5" stroke-linecap="round"/><circle cx="91" cy="101" r="6" fill="#526f9c"/><circle cx="207" cy="101" r="6" fill="#27b77a"/></svg>`
+    event: `<svg ${common}><rect x="18" y="18" width="284" height="114" rx="15" fill="#E8E8ED"/><rect x="34" y="34" width="74" height="82" rx="9" fill="#0071E3"/><path d="M48 57h46M48 69h36M48 81h42" stroke="white" stroke-width="5" stroke-linecap="round"/><rect x="121" y="34" width="164" height="34" rx="8" fill="white" stroke="#D2D2D7"/><path d="M136 51h72" stroke="#0071E3" stroke-width="6" stroke-linecap="round"/><rect x="121" y="78" width="164" height="38" rx="8" fill="white" stroke="#D2D2D7"/><circle cx="143" cy="97" r="8" fill="#248A3D"/><path d="M160 97h93" stroke="#8E8E93" stroke-width="5" stroke-linecap="round"/></svg>`,
+    reception: `<svg ${common}><rect x="24" y="18" width="272" height="114" rx="15" fill="#E8E8ED"/><rect x="43" y="31" width="104" height="88" rx="10" fill="white" stroke="#D2D2D7"/><circle cx="95" cy="56" r="13" fill="#E8E8ED"/><path d="M68 91h54M78 104h34" stroke="#0071E3" stroke-width="6" stroke-linecap="round"/><rect x="164" y="31" width="113" height="88" rx="10" fill="white" stroke="#D2D2D7"/><path d="M179 50h82M179 69h82M179 88h82" stroke="#D2D2D7" stroke-width="7" stroke-linecap="round"/><circle cx="246" cy="104" r="8" fill="#248A3D"/></svg>`,
+    bar: `<svg ${common}><rect x="22" y="18" width="276" height="114" rx="15" fill="#E8E8ED"/><rect x="39" y="32" width="115" height="84" rx="10" fill="white" stroke="#D2D2D7"/><rect x="52" y="45" width="38" height="28" rx="5" fill="#E8E8ED"/><rect x="101" y="45" width="38" height="28" rx="5" fill="#E8E8ED"/><path d="M52 88h87" stroke="#D2D2D7" stroke-width="7" stroke-linecap="round"/><rect x="171" y="32" width="110" height="84" rx="10" fill="#0071E3"/><path d="M187 51h78M187 68h78" stroke="#DCEBFF" stroke-width="6" stroke-linecap="round"/><rect x="187" y="82" width="78" height="21" rx="6" fill="#248A3D"/></svg>`,
+    schedule: `<svg ${common}><rect x="22" y="18" width="276" height="114" rx="15" fill="#E8E8ED"/><rect x="38" y="31" width="244" height="88" rx="10" fill="white" stroke="#D2D2D7"/><rect x="50" y="43" width="94" height="28" rx="7" fill="#E8E8ED"/><rect x="155" y="43" width="113" height="28" rx="7" fill="#E8E8ED"/><path d="M60 57h70M165 57h88" stroke="#0071E3" stroke-width="5" stroke-linecap="round"/><path d="M50 87h218" stroke="#D2D2D7" stroke-width="5" stroke-linecap="round"/><circle cx="91" cy="101" r="6" fill="#0071E3"/><circle cx="207" cy="101" r="6" fill="#248A3D"/></svg>`
   };
   return svg[kind] || "";
 }
