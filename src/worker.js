@@ -2,61 +2,6 @@
 // /api/flyer/<id>: フライヤー画像の保存と配信
 const DELETION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
-
-const RECEPTION_PER_PERSON = 1500; // 入場料1000円 + ドリンク代500円（app.js の ENTRY_FEE + DRINK_FEE と同じ）
-const tombVersion = t => Math.max(Number(t?.deletedAt || 0), Number(t?.restoredAt || 0));
-const tombRestored = t => Number(t?.restoredAt || 0) > Number(t?.deletedAt || 0);
-
-function applyEntryEffect(st, entry, sign) {
-  const people = Number(entry.general || 0) + Number(entry.tmp || 0);
-  st.totals.general += sign * Number(entry.general || 0);
-  st.totals.tmp += sign * Number(entry.tmp || 0);
-  st.totals.grossEntrance += sign * Number(entry.grossEntrance || people * RECEPTION_PER_PERSON);
-  st.totals.totalDiscount += sign * Number(entry.totalDiscount || 0);
-  st.drinkTickets = Math.max(0, Number(st.drinkTickets || 0) - sign * people);
-}
-
-// 受付履歴は1件ごとに「削除／復元の新しい方」を採用（回全体の上書きで復元が消えないようにする）
-function mergeReceptionStates(older, newer) {
-  const base = structuredClone(newer || older || {});
-  base.totals = { general: 0, tmp: 0, grossEntrance: 0, totalDiscount: 0, ...(base.totals || {}) };
-  const cutoff = Date.now() - DELETION_RETENTION_MS;
-  const tombs = new Map(), live = new Map();
-  for (const side of [newer, older]) {
-    if (!side) continue;
-    for (const t of (side.deletedReceptionHistory || [])) {
-      if (t?.entry?.id == null) continue;
-      const id = String(t.entry.id), prev = tombs.get(id);
-      if (!prev || tombVersion(t) > tombVersion(prev)) tombs.set(id, t);
-    }
-    for (const e of (side.receptionHistory || [])) {
-      if (e?.id == null) continue;
-      if (!live.has(String(e.id))) live.set(String(e.id), e);
-    }
-  }
-  const entries = [];
-  for (const [id, e] of live) {
-    const t = tombs.get(id);
-    if (t && !tombRestored(t)) continue;
-    entries.push(structuredClone(e));
-  }
-  for (const [id, t] of tombs) {
-    if (tombRestored(t) && !live.has(id)) entries.push(structuredClone(t.entry));
-  }
-  entries.sort((x, y) => Number(y.id || 0) - Number(x.id || 0));
-  const outIds = new Set(entries.map(e => String(e.id)));
-  const baseList = Array.isArray(base.receptionHistory) ? base.receptionHistory : [];
-  const baseIds = new Set(baseList.map(e => String(e.id)));
-  for (const e of entries) if (!baseIds.has(String(e.id))) applyEntryEffect(base, e, +1);
-  for (const e of baseList) if (!outIds.has(String(e.id))) applyEntryEffect(base, e, -1);
-  base.receptionHistory = entries;
-  base.deletedReceptionHistory = [...tombs.values()]
-    .filter(t => Number(t.deletedAt || 0) >= cutoff)
-    .sort((x, y) => tombVersion(y) - tombVersion(x))
-    .map(t => structuredClone(t));
-  return base;
-}
-
 function mergeBarTransactions(a = {}, b = {}) {
   const resetAt = Math.max(Number(a.resetAt || 0), Number(b.resetAt || 0));
   const voided = new Set([...(a.voidedSales || []), ...(b.voidedSales || [])]);
@@ -113,18 +58,15 @@ function mergeInto(target, source) {
     const versions = incoming.u || {};
 
     if (Number(versions.meta || 0) > Number(existing.u.meta || 0)) {
-      for (const key of ['name', 'date', 'flyer', 'archived', 'deleted', 'participants', 'pricing']) {
+      for (const key of ['name', 'date', 'flyer', 'archived', 'deleted', 'participants']) {
         if (Object.prototype.hasOwnProperty.call(incoming, key)) existing[key] = structuredClone(incoming[key]);
       }
       existing.u.meta = Number(versions.meta || 0);
     }
-    const incomingNewer = Number(versions.rec || 0) > Number(existing.u.rec || 0);
-    if (incoming.state || existing.state) {
-      existing.state = incomingNewer
-        ? mergeReceptionStates(existing.state, incoming.state)
-        : mergeReceptionStates(incoming.state, existing.state);
+    if (Number(versions.rec || 0) > Number(existing.u.rec || 0)) {
+      existing.state = structuredClone(incoming.state || {});
+      existing.u.rec = Number(versions.rec || 0);
     }
-    if (incomingNewer) existing.u.rec = Number(versions.rec || 0);
 
     const mergedTransactions = mergeBarTransactions(existing.bar || {}, incoming.bar || {});
     if (Number(versions.bar || 0) > Number(existing.u.bar || 0)) {

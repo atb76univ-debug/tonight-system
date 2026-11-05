@@ -5,17 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111111">
   <title>tonight!</title>
-  <link rel="stylesheet" href="style.css?v=event-pricing-v35">
+  <link rel="stylesheet" href="style.css?v=apple-ui-refresh-1">
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
   <link rel="icon" type="image/png" href="TMPlogo.png">
 </head>
 <body>
   <header class="topbar">
     <button type="button" id="backBtn" class="icon-btn hidden" aria-label="前の画面に戻る">←</button>
-    <div class="header-main"><h1 id="pageTitle">tonight!</h1></div>
+    <div class="header-main"><div class="brand-mini">tonight!</div><h1 id="pageTitle">tonight!</h1></div>
     <span id="headerLive" class="header-live hidden"><i></i><span>LIVE</span></span>
     <button type="button" id="eventHomeBtn" class="event-home-btn hidden" aria-label="イベントホームへ移動">⌂ <span>イベントホーム</span></button>
     <span id="sync" class="sync-state"></span>
@@ -26,17 +23,6 @@
   </section>
   <main id="app"></main>
   <div id="modalRoot"></div>
-  <script>
-    // ヘッダー高さをCSS変数に反映（iPadのステータスバー分・折り返し時でも NOW/NEXT がヘッダーに重ならない）
-    (() => {
-      const bar = document.querySelector(".topbar");
-      const set = () => document.documentElement.style.setProperty("--topbar-h", bar.offsetHeight + "px");
-      if (window.ResizeObserver) new ResizeObserver(set).observe(bar);
-      window.addEventListener("resize", set);
-      window.addEventListener("orientationchange", set);
-      set();
-    })();
-  </script>
   <script>
     (() => {
       const pulse = document.getElementById("eventPulse");
@@ -61,6 +47,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=event-pricing-v35"></script>
+  <script src="app.js?v=reception-restore-id-fix-1"></script>
 </body>
 </html>
