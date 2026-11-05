@@ -3341,3 +3341,138 @@ body{min-width:320px}
   #modalRoot :where(.cashier-dialog,.modal,.dialog){max-height:calc(100dvh - 16px);padding:14px}
   #modalRoot .cashier-keypad button{min-height:46px!important}
 }
+
+/* =========================================================
+   Layout repair pass — native controls, safe spacing and artwork
+   ========================================================= */
+/* Never apply text-field appearance rules to native selection controls. */
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: auto !important;
+  appearance: auto !important;
+  width: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
+  height: 20px !important;
+  min-height: 20px !important;
+  max-height: 20px !important;
+  flex: 0 0 20px !important;
+  padding: 0 !important;
+  margin: 0 2px 0 0 !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  accent-color: var(--primary, #0071e3) !important;
+  vertical-align: middle;
+}
+/* Keep the deliberately custom square checkbox in the cashier confirmation. */
+.cashier-dialog .bar-payment-checklist input[type="checkbox"] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 23px !important;
+  min-width: 23px !important;
+  max-width: 23px !important;
+  height: 23px !important;
+  min-height: 23px !important;
+  max-height: 23px !important;
+  flex: 0 0 23px !important;
+  border-radius: 7px !important;
+}
+/* Restore the platform dropdown indicator; selects must look selectable. */
+select,
+select.member-multi-select {
+  -webkit-appearance: auto !important;
+  appearance: auto !important;
+  background-color: #fff !important;
+  padding-right: 38px !important;
+  cursor: pointer;
+}
+select:disabled { cursor: not-allowed; opacity: .65; }
+
+/* Give content breathing room and prevent records from touching card edges. */
+#app {
+  padding-left: clamp(16px, 3vw, 30px) !important;
+  padding-right: clamp(16px, 3vw, 30px) !important;
+}
+#app > .card,
+#app > .event-month,
+#app > .guide-step,
+#app > .tt-form-panel,
+#app > .member-panel,
+#app > .bar-panel,
+#app > .result-panel {
+  max-width: 100%;
+  min-width: 0;
+}
+.history-item {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  margin: 12px 0 !important;
+  padding: 16px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.history-item > div { min-width: 0; max-width: 100%; }
+.history-item .history-time { margin-bottom: 8px; font-weight: 650; }
+.history-item .discount-count-block { margin-top: 12px; }
+.history-item .discount-counts { max-width: 100%; }
+.history-item .btn { margin-top: 10px; }
+.deleted-history-row { min-width: 0; max-width: 100%; }
+.deleted-history-content { min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+
+/* Event flyers are artwork, not thumbnails: show the complete image. */
+.event-grid { min-width: 0; }
+.event-card.compact-event {
+  min-width: 0;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-color: #e9e9ed !important;
+  overflow: hidden;
+}
+.event-card.compact-event:not(.noflyer)::before {
+  background: linear-gradient(180deg, rgba(0,0,0,.02) 35%, rgba(0,0,0,.70) 100%) !important;
+  pointer-events: none;
+}
+.event-card.compact-event .event-card-overlay {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-width: 0;
+  max-width: 100%;
+  padding: 30px 10px 10px !important;
+}
+.event-card.compact-event .event-card-title,
+.event-card.compact-event .event-card-sub {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.event-list-logo {
+  display: block;
+  width: 76px;
+  height: 76px;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: center;
+  padding: 5px;
+  overflow: visible;
+}
+.event-list-brand { min-width: 0; }
+.event-list-brand > div { min-width: 0; }
+.event-list-toolbar .list-heading { overflow-wrap: anywhere; }
+
+@media (max-width: 700px) {
+  #app { padding-left: 14px !important; padding-right: 14px !important; }
+  .history-item { padding: 14px !important; }
+  .event-card.compact-event { min-height: 150px; }
+  .event-list-logo { width: 60px; height: 60px; }
+}
+@media (max-width: 420px) {
+  #app { padding-left: 12px !important; padding-right: 12px !important; }
+  .event-card.compact-event { min-height: 160px; }
+  .event-card.compact-event .event-card-title { font-size: 13px !important; }
+  .history-item { padding: 12px !important; }
+}
