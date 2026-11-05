@@ -2467,51 +2467,66 @@ td,th{border-color:var(--border)!important}
 }
 
 
-/* ===== Header layout correction: keep title and action buttons on one row ===== */
+/* Top page: keep the title and actions in one horizontal header.
+   The title may wrap; the action buttons must not be pushed down by it. */
 .event-list-toolbar{
-  display:flex !important;
-  flex-flow:row nowrap !important;
-  align-items:center !important;
-  justify-content:space-between !important;
-  gap:24px !important;
-  width:100%;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  column-gap:clamp(16px,3vw,40px)!important;
+  row-gap:14px!important;
+  flex-wrap:nowrap!important;
 }
-.event-list-brand{
-  display:flex !important;
-  flex:1 1 auto !important;
-  flex-direction:row !important;
-  align-items:center !important;
-  min-width:0 !important;
+.event-list-toolbar > .event-list-brand{
+  min-width:0!important;
+  width:auto!important;
+  flex:initial!important;
 }
 .event-list-brand > div{min-width:0}
-.event-list-actions{
-  display:flex !important;
-  flex:0 0 auto !important;
-  flex-flow:row nowrap !important;
-  align-items:center !important;
-  justify-content:flex-end !important;
-  gap:12px !important;
-  margin:0 !important;
-  white-space:nowrap !important;
+.event-list-toolbar .list-heading{
+  overflow-wrap:anywhere;
+  word-break:normal;
+  max-width:100%;
 }
-.event-list-actions .btn{
-  display:inline-flex !important;
-  align-items:center;
-  justify-content:center;
-  flex:0 0 auto !important;
-  width:auto !important;
-  min-width:max-content;
-  white-space:nowrap !important;
+.event-list-toolbar > .event-list-actions{
+  grid-column:2;
+  grid-row:1;
+  width:auto!important;
+  min-width:max-content!important;
+  flex:initial!important;
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:10px!important;
+  margin:0!important;
 }
-@media(max-width:700px){
+.event-list-toolbar .event-list-actions > .btn{
+  flex:0 0 auto!important;
+  width:auto!important;
+  white-space:nowrap!important;
+  min-height:48px;
+}
+/* On narrow phones, move the actions to a dedicated full-width row. */
+@media(max-width:520px){
   .event-list-toolbar{
-    flex-direction:column !important;
-    align-items:stretch !important;
-    gap:16px !important;
+    grid-template-columns:minmax(0,1fr)!important;
+    row-gap:16px!important;
   }
-  .event-list-brand{width:100%}
-  .event-list-actions{
-    width:100%;
-    justify-content:flex-end !important;
+  .event-list-toolbar > .event-list-brand{
+    grid-column:1;
+    grid-row:1;
+  }
+  .event-list-toolbar > .event-list-actions{
+    grid-column:1;
+    grid-row:2;
+    width:100%!important;
+    min-width:0!important;
+    justify-content:stretch!important;
+  }
+  .event-list-toolbar .event-list-actions > .btn{
+    flex:1 1 0!important;
+    min-width:0!important;
   }
 }
