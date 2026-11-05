@@ -285,34 +285,14 @@ function renderReceptionTabs() {
     <button class="reception-page-tab ${active === "result" ? "active" : ""}" data-rec-page="result">リザルト</button>
     <button class="reception-page-tab ${active === "cash" ? "active" : ""}" data-rec-page="cash">金庫照合</button>`;
   screen.prepend(nav);
-}
-
-/* 受付タブのクリック処理は、再描画で nav 要素が作り直されても動くよう
-   #app にイベント委譲する。ホーム内のショートカットボタンの有無に依存しない。 */
-if (!screen.dataset.receptionTabDelegation) {
-  screen.dataset.receptionTabDelegation = "1";
-  screen.addEventListener("click", event => {
-    const btn = event.target.closest("[data-rec-page]");
-    if (!btn || !screen.contains(btn)) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    const pages = {
-      home: renderHome,
-      input: renderReceptionInput,
-      history: renderHistory,
-      result: renderResult,
-      cash: renderCashCheck
-    };
-    const target = pages[btn.dataset.recPage];
-    if (typeof target !== "function") return;
-
+  nav.querySelectorAll("[data-rec-page]").forEach(btn => btn.addEventListener("click", () => {
     if (state.currentReception && btn.dataset.recPage !== "input") {
       if (!confirm("入力途中の受付を中止して移動しますか？")) return;
       state.currentReception = null;
     }
-    navigate(target);
-  });
+    const pages = {home:renderHome,input:renderReceptionInput,history:renderHistory,result:renderResult,cash:renderCashCheck};
+    navigate(pages[btn.dataset.recPage]);
+  }));
 }
 
 function getPageTitle(renderFunc) {
@@ -909,28 +889,6 @@ function renderHome() {
       "click",
       () => navigate(
         renderReceptionInput
-      )
-    );
-
-  document
-    .getElementById(
-      "historyBtn"
-    )
-    .addEventListener(
-      "click",
-      () => navigate(
-        renderHistory
-      )
-    );
-
-  document
-    .getElementById(
-      "resultBtn"
-    )
-    .addEventListener(
-      "click",
-      () => navigate(
-        renderResult
       )
     );
 
