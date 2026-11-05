@@ -3072,3 +3072,311 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible{
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{transition:none!important;animation:none!important}
 }
+
+
+/* =========================================================
+   FINAL VISUAL QA PATCH — tonight!
+   Apple-like neutral surfaces, strong text contrast, semantic states.
+   This block intentionally comes last to prevent older page CSS from
+   reintroducing conflicting colors or the tab container rectangle.
+   ========================================================= */
+:root{
+  --bg:#f5f5f7;
+  --card:#ffffff;
+  --border:rgba(60,60,67,.14);
+  --text:#1d1d1f;
+  --sub:#6e6e73;
+  --primary:#0071e3;
+  --accent:#0071e3;
+  --success:#1e7434;
+  --danger:#b4232c;
+  --tn-bg:#f5f5f7;
+  --tn-surface:#ffffff;
+  --tn-surface-raised:#ffffff;
+  --tn-surface-soft:#f2f2f5;
+  --tn-surface-muted:#e8e8ed;
+  --tn-border:rgba(60,60,67,.14);
+  --tn-border-strong:rgba(60,60,67,.22);
+  --tn-text:#1d1d1f;
+  --tn-secondary:#6e6e73;
+  --tn-tertiary:#6e6e73;
+  --tn-blue:#0071e3;
+  --tn-blue-hover:#0077ed;
+  --tn-green:#1e7434;
+  --tn-red:#b4232c;
+}
+
+/* Base: avoid washed-out gray text and preserve the consistent light canvas. */
+html,body{background:var(--tn-bg)!important;color:var(--tn-text)!important}
+#app{color:var(--tn-text)}
+.sub-text,.eyebrow,.section-label,.form-row label,.hint,.muted,
+.event-pulse-hint,.event-pulse-title{color:var(--tn-secondary)!important}
+
+/* FIX: no background plate/container behind horizontal tabs.
+   The tabs themselves remain individual, visible controls. */
+.reception-page-nav,.bar-page-nav{
+  background:transparent!important;
+  background-color:transparent!important;
+  border:0!important;
+  border-color:transparent!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  padding:0!important;
+  margin:0 0 16px!important;
+  overflow:visible!important;
+}
+.reception-page-nav{
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  gap:8px!important;
+}
+.bar-page-nav{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:8px!important;
+}
+.reception-page-tab,.bar-page-tab{
+  min-width:0!important;
+  min-height:46px!important;
+  padding:9px 7px!important;
+  border:1px solid #d8d8de!important;
+  border-radius:13px!important;
+  background:#e8e8ed!important;
+  background-color:#e8e8ed!important;
+  color:#3a3a3c!important;
+  font-size:13px!important;
+  font-weight:650!important;
+  line-height:1.25!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+  opacity:1!important;
+}
+.reception-page-tab:hover,.bar-page-tab:hover{
+  background:#dedee4!important;
+  border-color:#c8c8cf!important;
+  color:#1d1d1f!important;
+  transform:none!important;
+}
+.reception-page-tab.active,.bar-page-tab.active{
+  background:#1d1d1f!important;
+  background-color:#1d1d1f!important;
+  border-color:#1d1d1f!important;
+  color:#ffffff!important;
+  box-shadow:0 2px 7px rgba(0,0,0,.14)!important;
+}
+.reception-page-tab:focus-visible,.bar-page-tab:focus-visible{
+  outline:3px solid rgba(0,113,227,.28)!important;
+  outline-offset:2px!important;
+}
+@media(max-width:520px){
+  .reception-page-nav,.bar-page-nav{gap:5px!important}
+  .reception-page-tab,.bar-page-tab{font-size:11px!important;padding:8px 3px!important}
+}
+
+/* Secondary actions: readable dark text on neutral gray. */
+.btn-secondary,.secondary-button,.button-secondary,.icon-btn,.event-home-btn,
+.tt-edit-btn,.offset-controls .btn,.cashier-cancel,.pulse-control,
+.history-actions button,.text-button,.qty-btn{
+  background:#f2f2f5!important;
+  background-color:#f2f2f5!important;
+  color:#3a3a3c!important;
+  border:1px solid #d8d8de!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+}
+.btn-secondary:hover,.secondary-button:hover,.button-secondary:hover,
+.icon-btn:hover,.event-home-btn:hover,.tt-edit-btn:hover,
+.offset-controls .btn:hover,.cashier-cancel:hover,.pulse-control:hover,
+.qty-btn:hover{
+  background:#e8e8ed!important;
+  color:#1d1d1f!important;
+}
+.btn-primary,.primary-button,.button-primary,.btn-ticket,
+#confirmOrder,#aAdd,#sAdd,.cashier-confirm{
+  background:#0071e3!important;
+  color:#ffffff!important;
+  border-color:#0071e3!important;
+  text-shadow:none!important;
+}
+.btn-primary:hover,.primary-button:hover,.button-primary:hover,.btn-ticket:hover,
+#confirmOrder:hover,#aAdd:hover,#sAdd:hover,.cashier-confirm:hover:not(:disabled){
+  background:#0066cc!important;
+  border-color:#0066cc!important;
+}
+.btn-danger,.danger-button,.mini-danger,.btn-delete{
+  background:#fff1f0!important;
+  color:#a61b26!important;
+  border:1px solid #efc7c9!important;
+  box-shadow:none!important;
+}
+button:disabled,.btn:disabled,.cashier-confirm:disabled{
+  background:#e5e5ea!important;
+  color:#626267!important;
+  border-color:#d4d4da!important;
+  box-shadow:none!important;
+  opacity:1!important;
+  cursor:not-allowed!important;
+}
+
+/* Product catalogue: selected, normal and sold-out states must remain distinct. */
+.product-tile{
+  background:#ffffff!important;
+  color:#1d1d1f!important;
+  border:1px solid #dedee3!important;
+  box-shadow:0 2px 8px rgba(0,0,0,.035)!important;
+}
+.product-tile .product-tile-name,.product-tile strong{color:#1d1d1f!important}
+.product-tile small{color:#6e6e73!important}
+.product-tile.has-selection{
+  background:#e8e8ed!important;
+  border:1.5px solid #8e8e93!important;
+  color:#1d1d1f!important;
+  filter:none!important;
+}
+.product-tile.has-selection .product-tile-name,
+.product-tile.has-selection strong,
+.product-tile.has-selection small{
+  color:#1d1d1f!important;
+  opacity:1!important;
+}
+.product-tile.sold-out,.product-tile.sold-out:disabled{
+  background:#fff0f0!important;
+  border:1.5px solid #d66b73!important;
+  color:#8f1721!important;
+  box-shadow:none!important;
+  opacity:1!important;
+}
+.product-tile.sold-out .product-tile-name,
+.product-tile.sold-out strong{color:#8f1721!important}
+.product-tile.sold-out small{
+  background:#a61b26!important;
+  color:#ffffff!important;
+  border-radius:999px!important;
+}
+
+/* Event pulse: keep the neutral surface, with distinct readable NOW/NEXT tags. */
+.event-pulse,.event-pulse.is-compact{
+  background:rgba(242,242,245,.97)!important;
+  color:#1d1d1f!important;
+  border-color:#dedee3!important;
+  box-shadow:0 5px 18px rgba(0,0,0,.055)!important;
+}
+.event-pulse .now-label{
+  background:#dedee3!important;
+  color:#3a3a3c!important;
+}
+.event-pulse .now-main,.event-pulse .schedule-shift-row strong{color:#1d1d1f!important}
+.event-pulse .schedule-shift-row{
+  background:#ffffff!important;
+  border:1px solid #dedee3!important;
+  color:#1d1d1f!important;
+}
+.schedule-tag.current,.event-pulse .schedule-tag.current{
+  background:#d9f3e6!important;
+  color:#14643f!important;
+}
+.schedule-tag.next,.event-pulse .schedule-tag.next{
+  background:#e2eaff!important;
+  color:#294d91!important;
+}
+.event-pulse .schedule-tag:not(.current):not(.next){
+  background:#e5e5ea!important;
+  color:#424248!important;
+}
+.pulse-control{background:#ffffff!important;color:#3a3a3c!important}
+
+/* Status badges and payment types: dark text on light fills or white on strong fills. */
+.badge,.event-card-status.live,.live-badge{
+  background:#1e7434!important;
+  color:#ffffff!important;
+}
+.badge.arc,.event-card-status.archived{
+  background:#5d5d64!important;
+  color:#ffffff!important;
+}
+.bar-order-payment.is-cash{
+  background:#e8f4eb!important;
+  color:#216638!important;
+}
+.bar-order-payment.is-ticket{
+  background:#fff1dc!important;
+  color:#7a4b0b!important;
+}
+.ticket-result-note.is-ok{
+  background:#eaf8ef!important;
+  color:#216638!important;
+}
+.ticket-result-note.is-warning{
+  background:#fff2e8!important;
+  color:#7a3515!important;
+}
+.cashier-status.exact{
+  background:#edf7ef!important;
+  border-color:#b8d9c0!important;
+  color:#216638!important;
+}
+.cashier-status.change{
+  background:#eef5fc!important;
+  border-color:#c3d8f0!important;
+  color:#0759a5!important;
+}
+.cashier-status.short{
+  background:#f2f2f5!important;
+  border-color:#d8d8de!important;
+  color:#424248!important;
+}
+.cashier-exact-button{
+  background:#edf7ef!important;
+  color:#216638!important;
+  border-color:#b8d9c0!important;
+}
+.cashier-keypad button{
+  background:#f2f2f5!important;
+  color:#1d1d1f!important;
+  border-color:#d8d8de!important;
+}
+.cashier-keypad button:hover{background:#e8e8ed!important}
+.cashier-dialog .bar-payment-checklist label{
+  background:#f7f7f9!important;
+  color:#1d1d1f!important;
+  border-color:#dedee3!important;
+}
+.cashier-dialog .bar-payment-checklist label:has(input:checked){
+  background:#edf7ef!important;
+  color:#1d1d1f!important;
+  border-color:#b8d9c0!important;
+}
+
+/* Selected timetable rows/forms: a restrained blue edge, dark text, pale surface. */
+.tt-record.is-selected{
+  background:#eef5fc!important;
+  border:1.5px solid #8bb8e6!important;
+  color:#1d1d1f!important;
+  box-shadow:0 3px 10px rgba(0,113,227,.08)!important;
+  transform:none!important;
+}
+.tt-record.is-selected *{color:#1d1d1f}
+.tt-form-panel.is-editing{
+  background:#f3f8ff!important;
+  border:1.5px solid #8bb8e6!important;
+  color:#1d1d1f!important;
+  box-shadow:0 4px 14px rgba(0,113,227,.07)!important;
+}
+.tt-form-panel.is-editing .tt-form-heading{color:#1d1d1f!important}
+
+/* Restored/deleted history is indicated by labels and borders, not low-opacity text. */
+.deleted-history-row.is-restored{
+  opacity:1!important;
+  background:#f2f2f5!important;
+  color:#6e6e73!important;
+}
+.deleted-history-row.is-restored .sub-text{color:#6e6e73!important}
+
+/* Keep ordinary body text comfortably readable on light surfaces. */
+.card,.card p,.card span,.card label,.card li,.card td,
+.guide-step,.guide-step p,.tt-record,.tt-record span,
+.member-record,.member-record span,.history-item,.history-item span{
+  text-shadow:none!important;
+}
