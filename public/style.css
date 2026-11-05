@@ -2867,12 +2867,14 @@ button,input,select,textarea,optgroup,option{
 }
 
 
+
 /* =========================================================
-   tonight! Apple palette — layout-safe application
-   Original layout rules are preserved; only color treatments are unified.
+   tonight! Design System — Apple-inspired unified theme
+   v1.0 / 2026-11-06
+   すべての画面で色・階層・操作表現を統一する最終テーマ
    ========================================================= */
 :root {
-color-scheme: light;
+  color-scheme: light;
 
   /* Core surfaces */
   --bg: #f5f5f7;
@@ -2913,37 +2915,67 @@ color-scheme: light;
   --ui-green: #248a3d;
   --ui-red: #d70015;
 }
+
 html, body {
+  background: var(--bg) !important;
   color: var(--text) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", Arial, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+body * ,
+body *::before,
+body *::after {
+  font-family: inherit;
+}
+button, input, select, textarea {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  transition: background-color .16s var(--apple-ease),
+    border-color .16s var(--apple-ease),
+    box-shadow .16s var(--apple-ease),
+    transform .16s var(--apple-ease),
+    color .16s var(--apple-ease);
+}
+button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, a:focus-visible {
+  outline: 3px solid rgba(0,113,227,.24) !important;
+  outline-offset: 2px;
 }
 
 /* App chrome */
 .topbar {
+  background: rgba(255,255,255,.92) !important;
   color: var(--text) !important;
+  border-bottom: 1px solid var(--border) !important;
   box-shadow: 0 1px 8px rgba(0,0,0,.035) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
 }
-
 .topbar h1, #pageTitle, .header-main {
   color: var(--text) !important;
 }
-
 .brand-mini, .sub-text, .section-label, .sync-state,
 .event-pulse-hint, .schedule-status {
   color: var(--sub) !important;
 }
-
 #app {
   color: var(--text);
 }
-
 .card, .panel, .settings-card, .member-card, .product-card,
 .history-card, .summary-card, .schedule-card, .result-card,
 .stat, .stat-card {
+  background: var(--surface) !important;
   color: var(--text) !important;
   border-color: var(--border);
   box-shadow: var(--shadow);
 }
-
+.card, .panel, .settings-card, .member-card, .product-card {
+  border-radius: var(--radius) !important;
+}
 .card-title, .section-title, .page-section-title {
   color: var(--text) !important;
 }
@@ -2954,18 +2986,19 @@ select, textarea,
 .tmp-member-toggle, .tmp-member-free-input,
 .tmp-member-search-input {
   color: var(--text) !important;
+  background: #fff !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
   box-shadow: inset 0 1px 2px rgba(0,0,0,.015);
 }
-
 input::placeholder, textarea::placeholder {
   color: #98989d !important;
 }
-
 input:focus, select:focus, textarea:focus {
   border-color: rgba(0,113,227,.55) !important;
   box-shadow: 0 0 0 4px rgba(0,113,227,.10) !important;
+  outline: none !important;
 }
-
 input[type="checkbox"], input[type="radio"] {
   accent-color: var(--primary) !important;
 }
@@ -2974,30 +3007,40 @@ input[type="checkbox"], input[type="radio"] {
 .btn-primary, .primary-button, .button-primary,
 .cashier-confirm, .confirm-button, .submit-button,
 button.primary, button.is-primary {
+  background: var(--primary) !important;
   border-color: var(--primary) !important;
   color: #fff !important;
   box-shadow: 0 2px 6px rgba(0,113,227,.16) !important;
 }
-
 .btn-primary:hover, .primary-button:hover, .button-primary:hover,
 .cashier-confirm:hover:not(:disabled), .confirm-button:hover,
 .submit-button:hover {
+  background: #0077ed !important;
   border-color: #0077ed !important;
 }
-
+.btn-primary:active, .primary-button:active, .button-primary:active,
+.cashier-confirm:active, .confirm-button:active {
+  transform: scale(.985);
+}
 .btn-secondary, .secondary-button, .button-secondary,
 button.secondary, .cashier-cancel {
+  background: #f5f5f7 !important;
   color: var(--text) !important;
+  border: 1px solid var(--border) !important;
   box-shadow: none !important;
 }
-
+.btn-secondary:hover, .secondary-button:hover, .button-secondary:hover,
+.cashier-cancel:hover {
+  background: #eaeaef !important;
+}
 .btn-danger, .danger-button, .button-danger,
 button.danger {
+  background: var(--danger) !important;
   border-color: var(--danger) !important;
   color: #fff !important;
 }
-
 button:disabled, .btn:disabled, .cashier-confirm:disabled {
+  background: #d1d1d6 !important;
   border-color: #d1d1d6 !important;
   color: #fff !important;
   box-shadow: none !important;
@@ -3006,22 +3049,27 @@ button:disabled, .btn:disabled, .cashier-confirm:disabled {
 
 /* Navigation and selected states */
 .bar-page-tab, .reception-page-tab {
+  background: #fff !important;
   color: var(--sub) !important;
+  border: 1px solid var(--border) !important;
   box-shadow: none !important;
 }
-
 .bar-page-tab.active, .reception-page-tab.active,
 .schedule-switch-btn,
 .tab.active, .nav-tab.active, .filter-tab.active {
+  background: var(--primary) !important;
   color: #fff !important;
   border-color: var(--primary) !important;
   box-shadow: 0 2px 7px rgba(0,113,227,.16) !important;
 }
-
 .schedule-switch-btn {
+  background: #f5f5f7 !important;
   color: var(--text) !important;
   border-color: var(--border) !important;
   box-shadow: none !important;
+}
+.schedule-switch-btn:hover {
+  background: #eaeaef !important;
 }
 
 /* Repeated information blocks */
@@ -3029,85 +3077,101 @@ button:disabled, .btn:disabled, .cashier-confirm:disabled {
 .money-display, .success-summary, .ticket-confirm-item,
 .env, .history-item, .member-record, .product-row,
 .cashier-keypad button, .bar-payment-checklist label {
+  background: var(--surface-secondary) !important;
   border-color: var(--border) !important;
   color: var(--text) !important;
 }
-
 .stat-label, .counter-label small, .money-display .label,
 .success-summary span, .form-row label {
   color: var(--sub) !important;
 }
-
 .stat-value, .money, .money-display .amount,
 .counter-value, .ticket-count, .cashier-paid {
   color: var(--text) !important;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Event pulse / NOW-NEXT */
 .event-pulse {
+  background: rgba(245,245,247,.96) !important;
   color: var(--text) !important;
+  border-bottom: 1px solid var(--border) !important;
   box-shadow: 0 4px 16px rgba(0,0,0,.045) !important;
 }
-
 .event-pulse .now-label {
+  background: #e5e5ea !important;
   color: #424248 !important;
 }
-
 .event-pulse .now-main,
 .event-pulse .schedule-shift-row strong {
   color: var(--text) !important;
 }
-
 .event-pulse .schedule-shift-row {
+  background: #fff !important;
+  border: 1px solid var(--border) !important;
   color: var(--text) !important;
 }
 
+/* Cashier / modal surfaces */
+.cashier-overlay, .modal-overlay, .dialog-overlay {
+  background: rgba(20,20,24,.38) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+}
 .cashier-dialog, .modal, .dialog {
+  background: rgba(255,255,255,.98) !important;
   color: var(--text) !important;
+  border: 1px solid rgba(255,255,255,.75) !important;
   box-shadow: var(--shadow-raised) !important;
 }
-
 .cashier-dialog h1, .cashier-dialog h2, .cashier-dialog h3,
 .modal h1, .modal h2, .modal h3 {
   color: var(--text) !important;
 }
-
 .cashier-keypad button {
+  background: #f5f5f7 !important;
   color: var(--text) !important;
+  border: 1px solid var(--border) !important;
 }
-
+.cashier-keypad button:hover {
+  background: #eaeaef !important;
+}
 .cashier-status {
+  background: #f5f5f7 !important;
+  border: 1px solid var(--border) !important;
   color: var(--text) !important;
 }
-
 .cashier-status.exact {
+  background: #edf7ef !important;
   border-color: rgba(36,138,61,.18) !important;
   color: #216e35 !important;
 }
-
 .cashier-status.change {
+  background: #eef5fc !important;
   border-color: rgba(0,113,227,.15) !important;
   color: #0759a5 !important;
 }
 
+/* Semantic colors: reserved for status, not decoration */
+.badge, .status-badge, .live-badge {
+  border-radius: 999px;
+}
 .ok, .success, .success-text, .highlight-green {
   color: var(--success) !important;
 }
-
 .ng, .error, .danger, .highlight-red {
   color: var(--danger) !important;
 }
-
 .highlight-blue, .link, a {
   color: var(--primary);
 }
-
 .banner, .warning, .notice {
+  background: #fff8e7 !important;
   border-color: #f0d28a !important;
   color: #76520c !important;
 }
-
 .badge.arc {
+  background: #eaeaef !important;
   color: var(--sub) !important;
 }
 
@@ -3119,23 +3183,161 @@ button[style*="#263b5b"], button[style*="#7357ff"] {
   border-color: var(--primary) !important;
   color: #fff !important;
 }
-
 .cashier-dialog .bar-payment-checklist input[type="checkbox"]:checked {
+  background: var(--success) !important;
   border-color: var(--success) !important;
 }
 
+/* Consistent geometry and touch behavior */
+.icon-btn, .event-home-btn, .schedule-switch-btn,
+.pulse-control, .tmp-name-delete {
+  border-radius: 12px !important;
+}
 .icon-btn, .event-home-btn, .pulse-control {
+  background: #fff !important;
   color: var(--text) !important;
+  border: 1px solid var(--border) !important;
   box-shadow: none !important;
 }
+.card, .btn, button, input, select, textarea {
+  -webkit-appearance: none;
+}
+button, .event-card, .member-record, .product-card {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep event artwork expressive; unify only the application chrome around it. */
+.event-card, .flyer-hero, .flyer-empty {
+  border-radius: var(--radius) !important;
+}
+
 
 /* Final component-specific palette alignment */
 .member-chip {
+  background: #eef5fc !important;
   border-color: rgba(0,113,227,.18) !important;
   color: #0759a5 !important;
 }
-
 .member-chip button {
+  background: #dcecff !important;
   color: #0759a5 !important;
 }
 
+/* =========================================================
+   Responsive layout safety pass (2026-11)
+   Layout safeguards only: prevent intrinsic-width overflow,
+   keep controls inside their containers, and reflow at narrow widths.
+   ========================================================= */
+*,*::before,*::after{box-sizing:border-box}
+html,body{width:100%;max-width:100%;overflow-x:clip}
+body{min-width:320px}
+#app{width:100%;min-width:0;max-width:1080px;margin-inline:auto}
+#app *,#modalRoot *{min-width:0}
+#app :where(.card,.panel,.tt-form-panel,.member-panel,.bar-panel,.result-panel,.guide-step,.event-month),
+#modalRoot :where(.modal,.dialog,.cashier-dialog){max-width:100%;min-width:0}
+#app :where(h1,h2,h3,h4,p,span,strong,small,label,a,li,td,th){overflow-wrap:anywhere;word-break:normal}
+#app :where(.sub-text,.help-text,.description,.event-card-title,.event-card-sub,.member-record-main,.product-name,.product-title){line-height:1.45}
+#app :where(.row,.compact-row,.member-record,.member-check,.counter-row,.discount-card-header,.history-actions,.form-row,.inline-form,.member-filter-toolbar,.member-bulk-toolbar,.event-list-toolbar,.event-list-brand,.event-list-actions,.cashier-head,.cashier-total-row,.ticket-confirm-item){min-width:0;max-width:100%}
+#app :where(.inline-form,.member-filter-toolbar,.member-bulk-toolbar,.event-list-actions,.history-actions){flex-wrap:wrap}
+#app :where(input:not([type=checkbox]):not([type=radio]),select,textarea){width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+#app :where(button,.btn){max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.3}
+#app :where(.icon-btn,.pulse-control,.tmp-name-delete,.counter button,.qty-btn,.product-selection-qty .qty-btn){flex-shrink:0;white-space:nowrap;overflow-wrap:normal}
+#app :where(.full){width:100%;max-width:100%}
+#app :where(.stats,.stats-grid,.discount-counts,.discount-options,.product-grid,.event-grid,.member-check-grid,.ticket-reconciliation-grid){grid-template-columns:repeat(2,minmax(0,1fr))}
+#app :where(.stats>*,.stats-grid>*,.discount-counts>*,.discount-options>*,.product-grid>*,.event-grid>*,.member-check-grid>*,.ticket-reconciliation-grid>*){min-width:0}
+#app :where(.member-record){display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#app .member-record-main{flex:1 1 180px;min-width:0}
+#app .member-record-main strong,#app .member-record-main small{display:block;max-width:100%;overflow-wrap:anywhere}
+#app :where(.member-filter-toolbar,.member-bulk-toolbar){display:flex;align-items:center;gap:8px}
+#app .member-filter-toolbar>*{flex:1 1 180px;min-width:0}
+#app .member-bulk-toolbar>*{min-width:0}
+#app :where(.event-list-toolbar,.event-list-brand,.event-list-actions){min-width:0}
+#app .event-list-toolbar{grid-template-columns:minmax(0,1fr) auto}
+#app .event-list-actions{flex-wrap:wrap}
+#app .event-list-actions .btn{white-space:normal}
+#app :where(.timeline,.timeline-track,.shift-timeline-track){width:100%;max-width:100%;min-width:0}
+#app .timeline-track{overflow:hidden}
+#app .timeline-item{min-width:0;max-width:calc(100% - 8px);overflow:hidden}
+#app .timeline-item :where(strong,.timeline-time){display:block;max-width:100%;overflow-wrap:anywhere;white-space:normal}
+#app .timeline-item .timeline-time{font-variant-numeric:tabular-nums}
+#app :where(.table-wrap,.table-scroll,.overflow-x-auto){max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+#app table{max-width:100%;}
+#app :where(th,td){overflow-wrap:anywhere}
+#modalRoot :where(.cashier-overlay,.modal-overlay,.dialog-overlay){position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow-y:auto;overflow-x:hidden;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+#modalRoot :where(.cashier-dialog,.modal,.dialog){width:min(100%,680px);max-width:680px;max-height:calc(100dvh - 24px);overflow-x:hidden;overflow-y:auto;margin:auto;padding:clamp(16px,3vw,28px)}
+#modalRoot .cashier-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+#modalRoot .cashier-head h2{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+#modalRoot .cashier-head button{flex:0 0 auto;max-width:40%;white-space:normal}
+#modalRoot .cashier-total-row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+#modalRoot .cashier-total-row>*{min-width:0;overflow-wrap:anywhere}
+#modalRoot .cashier-total-row strong{font-variant-numeric:tabular-nums;text-align:right}
+#modalRoot .cashier-keypad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#modalRoot .cashier-keypad button{min-width:0;width:100%;padding:10px 4px}
+#modalRoot .cashier-confirm,#modalRoot .cashier-exact-button{width:100%;max-width:100%;white-space:normal}
+#modalRoot .bar-payment-checklist label{min-width:0}
+#modalRoot .bar-payment-checklist span{min-width:0;overflow-wrap:anywhere}
+.topbar{min-width:0;gap:8px;flex-wrap:nowrap}
+.topbar .header-main{flex:1 1 auto;min-width:0}
+.topbar h1{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar :where(.icon-btn,.event-home-btn,.schedule-switch-btn){flex:0 0 auto;max-width:42vw}
+.event-pulse,#eventPulse,#globalNowBox{min-width:0;max-width:100%}
+.event-pulse :where(.now-row,.schedule-shift-row){min-width:0;max-width:100%}
+.event-pulse .now-main{min-width:0;overflow-wrap:anywhere}
+
+@media(max-width:700px){
+  #app{padding:14px 12px calc(36px + env(safe-area-inset-bottom,0px))}
+  #app .card{padding:16px;margin-bottom:13px}
+  #app .card-title{font-size:18px;line-height:1.3}
+  #app :where(.stats,.stats-grid,.discount-counts,.discount-options,.product-grid,.member-check-grid,.ticket-reconciliation-grid){grid-template-columns:repeat(2,minmax(0,1fr))}
+  #app .event-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #app .event-card{min-width:0;min-height:138px}
+  #app .event-list-toolbar{grid-template-columns:minmax(0,1fr)!important;padding:16px;gap:12px}
+  #app .event-list-brand{grid-column:1;grid-row:1}
+  #app .event-list-actions{grid-column:1;grid-row:2;width:100%;justify-content:stretch}
+  #app .event-list-actions>.btn{flex:1 1 130px;min-width:0}
+  #app .inline-form{grid-template-columns:minmax(0,1fr)}
+  #app .inline-form>.full{grid-column:1}
+  #app .member-filter-toolbar{display:grid;grid-template-columns:minmax(0,1fr)}
+  #app .member-bulk-toolbar{align-items:stretch}
+  #app .member-bulk-toolbar .btn{flex:1 1 100%}
+  #app .counter-row{flex-wrap:wrap}
+  #app .counter{width:100%;min-width:0}
+  #app .history-actions{flex-wrap:wrap}
+  #app .history-actions>*{flex:1 1 130px;min-width:0}
+  #app .tt-form-panel>.inline-form{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #app .tt-form-panel>.inline-form>.full,#app .tt-form-panel>.inline-form>.member-picker,#app .tt-form-panel>.inline-form>button{grid-column:1/-1}
+  #app .timeline-item{max-width:calc(100% - 6px)}
+  #app .timeline-item.parallel strong{font-size:clamp(9px,2.7vw,12px)}
+  #app .timeline-item.parallel-crowded strong{font-size:clamp(8px,2.35vw,10px)}
+  .topbar{padding-inline:10px!important;gap:6px}
+  .topbar h1{font-size:16px!important}
+  .topbar :where(.icon-btn,.event-home-btn,.schedule-switch-btn){font-size:12px;padding-inline:8px;max-width:36vw}
+  .topbar .event-home-btn span{max-width:22vw;overflow:hidden;text-overflow:ellipsis}
+}
+@media(max-width:420px){
+  #app{padding-inline:10px}
+  #app .card{padding:13px}
+  #app :where(.stats,.stats-grid,.discount-counts,.discount-options,.product-grid,.member-check-grid,.ticket-reconciliation-grid){grid-template-columns:minmax(0,1fr)}
+  #app .event-grid{grid-template-columns:minmax(0,1fr)}
+  #app .event-card{min-height:170px}
+  #app .tt-form-panel>.inline-form{grid-template-columns:minmax(0,1fr)!important}
+  #app .tt-form-panel>.inline-form>.full,#app .tt-form-panel>.inline-form>.member-picker,#app .tt-form-panel>.inline-form>button{grid-column:1}
+  #app .discount-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #app .ticket-reconciliation-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #app .counter-label span{font-size:16px}
+  #app .money{font-size:clamp(30px,10vw,42px)}
+  #app .ticket-count{font-size:clamp(38px,12vw,54px)}
+  .topbar :where(.event-home-btn,.schedule-switch-btn){max-width:31vw}
+  .topbar .event-home-btn span{display:none}
+}
+@media(max-width:350px){
+  #app .discount-options,#app .ticket-reconciliation-grid{grid-template-columns:minmax(0,1fr)}
+  #app .tt-form-panel>.inline-form{grid-template-columns:minmax(0,1fr)!important}
+  #app .tt-form-panel>.inline-form>*{grid-column:1!important}
+  #app .event-list-brand{gap:9px}
+  #app .event-list-logo{width:48px;height:48px}
+}
+@media(orientation:landscape) and (max-height:520px){
+  #modalRoot :where(.cashier-dialog,.modal,.dialog){max-height:calc(100dvh - 16px);padding:14px}
+  #modalRoot .cashier-keypad button{min-height:46px!important}
+}
