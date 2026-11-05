@@ -305,7 +305,7 @@ function getPageTitle(renderFunc) {
     [renderSuccessScreen, "受付完了"], [renderHistory, "受付履歴"],
     [renderResult, "受付リザルト"], [renderCashCheck, "金庫照合"],
     [renderEditStartCash, "初期金庫額"], [renderEditDrinkTickets, "ドリチケ設定"],
-    [renderBarHome, "バーカウンター"], [renderTimetable, "タイムテーブル・シフト"]
+    [renderBarHome, "バーカウンター"], [renderTimetable, "タイムテーブル"], [renderShifts, "シフト"]
   ]);
   if (renderFunc === renderBarHome) return ({sales:"ドリンク販売",products:"商品管理",history:"販売履歴・集計",cash:"金庫・精算"})[barPage] || "バーカウンター";
   return titles.get(renderFunc) || "tonight!";
@@ -316,6 +316,13 @@ function updateBackButton() {
   backBtn.classList.toggle("hidden", !canGoBack);
   backBtn.disabled = !canGoBack;
   if (pageTitleEl) pageTitleEl.textContent = getPageTitle(currentRender);
+  const scheduleSwitchBtn = document.getElementById("scheduleSwitchBtn");
+  if (scheduleSwitchBtn) {
+    const onSchedule = currentRender === renderTimetable || currentRender === renderShifts;
+    scheduleSwitchBtn.classList.toggle("hidden", !onSchedule);
+    scheduleSwitchBtn.textContent = currentRender === renderShifts ? "タイムテーブル" : "シフト";
+    scheduleSwitchBtn.setAttribute("aria-label", currentRender === renderShifts ? "タイムテーブルへ移動" : "シフトへ移動");
+  }
   if (eventHomeBtn) {
     eventHomeBtn.classList.toggle("hidden", !ctx);
     const onEventHome = currentRender === renderEventPage;
@@ -378,6 +385,11 @@ backBtn.addEventListener("click", event => {
   event.stopPropagation();
   back();
 }, { capture: true });
+const scheduleSwitchBtn = document.getElementById("scheduleSwitchBtn");
+if (scheduleSwitchBtn) scheduleSwitchBtn.addEventListener("click", () => {
+  if (currentRender === renderShifts) navigate(renderTimetable);
+  else if (currentRender === renderTimetable) navigate(renderShifts);
+});
 if (eventHomeBtn) eventHomeBtn.addEventListener("click", event => {
   event.preventDefault();
   if (currentRender === renderEventPage) goTopPage();
@@ -2999,7 +3011,8 @@ function renderEventPage() {
     <div class="event-action-grid">
       <button class="btn btn-primary" id="goRec"><span>受付</span><small>来場・入場会計</small></button>
       <button class="btn btn-primary" id="goBar"><span>バーカウンター</span><small>商品販売・ドリンク精算</small></button>
-      <button class="btn btn-secondary" id="goTt"><span>タイムテーブル・シフト</span><small>出演・スタッフ配置</small></button>
+      <button class="btn btn-secondary" id="goTt"><span>タイムテーブル</span><small>出演スケジュール</small></button>
+      <button class="btn btn-secondary" id="goShifts"><span>シフト</span><small>スタッフ配置・勤務時間</small></button>
     </div>
 
     <div class="card"><div class="card-title">参加予定メンバー</div><div class="sub-text">${(ev.participants||[]).length}名登録</div><div class="participant-home-list">${(ev.participants||[]).map(id=>{const m=(db.members||[]).find(x=>x.id===id);const done=(state.receptionHistory||[]).some(r=>(r.guests||[]).some(g=>g.type==="tmp"&&(g.memberId===id||(!g.memberId&&g.name===m?.name))));return `<span>${esc(m?memberDisplayName(m):"名簿から削除済み")} <b class="${done?"checked":"pending"}">${done?"受付済み":"未受付"}</b></span>`}).join("")||`<span class="sub-text">参加予定はまだ登録されていません。</span>`}</div></div>
@@ -3011,6 +3024,7 @@ function renderEventPage() {
   document.getElementById("goRec").onclick = () => navigate(state.initialized ? renderHome : renderSetup);
   document.getElementById("goBar").onclick = () => navigate(ensureBar(ctx.bar).started ? renderBarHome : renderBarSetup);
   document.getElementById("goTt").onclick = () => navigate(renderTimetable);
+  document.getElementById("goShifts").onclick = () => navigate(renderShifts);
   document.getElementById("goMembers").onclick = () => navigate(renderMembers);
   document.getElementById("exportEventCsv").onclick = downloadCurrentEventCsv;
   document.getElementById("editEv").onclick = () => navigate(renderEventEdit);
@@ -3988,6 +4002,7 @@ function updateNow(options = {}) {
     const global = document.getElementById("globalNowBox");
     if (global) global.innerHTML = html;
     if (options.refreshTimeline !== false && currentRender === renderTimetable) renderEventTimeline();
+    if (options.refreshTimeline !== false && currentRender === renderShifts) renderShiftTimeline();
   } catch (error) {
     // 定期更新の例外で、ヘッダーやページ遷移まで止めない
     console.error("NOW/NEXT更新エラー:", error);
@@ -4153,7 +4168,7 @@ function renderTimetable() {
     if (!o.start || !o.end || !o.role || !o.name) { alert("開始・終了時刻、役割、担当者名を入力してください"); return; }
     if (!isValidTimeRange(o.start, o.end, o.startDate, o.endDate)) { alert("終了日時は開始日時より後に設定してください。"); return; }
     if (editS) Object.assign(tt.shifts.find(x => x.id === editS), o); else tt.shifts.push({ id: uid(), ...o });
-    saveTt(); renderTimetable();
+    saveTt(); currentRender === renderShifts ? renderShifts() : renderTimetable();
   };
   screen.querySelectorAll("[data-ea]").forEach(el => el.onclick = () => {
     const a = tt.acts.find(x => x.id === el.dataset.ea); if (!a) return;
@@ -4171,8 +4186,76 @@ function renderTimetable() {
   });
   screen.querySelectorAll("[data-ds]").forEach(btn => btn.onclick = () => {
     if (!confirm("このシフトを削除しますか？")) return;
-    tt.shifts = tt.shifts.filter(x => x.id !== btn.dataset.ds); saveTt(); renderTimetable();
+    tt.shifts = tt.shifts.filter(x => x.id !== btn.dataset.ds); saveTt(); currentRender === renderShifts ? renderShifts() : renderTimetable();
   });
+}
+
+/* ---------- シフト専用ページ ---------- */
+function renderShifts() {
+  if (!ctx) return;
+  // 既存のシフト入力・編集処理をそのまま再利用し、出番関連だけを画面から分離する
+  renderTimetable();
+  const cards = [...screen.querySelectorAll(".card")];
+  let shiftCard = cards.find(card => card.querySelector(".card-title")?.textContent.trim() === "シフト");
+  let timelineCard = cards.find(card => card.querySelector(".card-title")?.textContent.trim() === "タイムライン");
+  cards.forEach(card => { if (card !== shiftCard && card !== timelineCard) card.remove(); });
+  if (!shiftCard) return;
+  if (!timelineCard) {
+    timelineCard = document.createElement("section");
+    timelineCard.className = "card";
+    timelineCard.innerHTML = '<div class="card-title">シフトタイムライン</div><div class="timeline" id="shiftTimeline"></div>';
+    shiftCard.before(timelineCard);
+  } else {
+    timelineCard.querySelector(".card-title").textContent = "シフトタイムライン";
+    const host = timelineCard.querySelector(".timeline");
+    if (host) host.id = "shiftTimeline";
+  }
+  renderShiftTimeline();
+  // 既存renderTimetableの最後に実行される再描画処理も、表示中ページに合わせる
+}
+function renderShiftTimeline() {
+  const host = document.getElementById("shiftTimeline");
+  if (!host || !ctx) return;
+  const shifts = (ctx.tt?.shifts || []).slice().sort((a,b) => slotRange(a)[0]-slotRange(b)[0]);
+  if (!shifts.length) {
+    host.innerHTML = '<p class="sub-text">シフトを登録するとタイムラインが表示されます。</p>';
+    return;
+  }
+  const min = Math.min(...shifts.map(x => slotRange(x)[0]));
+  const max = Math.max(...shifts.map(x => slotRange(x)[1]));
+  const span = Math.max(60, max-min);
+  const pxPerMinute = Math.max(1.2, ...shifts.map(x => 60/Math.max(1,slotRange(x)[1]-slotRange(x)[0])));
+  const height = Math.max(380, Math.ceil(span*pxPerMinute));
+  const now = (Date.now()-new Date(ctx.ev.date+"T00:00:00").getTime())/60000;
+  const marker = Math.max(0,Math.min(100,(now-min)/span*100));
+  const groups=[];
+  shifts.forEach(item=>{
+    const [start,end]=slotRange(item);
+    let group=groups.find(g=>start<g.end && end>g.start);
+    if(!group){group={start,end,items:[]};groups.push(group);}
+    group.start=Math.min(group.start,start);group.end=Math.max(group.end,end);group.items.push(item);
+  });
+  const lanes=new Map();
+  groups.forEach(group=>{
+    const ends=[];
+    group.items.forEach(item=>{
+      const [a,b]=slotRange(item);
+      let lane=ends.findIndex(v=>v<=a);if(lane<0)lane=ends.length;
+      ends[lane]=b;lanes.set(item.id,{lane,count:0});
+    });
+    group.items.forEach(item=>lanes.get(item.id).count=ends.length);
+  });
+  const items=shifts.map(item=>{
+    const [a,b]=slotRange(item), lane=lanes.get(item.id)||{lane:0,count:1};
+    const left=lane.count>1?`calc(${lane.lane*100/lane.count}% + 8px)`:"8px";
+    const width=lane.count>1?`calc(${100/lane.count}% - 16px)`:"auto";
+    const active=now>=a&&now<b;
+    return `<div class="timeline-item shift-timeline-item ${active?"active":""}" style="top:${(a-min)/span*100}%;height:${Math.max(3,(b-a)/span*100)}%;left:${left};${lane.count>1?`width:${width};right:auto;`:"right:8px;"}">
+      <span class="timeline-time">${esc(scheduleRangeLabel(item))}</span>
+      <strong>${esc(item.role||"シフト")}：${esc(recordMemberDisplay(item))}</strong>
+    </div>`;
+  }).join("");
+  host.innerHTML=`<div class="timeline-axis"><span>${formatOffsetTime(min)}</span><span>${formatOffsetTime(max)}</span></div><div class="timeline-track shift-timeline-track" style="height:${height}px"><div class="timeline-now-line" style="top:${marker}%"><span>NOW</span></div>${items}</div>`;
 }
 
 /* ---------- 起動 ---------- */

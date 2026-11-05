@@ -2799,3 +2799,36 @@ html,body,button,input,select,textarea{
   .cashier-dialog .bar-payment-checklist span{font-size:15px!important}
   .cashier-confirm{min-height:54px!important;font-size:16px!important}
 }
+
+
+/* タイムテーブル／シフトを独立ページ化 */
+.schedule-switch-btn{
+  flex:0 0 auto;
+  min-height:38px;
+  padding:8px 13px;
+  border:1px solid rgba(60,60,67,.16);
+  border-radius:999px;
+  background:#f2f2f5;
+  color:#1d1d1f;
+  font-size:13px;
+  font-weight:650;
+  letter-spacing:-.02em;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:background .15s,transform .15s;
+}
+.schedule-switch-btn:hover{background:#e8e8ed}
+.schedule-switch-btn:active{transform:scale(.97)}
+.shift-timeline-item{
+  border-left:4px solid #8e8e93!important;
+  background:linear-gradient(105deg,#f0f0f2,#fafafa)!important;
+  color:#1d1d1f!important;
+}
+.shift-timeline-item.active{
+  border-left-color:#248a3d!important;
+  background:linear-gradient(105deg,#e9f5ec,#f7fbf8)!important;
+}
+.shift-timeline-track{min-height:380px}
+@media(max-width:520px){
+  .schedule-switch-btn{padding:7px 10px;font-size:12px}
+}
