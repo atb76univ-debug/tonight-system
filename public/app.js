@@ -199,6 +199,7 @@ function navigate(renderFunc) {
     renderFunc();
     renderReceptionTabs();
     updateBackButton();
+    window.scrollTo(0, 0);
     return true;
   } catch (error) {
     // 描画失敗時に履歴だけが先へ進まないよう、直前の状態へ戻す
@@ -229,6 +230,7 @@ function back() {
       renderHome();
       renderReceptionTabs();
       updateBackButton();
+      window.scrollTo(0, 0);
       return true;
     } catch (error) {
       showNavigationError(error);
@@ -251,6 +253,7 @@ function back() {
     previous();
     renderReceptionTabs();
     updateBackButton();
+    window.scrollTo(0, 0);
     return true;
   } catch (error) {
     // 戻り先の描画に失敗した場合は、履歴を元に戻す
@@ -349,6 +352,7 @@ function goEventHome() {
     renderEventPage();
     renderReceptionTabs();
     updateBackButton();
+    window.scrollTo(0, 0);
   } catch (error) {
     showNavigationError(error);
   }
@@ -363,6 +367,7 @@ function goTopPage() {
     renderEventList();
     renderReceptionTabs();
     updateBackButton();
+    window.scrollTo(0, 0);
   } catch (error) {
     showNavigationError(error);
   }
@@ -2844,7 +2849,7 @@ function renderEventList() {
   evs.forEach(e => { (months[e.date.slice(0, 7)] = months[e.date.slice(0, 7)] || []).push(e); });
 
   let html = `<div class="event-list-toolbar">
-    <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="list-heading">パーティを始めよう。</div></div></div>
+    <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="eyebrow">TSUKUBA MUSIC PROJECT</div><div class="list-heading">イベントを選択</div></div></div>
     <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
   </div>`;
   if (!evs.length) html += `<div class="card sub-text">まだ回がありません。「新しい回」から作成してください。</div>`;

@@ -2530,3 +2530,126 @@ td,th{border-color:var(--border)!important}
     min-width:0!important;
   }
 }
+
+
+/* =========================================================
+   UI polish: reception tabs, delete controls, schedule pulse,
+   and scroll position on page navigation.
+   ========================================================= */
+
+/* 受付タブの外側に見える帯状の背景をなくし、タブだけを独立させる */
+.reception-page-nav{
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  padding:0!important;
+  margin:0 0 16px!important;
+}
+.reception-page-tab{
+  background:#e9e9ed!important;
+  border:1px solid #dedee3!important;
+  color:#5d5d63!important;
+  box-shadow:none!important;
+}
+.reception-page-tab:hover{
+  background:#e2e2e7!important;
+}
+.reception-page-tab.active{
+  background:#1d1d1f!important;
+  color:#fff!important;
+  border-color:#1d1d1f!important;
+  box-shadow:0 5px 14px rgba(0,0,0,.13)!important;
+}
+
+/* 名簿などの「×」削除ボタンをアプリ全体のトーンに統一 */
+button.x,
+#memberList .member-record .x{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex:0 0 38px!important;
+  width:38px!important;
+  min-width:38px!important;
+  max-width:38px!important;
+  height:38px!important;
+  min-height:38px!important;
+  padding:0!important;
+  border:1px solid #e3e3e8!important;
+  border-radius:12px!important;
+  background:#f2f2f5!important;
+  color:#77777e!important;
+  font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif!important;
+  font-size:22px!important;
+  font-weight:500!important;
+  line-height:1!important;
+  cursor:pointer!important;
+  box-shadow:0 1px 3px rgba(0,0,0,.045)!important;
+  transition:background .18s,border-color .18s,color .18s,transform .18s,box-shadow .18s!important;
+}
+button.x:hover,
+#memberList .member-record .x:hover{
+  background:#fff0f0!important;
+  border-color:#f0c9c9!important;
+  color:#d33b43!important;
+  box-shadow:0 3px 9px rgba(180,40,40,.09)!important;
+  transform:scale(1.04);
+}
+button.x:active,
+#memberList .member-record .x:active{
+  transform:scale(.94);
+}
+/* 受付のTMP自由入力行にある削除ボタンも同じデザインへ */
+.tmp-name-delete{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border:1px solid #e3e3e8!important;
+  border-radius:12px!important;
+  background:#f2f2f5!important;
+  color:#77777e!important;
+  font-size:12px!important;
+  font-weight:700!important;
+  box-shadow:0 1px 3px rgba(0,0,0,.045)!important;
+}
+.tmp-name-delete:hover{
+  background:#fff0f0!important;
+  border-color:#f0c9c9!important;
+  color:#d33b43!important;
+}
+
+/* NOW/NEXT・出番・シフトの上部バーをAppleらしいニュートラルグレーに */
+.event-pulse{
+  background:rgba(242,242,245,.96)!important;
+  color:#1d1d1f!important;
+  border-bottom:1px solid #dedee3!important;
+  box-shadow:0 5px 18px rgba(0,0,0,.055)!important;
+}
+.event-pulse-title,
+.event-pulse .schedule-shifts .section-label{
+  color:#77777e!important;
+}
+.event-pulse-hint,
+.event-pulse .schedule-status,
+.event-pulse .sub-text,
+.event-pulse .schedule-shift-row span{
+  color:#77777e!important;
+}
+.event-pulse .now-label{
+  background:#dedee3!important;
+  color:#424248!important;
+}
+.event-pulse .now-main,
+.event-pulse .schedule-shift-row strong{
+  color:#1d1d1f!important;
+}
+.event-pulse .schedule-shift-row{
+  background:#fff!important;
+  border:1px solid #e1e1e6!important;
+  color:#1d1d1f!important;
+}
+
+/* 画面遷移時に前ページのスクロール位置を引き継がない */
+html{scroll-behavior:auto!important}
