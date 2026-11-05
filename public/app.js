@@ -1,8 +1,14 @@
 const STORAGE_KEY = "tonight_reception_v1";
 
-const BOX_FEE = 10000;
-const ENTRY_FEE = 1000;
-const DRINK_FEE = 500;
+const DEFAULT_PRICING = Object.freeze({ entryFee: 1000, drinkFee: 500, boxFee: 10000, discount1: 500, discount2: 1000 });
+function normalizePricing(pricing) {
+  const p = { ...DEFAULT_PRICING, ...(pricing || {}) };
+  for (const key of Object.keys(DEFAULT_PRICING)) p[key] = Math.max(0, Math.round(Number(p[key] ?? DEFAULT_PRICING[key]) || 0));
+  return p;
+}
+function getPricing() {
+  return ctx?.pricing ? normalizePricing(ctx.pricing) : normalizePricing(ctx?.ev?.pricing);
+}
 const CASH_DENOMINATIONS = [
   10000,
   5000,
@@ -50,6 +56,72 @@ function createInitialState() {
 }
 
 const DELETION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/* ---------- 受付履歴のマージ（履歴1件ごとに削除／復元の新しい方を採用） ---------- */
+const RECEPTION_PER_PERSON = DEFAULT_PRICING.entryFee + DEFAULT_PRICING.drinkFee;
+function receptionTombVersion(t) { return Math.max(Number(t?.deletedAt || 0), Number(t?.restoredAt || 0)); }
+function receptionTombRestored(t) { return Number(t?.restoredAt || 0) > Number(t?.deletedAt || 0); }
+function applyReceptionEntryEffect(st, entry, sign) {
+  const people = Number(entry.general || 0) + Number(entry.tmp || 0);
+  st.totals.general += sign * Number(entry.general || 0);
+  st.totals.tmp += sign * Number(entry.tmp || 0);
+  st.totals.grossEntrance += sign * Number(entry.grossEntrance || people * RECEPTION_PER_PERSON);
+  st.totals.totalDiscount += sign * Number(entry.totalDiscount || 0);
+  st.drinkTickets = Math.max(0, Number(st.drinkTickets || 0) - sign * people);
+}
+// newer: u.rec が新しい側（金額・設定など単独値はこちらを採用）／older: 古い側
+function mergeReceptionStates(older, newer) {
+  const base = structuredClone(newer || older || {});
+  base.totals = { general: 0, tmp: 0, grossEntrance: 0, totalDiscount: 0, ...(base.totals || {}) };
+  const cutoff = Date.now() - DELETION_RETENTION_MS;
+  const tombs = new Map(), live = new Map();
+  for (const side of [newer, older]) {
+    if (!side) continue;
+    for (const t of (side.deletedReceptionHistory || [])) {
+      if (t?.entry?.id == null) continue;
+      const id = String(t.entry.id), prev = tombs.get(id);
+      if (!prev || receptionTombVersion(t) > receptionTombVersion(prev)) tombs.set(id, t);
+    }
+    for (const e of (side.receptionHistory || [])) {
+      if (e?.id == null) continue;
+      if (!live.has(String(e.id))) live.set(String(e.id), e);
+    }
+  }
+  const entries = [];
+  for (const [id, e] of live) {
+    const t = tombs.get(id);
+    if (t && !receptionTombRestored(t)) continue;      // 削除が最新 → 履歴に出さない
+    entries.push(structuredClone(e));
+  }
+  for (const [id, t] of tombs) {
+    if (receptionTombRestored(t) && !live.has(id)) entries.push(structuredClone(t.entry)); // 復元が最新
+  }
+  entries.sort((x, y) => Number(y.id || 0) - Number(x.id || 0));
+  const outIds = new Set(entries.map(e => String(e.id)));
+  const baseList = Array.isArray(base.receptionHistory) ? base.receptionHistory : [];
+  const baseIds = new Set(baseList.map(e => String(e.id)));
+  for (const e of entries) if (!baseIds.has(String(e.id))) applyReceptionEntryEffect(base, e, +1);
+  for (const e of baseList) if (!outIds.has(String(e.id))) applyReceptionEntryEffect(base, e, -1);
+  base.receptionHistory = entries;
+  base.deletedReceptionHistory = [...tombs.values()]
+    .filter(t => Number(t.deletedAt || 0) >= cutoff)
+    .sort((x, y) => receptionTombVersion(y) - receptionTombVersion(x))
+    .map(t => structuredClone(t));
+  return base;
+}
+function logReceptionDeletion(entry, at) {
+  ensureDeletionLogs();
+  const id = String(entry.id);
+  const floor = state.deletedReceptionHistory.filter(x => String(x.entry?.id) === id)
+    .reduce((m, x) => Math.max(m, receptionTombVersion(x)), 0);
+  state.deletedReceptionHistory = state.deletedReceptionHistory.filter(x => String(x.entry?.id) !== id);
+  state.deletedReceptionHistory.unshift({ entry: structuredClone(entry), deletedAt: Math.max(at || Date.now(), floor + 1), restoredAt: 0 });
+}
+function refreshCurrentView() {
+  try { currentRender(); renderReceptionTabs(); updateBackButton(); }
+  catch (error) { showNavigationError(error); }
+}
+
 function pruneDeletionLog(items) {
   const cutoff = Date.now() - DELETION_RETENTION_MS;
   return (Array.isArray(items) ? items : []).filter(x => Number(x.deletedAt || 0) >= cutoff);
@@ -367,58 +439,25 @@ function getReceptionTotal() {
 }
 
 function getDiscountCounts(receptions) {
-
-  const counts = {
-    500: 0,
-    1000: 0
-  };
-
-  receptions.forEach(
-    reception => {
-
-      (reception.guests || [])
-        .forEach(
-          guest => {
-
-            if (
-              guest.discount === 500 ||
-              guest.discount === 1000
-            ) {
-              counts[guest.discount]++;
-            }
-          }
-        );
-    }
-  );
-
+  const counts = {};
+  (receptions || []).forEach(reception => {
+    (reception.guests || []).forEach(guest => {
+      const amount = Number(guest.discount || 0);
+      if (amount > 0) counts[amount] = (counts[amount] || 0) + 1;
+    });
+  });
   return counts;
 }
 
 function renderDiscountCounts(counts) {
-
-  if (
-    counts[500] === 0 &&
-    counts[1000] === 0
-  ) {
-    return `
-      <div class="sub-text">
-        割引なし
-      </div>
-    `;
-  }
-
-  return `
-    <div class="discount-counts">
-      <div>
-        <span>¥500OFF</span>
-        <strong>${counts[500]}人</strong>
-      </div>
-      <div>
-        <span>¥1,000OFF</span>
-        <strong>${counts[1000]}人</strong>
-      </div>
-    </div>
-  `;
+  const entries = Object.entries(counts || {})
+    .map(([amount, count]) => [Number(amount), Number(count)])
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => a[0] - b[0]);
+  if (!entries.length) return `<div class="sub-text">割引なし</div>`;
+  return `<div class="discount-counts">${entries.map(([amount, count]) => `
+    <div><span>¥${formatMoney(amount)}OFF</span><strong>${count}人</strong></div>
+  `).join("")}</div>`;
 }
 
 function renderCashBreakdown(breakdown) {
@@ -1083,18 +1122,35 @@ function renderReceptionInput() {
     }).join("");
 
     const normalizeMemberSearch = value => String(value || "").normalize("NFKC").toLocaleLowerCase("ja").replace(/[ァ-ン]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)).replace(/[　\s・ー‐‑–—]/g, "");
+    // 候補一覧：全員を表示（件数の上限なし）。上部の検索欄で絞り込み（ひらがな／カタカナ・全角半角・空白の揺れに対応）
     const showMemberResults = (index, query = "") => {
       const resultBox = listContainer.querySelector(`.tmp-member-results[data-index="${index}"]`);
       if (!resultBox) return;
-      const q = normalizeMemberSearch(query);
       const allMembers = [...(db.members || [])].sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b), "ja"));
-      const matches = allMembers.filter(m => !q || normalizeMemberSearch([m.name, m.nickname, memberDisplayName(m)].filter(Boolean).join(" ")).includes(q)).slice(0, 40);
-      resultBox.innerHTML = matches.length
-        ? `${!q ? '<div class="tmp-member-results-hint">メンバーを選択してください</div>' : ''}${matches.map(m => `<button type="button" role="option" class="tmp-member-result" data-member-id="${esc(m.id)}" data-index="${index}"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname ? `<small>本名：${esc(m.name)}</small>` : ""}${m.grade ? `<small>${esc(m.grade)}</small>` : ""}</button>`).join("")}`
-        : `<div class="tmp-member-no-result">該当するメンバーがいません。</div>`;
+      const justOpened = resultBox.hidden || !resultBox.querySelector(".tmp-member-search-input");
+      if (!resultBox.querySelector(".tmp-member-search-input")) {
+        resultBox.innerHTML = `
+          <div class="tmp-member-search-row">
+            <input type="search" class="tmp-member-search-input" data-index="${index}" placeholder="名前・DJネームで検索（ひらがなOK）" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="TMPメンバーを検索">
+          </div>
+          <div class="tmp-member-results-list"></div>`;
+        resultBox.querySelector(".tmp-member-search-input").addEventListener("input", e => renderList(e.target.value));
+      }
+      const searchInput = resultBox.querySelector(".tmp-member-search-input");
+      const renderList = value => {
+        const q = normalizeMemberSearch(value);
+        const matches = allMembers.filter(m => !q || normalizeMemberSearch([m.name, m.nickname, memberDisplayName(m)].filter(Boolean).join(" ")).includes(q));
+        const list = resultBox.querySelector(".tmp-member-results-list");
+        list.innerHTML = matches.length
+          ? `<div class="tmp-member-results-hint">${q ? `${matches.length}名が該当（全${allMembers.length}名）` : `メンバーを選択してください（全${allMembers.length}名）`}</div>${matches.map(m => `<button type="button" role="option" class="tmp-member-result" data-member-id="${esc(m.id)}" data-index="${index}"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname ? `<small>本名：${esc(m.name)}</small>` : ""}${m.grade ? `<small>${esc(m.grade)}</small>` : ""}</button>`).join("")}`
+          : `<div class="tmp-member-no-result">該当するメンバーがいません。名簿にない場合は下の自由入力をお使いください。</div>`;
+      };
+      if (justOpened) searchInput.value = query;
+      renderList(searchInput.value);
       resultBox.hidden = false;
       const toggle = listContainer.querySelector(`.tmp-member-toggle[data-index="${index}"]`);
       if (toggle) toggle.setAttribute("aria-expanded", "true");
+      if (justOpened) searchInput.focus({ preventScroll: false });
     };
 
     listContainer.querySelectorAll(".tmp-member-toggle").forEach(button => button.addEventListener("click", () => {
@@ -1125,6 +1181,9 @@ function renderReceptionInput() {
         if (!member) return;
         tmpNames[index].name = memberDisplayName(member);
         tmpNames[index].memberId = member.id;
+        tmpNames[index].customName = "";
+        const freeInput = listContainer.querySelector(`.tmp-member-free-input[data-index="${index}"]`);
+        if (freeInput) freeInput.value = "";
         const toggle = listContainer.querySelector(`.tmp-member-toggle[data-index="${index}"]`);
         if (toggle) {
           toggle.innerHTML = `${esc(memberDisplayName(member))} <span aria-hidden="true">▾</span>`;
@@ -1138,14 +1197,16 @@ function renderReceptionInput() {
     // 外側をタップすると候補を閉じる。自由入力欄は常に表示したまま。
     if (!listContainer.dataset.outsideCloseBound) {
       listContainer.dataset.outsideCloseBound = "1";
-      document.addEventListener("click", e => {
+      if (window.__tmpOutsideClose) document.removeEventListener("click", window.__tmpOutsideClose);
+      window.__tmpOutsideClose = e => {
         if (listContainer.contains(e.target)) return;
         listContainer.querySelectorAll(".tmp-member-results:not([hidden])").forEach(box => {
           box.hidden = true;
           const toggle = listContainer.querySelector(`.tmp-member-toggle[data-index="${box.dataset.index}"]`);
           if (toggle) toggle.setAttribute("aria-expanded", "false");
         });
-      });
+      };
+      document.addEventListener("click", window.__tmpOutsideClose);
     }
 
     listContainer.querySelectorAll(".tmp-name-delete").forEach(btn => btn.addEventListener("click", e => {
@@ -1296,7 +1357,7 @@ function renderDiscountScreen() {
 
             ${
               guest.type === "tmp"
-                ? guest.name || "TMP来場者"
+                ? esc(guest.name || "TMP来場者")
                 : `来場者 ${index + 1}`
             }
 
@@ -1338,43 +1399,10 @@ function renderDiscountScreen() {
 
           </div>
 
-          <div
-            class="discount-option"
-          >
-
-            <button
-              class="${guest.discount === 500 ? "active" : ""}"
-              onclick="
-              setDiscount(
-              ${index},
-              500
-              )"
-            >
-
-              -500
-
-            </button>
-
-          </div>
-
-          <div
-            class="discount-option"
-          >
-
-            <button
-              class="${guest.discount === 1000 ? "active" : ""}"
-              onclick="
-              setDiscount(
-              ${index},
-              1000
-              )"
-            >
-
-              -1000
-
-            </button>
-
-          </div>
+          ${[getPricing().discount1, getPricing().discount2].filter((v, i, arr) => v > 0 && arr.indexOf(v) === i).map(amount => `
+            <div class="discount-option">
+              <button class="${guest.discount === amount ? "active" : ""}" onclick="setDiscount(${index}, ${amount})">-${formatMoney(amount)}</button>
+            </div>`).join("")}
 
         </div>
 
@@ -1435,7 +1463,8 @@ function setDiscount(
 
 function renderPaymentScreen() {
   const guests = state.currentReception.guests;
-  const total = guests.reduce((sum, guest) => sum + ENTRY_FEE + DRINK_FEE - guest.discount, 0);
+  const pricing = getPricing();
+  const total = guests.reduce((sum, guest) => sum + pricing.entryFee + pricing.drinkFee - guest.discount, 0);
   state.currentReception.totalAmount = total;
   let paid = 0;
   screen.innerHTML = `
@@ -1478,10 +1507,8 @@ function renderPaymentScreen() {
 }
 
 function renderChecklist() {
-
   const reception = state.currentReception;
-  // 受付データが完了処理などで破棄された後に古い履歴から戻ってきた場合は、
-  // null の受付データを参照せずホームへ戻す。
+  // 受付データが完了処理などで破棄された後に古い履歴から戻ってきた場合は、ホームへ戻す
   if (!reception) {
     clearTimeout(successReturnTimer);
     pageHistory = [renderHome];
@@ -1492,91 +1519,33 @@ function renderChecklist() {
     return;
   }
 
+  // ドリンク会計の「会計確認」と同じ見た目・手順（ダイアログ＋チェック全部で確定ボタンが有効）
   screen.innerHTML = `
-
-  <div class="card checklist-card">
-
-    <div class="card-title">
-      受付確認
-    </div>
-
-    <div class="money-display">
-
-      <div class="label">
-        お釣り
+    <div class="cashier-overlay">
+      <div class="cashier-dialog">
+        <div class="cashier-head"><h2>会計確認</h2><button type="button" class="cashier-cancel" id="receptionChecklistBack">戻る</button></div>
+        <div class="cashier-total-row"><span>合計</span><strong>¥${formatMoney(reception.totalAmount)}</strong></div>
+        <div class="cashier-total-row"><span>預かり</span><strong>¥${formatMoney(reception.paidAmount)}</strong></div>
+        <div class="cashier-status change">お釣り ¥${formatMoney(reception.change)}</div>
+        <div class="bar-payment-checklist" aria-label="受付確認">
+          <label><input type="checkbox" id="checkTicket"><span>ドリンクチケットを渡した</span></label>
+          <label><input type="checkbox" id="checkMoney"><span>お金を受け取った</span></label>
+          <label><input type="checkbox" id="checkChange"><span>お釣りを渡した</span></label>
+        </div>
+        <button type="button" class="cashier-confirm" id="completeReceptionBtn" disabled>会計を確定</button>
       </div>
+    </div>`;
 
-      <div class="amount">
-
-        ¥${formatMoney(
-          reception.change
-        )}
-
-      </div>
-
-    </div>
-
-    <div class="checklist">
-
-      <label>
-
-        <input
-          type="checkbox"
-          id="checkTicket"
-        >
-
-        <span>ドリンクチケットを渡した</span>
-
-      </label>
-
-      <label>
-
-        <input
-          type="checkbox"
-          id="checkMoney"
-        >
-
-        <span>お金を受け取った</span>
-
-      </label>
-
-      <label>
-
-        <input
-          type="checkbox"
-          id="checkChange"
-        >
-
-        <span>お釣りを渡した</span>
-
-      </label>
-
-    </div>
-
-    <br>
-
-    <button
-      class="
-      btn
-      btn-primary
-      btn-large
-      "
-      id="completeReceptionBtn"
-    >
-
-      受付完了
-
-    </button>
-
-  </div>
-  `;
-
-  document
-    .getElementById(
-      "completeReceptionBtn"
-    )
-    .onclick =
-      completeReception;
+  const checks = ["checkTicket", "checkMoney", "checkChange"].map(id => document.getElementById(id));
+  const confirmBtn = document.getElementById("completeReceptionBtn");
+  const refresh = () => { confirmBtn.disabled = !checks.every(c => c.checked); };
+  checks.forEach(c => c.onchange = refresh);
+  document.getElementById("receptionChecklistBack").onclick = back;
+  confirmBtn.onclick = () => {
+    if (confirmBtn.disabled) return;
+    confirmBtn.disabled = true;          // 二重確定防止
+    completeReception();
+  };
 }
 
 function completeReception() {
@@ -1612,9 +1581,10 @@ function completeReception() {
   const reception =
     state.currentReception;
 
+  const pricing = getPricing();
   const grossEntrance =
     reception.guests.length *
-    (ENTRY_FEE + DRINK_FEE);
+    (pricing.entryFee + pricing.drinkFee);
 
   const totalDiscount =
     reception.guests.reduce(
@@ -1868,7 +1838,7 @@ function renderHistory() {
                   .filter(g => g.type === "tmp")
                   .map(g => `
                     <div style="padding:8px 0; border-bottom:1px solid var(--border);">
-                      <span style="font-weight:600;">${g.name || "名前未記入"}</span>
+                      <span style="font-weight:600;">${esc(g.name || "名前未記入")}</span>
                     </div>
                   `)
                   .join("")}
@@ -1975,7 +1945,7 @@ function deleteHistory(id) {
     target.grossEntrance ||
     (
       (target.general + target.tmp) *
-      (ENTRY_FEE + DRINK_FEE)
+      (DEFAULT_PRICING.entryFee + DEFAULT_PRICING.drinkFee)
     );
 
   state.totals.totalDiscount -=
@@ -1987,35 +1957,36 @@ function deleteHistory(id) {
     target.general +
     target.tmp;
 
-  ensureDeletionLogs();
-  state.deletedReceptionHistory.unshift({ entry: structuredClone(target), deletedAt: Date.now() });
+  logReceptionDeletion(target, Date.now());
   state.receptionHistory =
     state.receptionHistory.filter(x => x.id !== id);
 
   saveState();
 
-  renderHistory();
+  refreshCurrentView();
 }
 function restoreHistory(id) {
   ensureDeletionLogs();
-  const index = state.deletedReceptionHistory.findIndex(x => String(x.entry?.id) === String(id));
-  if (index < 0) return;
-  const record = state.deletedReceptionHistory[index];
+  const record = state.deletedReceptionHistory.find(x => String(x.entry?.id) === String(id) && !receptionTombRestored(x));
+  if (!record) return;
   const entry = structuredClone(record.entry);
+  // 端末の時計がずれていても「削除より後」の復元として扱われるようにする
+  record.restoredAt = Math.max(Date.now(), Number(record.deletedAt || 0) + 1);
   if (state.receptionHistory.some(x => String(x.id) === String(entry.id))) {
-    console.warn("この受付履歴はすでに復元されています:", id);
+    saveState();
+    refreshCurrentView();
     return;
   }
-  record.restoredAt = Date.now();
   const people = Number(entry.general || 0) + Number(entry.tmp || 0);
   state.drinkTickets = Math.max(0, Number(state.drinkTickets || 0) - people);
   state.totals.general += Number(entry.general || 0);
   state.totals.tmp += Number(entry.tmp || 0);
-  state.totals.grossEntrance += Number(entry.grossEntrance || ((people) * (ENTRY_FEE + DRINK_FEE)));
+  state.totals.grossEntrance += Number(entry.grossEntrance || (people * (DEFAULT_PRICING.entryFee + DEFAULT_PRICING.drinkFee)));
   state.totals.totalDiscount += Number(entry.totalDiscount || 0);
   state.receptionHistory.unshift(entry);
+  state.receptionHistory.sort((x, y) => Number(y.id || 0) - Number(x.id || 0));
   saveState();
-  renderHistory();
+  refreshCurrentView();
 }
 
 function clearReceptionHistory() {
@@ -2035,10 +2006,7 @@ function clearReceptionHistory() {
   state.drinkTickets += totalPeople;
   ensureDeletionLogs();
   const deletedAt = Date.now();
-  state.deletedReceptionHistory = [
-    ...state.receptionHistory.map(entry => ({ entry: structuredClone(entry), deletedAt })),
-    ...state.deletedReceptionHistory
-  ];
+  state.receptionHistory.forEach(entry => logReceptionDeletion(entry, deletedAt));
   state.receptionHistory = [];
 
   state.totals = {
@@ -2050,7 +2018,7 @@ function clearReceptionHistory() {
 
   saveState();
 
-  renderHistory();
+  refreshCurrentView();
 }
 
 function clearReceptionAccountingData() {
@@ -2058,9 +2026,12 @@ function clearReceptionAccountingData() {
     "この回の受付会計データを一括削除しますか？\n受付履歴・来場者数・初期金庫額・ドリチケ残数をリセットします。\nイベント情報、出番／シフト、バーカウンターの会計データは削除されません。"
   )) return;
 
+  const oldEntries = state.receptionHistory.slice();
   const deletedReceptionHistory = pruneDeletionLog(state.deletedReceptionHistory || []);
   state = createInitialState();
   state.deletedReceptionHistory = deletedReceptionHistory;
+  const resetAt = Date.now();
+  oldEntries.forEach(entry => logReceptionDeletion(entry, resetAt));
   saveState();
   pageHistory = [renderEventList, renderEventPage];
   navigate(renderSetup);
@@ -2068,11 +2039,8 @@ function clearReceptionAccountingData() {
 
 function renderResult() {
 
-  const people =
-
-    state.totals.general +
-
-    state.totals.tmp;
+  const people = state.totals.general + state.totals.tmp;
+  const pricing = getPricing();
 
   // TMP来場者一覧を集計
   const allTmpGuests = state.receptionHistory
@@ -2091,7 +2059,7 @@ function renderResult() {
             r.grossEntrance ||
             (
               (r.general + r.tmp) *
-              (ENTRY_FEE + DRINK_FEE)
+              (pricing.entryFee + pricing.drinkFee)
             )
           ),
         0
@@ -2123,8 +2091,7 @@ function renderResult() {
   const drinkTicketAmount =
 
     people *
-
-    DRINK_FEE;
+    pricing.drinkFee;
 
   const profitTargetIncome =
 
@@ -2133,10 +2100,8 @@ function renderResult() {
     drinkTicketAmount;
 
   const profit =
-
     profitTargetIncome -
-
-    BOX_FEE;
+    pricing.boxFee;
 
   const theoreticalCash =
 
@@ -2248,7 +2213,7 @@ function renderResult() {
               justify-content:space-between;
               align-items:center;
             ">
-              <span style="font-weight:600;">${guest.name}</span>
+              <span style="font-weight:600;">${esc(guest.name)}</span>
               <span style="font-size:12px; color:var(--sub);">
                 ${guest.timestamp}
               </span>
@@ -2265,11 +2230,11 @@ function renderResult() {
       精算額
     </div>
     <div style="font-size: 64px; font-weight: 900; margin-bottom: 8px; line-height: 1;">
-      ¥${formatMoney(drinkTicketAmount + BOX_FEE)}
+      ¥${formatMoney(drinkTicketAmount + getPricing().boxFee)}
     </div>
     <div style="font-size: 13px; opacity: 0.8; line-height: 1.6;">
       <div>1D(ドリチケ)分：¥${formatMoney(drinkTicketAmount)}</div>
-      <div style="margin-top: 8px;">箱代：¥10,000</div>
+      <div style="margin-top: 8px;">箱代：¥${formatMoney(pricing.boxFee)}</div>
     </div>
   </div>
 
@@ -2333,7 +2298,7 @@ function renderResult() {
 
       <strong class="highlight-blue">
 
-        -¥10,000
+        -¥${formatMoney(pricing.boxFee)}
 
       </strong>
 
@@ -2389,10 +2354,10 @@ function renderResult() {
       <strong>
 
         ¥${formatMoney(
-          theoreticalCash - drinkTicketAmount - 10000
+          theoreticalCash - drinkTicketAmount - pricing.boxFee
         )}
         (${formatSignedMoney(
-          cashIncrease - drinkTicketAmount - 10000
+          cashIncrease - drinkTicketAmount - pricing.boxFee
         )})
 
       </strong>
@@ -2524,7 +2489,7 @@ function calculateCashCheck() {
     state.totals.tmp;
 
   const drinkTicketAmount =
-    people * DRINK_FEE;
+    people * getPricing().drinkFee;
 
   const theoreticalCash =
     state.startCash +
@@ -2536,11 +2501,11 @@ function calculateCashCheck() {
       );
 
   const diff =
-    actualCash - theoreticalCash + drinkTicketAmount + 10000;
+    actualCash - theoreticalCash + drinkTicketAmount + getPricing().boxFee;
 
   alert(
     `実金庫額: ¥${formatMoney(actualCash)}\n` +
-    `理論金庫額: ¥${formatMoney(theoreticalCash - drinkTicketAmount - 10000)}\n` +
+    `理論金庫額: ¥${formatMoney(theoreticalCash - drinkTicketAmount - getPricing().boxFee)}\n` +
     `差額: ¥${formatMoney(diff)}`
   );
 }
@@ -2602,7 +2567,7 @@ function newEvent(name, date, st) {
   const t = Date.now();
   return {
     id: uid(), name, date, flyer: 0, archived: false, deleted: false, participants: [],
-    state: st || createInitialState(), bar: createBar(), tt: createTt(),
+    state: st || createInitialState(), pricing: { ...DEFAULT_PRICING }, bar: createBar(), tt: createTt(),
     u: { meta: t, rec: t, bar: t, tt: t }
   };
 }
@@ -2613,6 +2578,7 @@ function loadDb() {
       const d = JSON.parse(r); d.events = d.events || []; d.members = Array.isArray(d.members) ? d.members : [];
       for (const e of d.events) {
         e.state = e.state || createInitialState();
+        e.pricing = normalizePricing(e.pricing);
         e.state.deletedReceptionHistory = pruneDeletionLog(e.state.deletedReceptionHistory || []);
         e.bar = ensureBar(e.bar);
       }
@@ -2681,7 +2647,21 @@ function mergeInto(t, s) {
       for (const k of ["name", "date", "flyer", "archived", "deleted", "participants"]) o[k] = e[k];
       o.u.meta = eu.meta;
     }
-    if ((eu.rec || 0) > (o.u.rec || 0)) { o.state = structuredClone(e.state); o.u.rec = eu.rec; }
+    {
+      const incomingNewer = (eu.rec || 0) > (o.u.rec || 0);
+      if (e.state || o.state) {
+        const localCurrent = o.state ? o.state.currentReception : null;
+        const merged = incomingNewer ? mergeReceptionStates(o.state, e.state) : mergeReceptionStates(e.state, o.state);
+        merged.currentReception = localCurrent || null;   // 入力途中の受付は自端末のもの（同じオブジェクト）を残す
+        if (o.state && typeof o.state === "object") {
+          if (JSON.stringify(o.state) !== JSON.stringify(merged)) {   // 変化があるときだけ更新
+            for (const k of Object.keys(o.state)) delete o.state[k];
+            Object.assign(o.state, merged);
+          }
+        } else o.state = merged;
+      }
+      if (incomingNewer) o.u.rec = eu.rec;
+    }
     const mergedBarTransactions = mergeBarTransactions(o.bar || {}, e.bar || {});
     if ((eu.bar || 0) > (o.u.bar || 0)) { o.bar = structuredClone(e.bar); o.u.bar = eu.bar; }
     o.bar = o.bar || {};
@@ -2694,7 +2674,7 @@ function mergeInto(t, s) {
   return t;
 }
 function dbSig() {
-  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
+  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
 }
 function setSync(t) { const e = document.getElementById("sync"); if (e) e.textContent = t; }
 function saveLocalDb() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {} }
@@ -2761,9 +2741,10 @@ function saveBar() {
 function commitCtx() {
   const ev = ctx.ev, t = Date.now();
   ev.state = structuredClone(state);
+  ev.pricing = normalizePricing(ctx.pricing);
   ev.bar = structuredClone(ctx.bar);
   ev.tt = structuredClone(ctx.tt);
-  ev.u.rec = t; ev.u.bar = t; ev.u.tt = t;
+  ev.u.rec = t; ev.u.bar = t; ev.u.tt = t; ev.u.meta = t;
   ctx.dirty = false;
   persistDb();
 }
@@ -2846,12 +2827,13 @@ function summarizeBarSales(bar) {
   return summary;
 }
 
-function evStats(st, bar) {
+function evStats(st, bar, pricing = getPricing()) {
   const h = st.receptionHistory || [];
   const people = st.totals.general + st.totals.tmp;
-  const gross = h.reduce((s, r) => s + (r.grossEntrance || ((r.general + r.tmp) * (ENTRY_FEE + DRINK_FEE))), 0);
+  const gross = h.reduce((s, r) => s + (r.grossEntrance || ((r.general + r.tmp) * (pricing.entryFee + pricing.drinkFee))), 0);
   const disc = h.reduce((s, r) => s + (r.totalDiscount || 0), 0);
-  const profit = people ? gross - disc - people * DRINK_FEE - BOX_FEE : 0;
+  const actualReceptionRevenue = gross - disc;
+  const profit = people ? actualReceptionRevenue - people * pricing.drinkFee - pricing.boxFee : 0;
   return { people, profit, bar: barCalc(bar || createBar()) };
 }
 
@@ -2862,14 +2844,14 @@ function renderEventList() {
   evs.forEach(e => { (months[e.date.slice(0, 7)] = months[e.date.slice(0, 7)] || []).push(e); });
 
   let html = `<div class="event-list-toolbar">
-    <div><div class="eyebrow">TSUKUBA MUSIC PROJECT</div><div class="list-heading">イベントを選択</div></div>
+    <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="eyebrow">TSUKUBA MUSIC PROJECT</div><div class="list-heading">イベントを選択</div></div></div>
     <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
   </div>`;
   if (!evs.length) html += `<div class="card sub-text">まだ回がありません。「新しい回」から作成してください。</div>`;
 
   Object.keys(months).sort((a, b) => b.localeCompare(a)).forEach(m => {
     const list = months[m];
-    const stats = list.map(e => evStats(e.state, e.bar));
+    const stats = list.map(e => evStats(e.state, e.bar, normalizePricing(e.pricing)));
     const people = stats.reduce((s, x) => s + x.people, 0);
     const profit = stats.reduce((s, x) => s + x.profit, 0);
     const [y, mo] = m.split("-");
@@ -2948,18 +2930,95 @@ function openEvent(id) {
   ev.tt = ensureTt(ev.tt);
   ev.u.tt = ev.u.tt || 0;
   if (ev.archived) {
-    ctx = { ev, mode: "archive", dirty: false, bar: structuredClone(ev.bar), tt: structuredClone(ev.tt) };
+    ctx = { ev, mode: "archive", dirty: false, pricing: normalizePricing(ev.pricing), bar: structuredClone(ev.bar), tt: structuredClone(ev.tt) };
     state = structuredClone(ev.state);
   } else {
-    ctx = { ev, mode: "live", dirty: false, bar: ev.bar, tt: ev.tt };
+    ctx = { ev, mode: "live", dirty: false, pricing: normalizePricing(ev.pricing), bar: ev.bar, tt: ev.tt };
     state = ev.state;
   }
   navigate(renderEventPage);
 }
 
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+function downloadCurrentEventCsv() {
+  if (!ctx?.ev) return;
+  const ev = ctx.ev;
+  const eventState = state || ev.state || createInitialState();
+  const bar = ensureBar(ctx.bar || ev.bar || createBar());
+  const tt = ensureTt(ctx.tt || ev.tt || createTt());
+  const pricing = getPricing();
+  const headers = ["データ種別", "イベント名", "開催日", "日時", "開始日", "開始時刻", "終了日", "終了時刻", "区分", "名前・内容", "数量", "金額", "支払方法", "割引額", "預かり金", "お釣り", "備考"];
+  const rows = [];
+  const add = values => rows.push(headers.map((_, i) => csvCell(values[i] ?? "")));
+  const eventName = ev.name || "", eventDate = ev.date || "";
+  const receptionHistory = Array.isArray(eventState.receptionHistory) ? eventState.receptionHistory : [];
+  const sales = Array.isArray(bar.sales) ? bar.sales : [];
+  const activeSales = sales.filter(sale => Number(sale.timestamp || 0) > Number(bar.resetAt || 0));
+  const totalPeople = Number(eventState.totals?.general || 0) + Number(eventState.totals?.tmp || 0);
+  const totalDrinkUnits = activeSales.reduce((sum, sale) => sum + (sale.items || []).reduce((n, item) => n + Number(item.qty || 0), 0), 0);
+  const drinkSalesSummary = summarizeBarSales(bar);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "来場者", "", totalPeople, "", "", "", "", "", `一般 ${Number(eventState.totals?.general || 0)}名／TMP ${Number(eventState.totals?.tmp || 0)}名`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "料金設定", "", "", "", "", "", "", "", `エントランス ¥${formatMoney(pricing.entryFee)}／1stドリンク ¥${formatMoney(pricing.drinkFee)}／箱代 ¥${formatMoney(pricing.boxFee)}／割引 ¥${formatMoney(pricing.discount1)}・¥${formatMoney(pricing.discount2)}`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付売上", "", "", Number(eventState.totals?.grossEntrance || 0), "", Number(eventState.totals?.totalDiscount || 0), "", "", `受付履歴 ${receptionHistory.length}件`]);
+  const discountAmount = Number(eventState.totals?.totalDiscount || 0);
+  const actualReceptionRevenue = Math.max(0, Number(eventState.totals?.grossEntrance || 0) - discountAmount);
+  const discountPeople = receptionHistory.reduce((sum, record) => {
+    const guests = Array.isArray(record.guests) ? record.guests : [];
+    return sum + guests.filter(guest => Number(guest.discount || 0) > 0).length;
+  }, 0);
+  const firstDrinkRevenue = totalPeople * pricing.drinkFee;
+  const eventProfit = totalPeople ? actualReceptionRevenue - firstDrinkRevenue - pricing.boxFee : 0;
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "割引人数", "", discountPeople, "", "", "", "", "", "割引が適用された来場者数"]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "割引総額", "", "", discountAmount, "", "", "", "", ""]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付売上（割引後）", "", "", actualReceptionRevenue, "", "", "", "", `割引前受付売上 ¥${formatMoney(Number(eventState.totals?.grossEntrance || 0))} − 割引総額 ¥${formatMoney(discountAmount)}`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "1stドリンク売上額", "", totalPeople, firstDrinkRevenue, "", "", "", "", `来場者数 ${totalPeople}名 × 1stドリンク料金 ¥${formatMoney(pricing.drinkFee)}`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "利益", "", "", eventProfit, "", "", "", "", `割引後受付売上 − 1stドリンク売上額 − 箱代（¥${formatMoney(pricing.boxFee)}）`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "ドリンク販売", "", totalDrinkUnits, "", "", "", "", "", `販売履歴 ${activeSales.length}件`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "キャッシュドリンク売上", "", drinkSalesSummary.cashUnits, drinkSalesSummary.cashRevenue, "現金", "", "", "", `現金販売 ${drinkSalesSummary.cashUnits}杯`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "進行時間調整", "", "", "", "", "", "", "", `${Number(tt.offsetMinutes || 0)}分`]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "受付金庫初期金額", "", "", Number(eventState.startCash || 0), "", "", "", "", ""]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "ドリチケ残数", "", Number(eventState.drinkTickets || 0), "", "", "", "", "", ""]);
+  const barCash = barCalc(bar);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "バー金庫開始額", "", "", barCash.start, "", "", "", "", ""]);
+  add(["イベント概要", eventName, eventDate, "", "", "", "", "", "バー金庫終了額", "", "", barCash.hasEnd ? barCash.end : "", "", "", "", "", barCash.hasEnd ? "締め処理済み" : "未締め"]);
+  (ev.participants || []).forEach(id => {
+    const member = (db.members || []).find(m => String(m.id) === String(id));
+    add(["参加予定", eventName, eventDate, "", "", "", "", "", "参加予定メンバー", member ? memberDisplayName(member) : "名簿から削除済み", 1, "", "", "", "", "", `メンバーID: ${id}`]);
+  });
+  receptionHistory.forEach(entry => {
+    const guestNames = (entry.guests || []).map(g => `${g.type === "tmp" ? "TMP" : "一般"}:${g.name || ""}`).filter(Boolean).join(" / ");
+    add(["受付履歴", eventName, eventDate, entry.timestamp || "", "", "", "", "", `一般${Number(entry.general || 0)}名・TMP${Number(entry.tmp || 0)}名`, guestNames, Number(entry.general || 0) + Number(entry.tmp || 0), Number(entry.totalAmount || 0), "受付", Number(entry.totalDiscount || 0), Number(entry.paidAmount || 0), Number(entry.change || 0), `受付ID: ${entry.id ?? ""}`]);
+  });
+  activeSales.forEach(sale => {
+    const time = sale.timestamp ? new Date(Number(sale.timestamp)).toLocaleString("ja-JP") : "";
+    (sale.items || []).forEach(item => {
+      const qty = Number(item.qty || 0);
+      add(["ドリンク販売", eventName, eventDate, time, "", "", "", "", sale.paymentMethod === "ticket" ? "ドリチケ" : "現金", item.name || "", qty, Number(item.price || 0) * qty, sale.paymentMethod === "ticket" ? "ドリチケ" : "現金", "", Number(sale.paidAmount || 0), Number(sale.change || 0), `販売ID: ${sale.id ?? ""}／注文合計: ${Number(sale.totalAmount || 0)}円`]);
+    });
+  });
+  (tt.acts || []).slice().sort((a, b) => slotRange(a)[0] - slotRange(b)[0]).forEach(act => {
+    add(["タイムテーブル", eventName, eventDate, "", act.startDate || eventDate, act.start || "", act.endDate || eventDate, act.end || "", act.type === "その他" ? (act.customType || "その他") : (act.type || "DJ"), act.name || recordMemberDisplay(act), "", "", "", "", "", "", `出演者ID: ${(act.memberIds || []).join(" / ")}`]);
+  });
+  (tt.shifts || []).slice().sort((a, b) => slotRange(a)[0] - slotRange(b)[0]).forEach(shift => {
+    add(["シフト", eventName, eventDate, "", shift.startDate || eventDate, shift.start || "", shift.endDate || eventDate, shift.end || "", shift.role || "", shift.name || recordMemberDisplay(shift), "", "", "", "", "", "", `担当者ID: ${(shift.memberIds || []).join(" / ")}`]);
+  });
+  const csv = "\uFEFF" + [headers.map(csvCell), ...rows].map(row => row.join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const safeName = `${eventName}_${eventDate}`.replace(/[\\/:*?"<>|]/g, "_");
+  link.href = url; link.download = `${safeName || "event-data"}.csv`;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function renderEventPage() {
   const ev = ctx.ev, arc = ctx.mode === "archive";
-  const s = evStats(state, ctx.bar), url = flyerUrl(ev);
+  const s = evStats(state, ctx.bar, getPricing()), url = flyerUrl(ev);
   const sales = summarizeBarSales(ctx.bar);
   screen.innerHTML = `
     ${url ? `<img class="flyer-hero" src="${url}" alt="フライヤー">` : `<div class="flyer-empty">フライヤー未登録</div>`}
@@ -2971,32 +3030,38 @@ function renderEventPage() {
       <div class="row"><span>受付利益</span><strong>¥${formatMoney(s.profit)}</strong></div>
       <div class="row"><span>ドリンク販売数</span><strong>${sales.totalUnits || (ctx.bar.tally || 0)}杯</strong></div>
       <div class="row"><span>ドリンク現金売上</span><strong>¥${formatMoney(sales.cashRevenue)}</strong></div>
+      <button class="btn btn-secondary full" id="exportEventCsv">この回のデータをCSV出力</button>
     </div>
-    <div class="card"><div class="card-title">参加予定メンバー</div><div class="sub-text">${(ev.participants||[]).length}名登録</div><div class="participant-home-list">${(ev.participants||[]).map(id=>{const m=(db.members||[]).find(x=>x.id===id);const done=(state.receptionHistory||[]).some(r=>(r.guests||[]).some(g=>g.type==="tmp"&&(g.memberId===id||(!g.memberId&&g.name===m?.name))));return `<span>${esc(m?memberDisplayName(m):"名簿から削除済み")} <b class="${done?"checked":"pending"}">${done?"受付済み":"未受付"}</b></span>`}).join("")||`<span class="sub-text">参加予定はまだ登録されていません。</span>`}</div></div>
+    
     <div class="event-action-grid">
       <button class="btn btn-primary" id="goRec"><span>受付</span><small>来場・入場会計</small></button>
       <button class="btn btn-primary" id="goBar"><span>バーカウンター</span><small>商品販売・ドリンク精算</small></button>
       <button class="btn btn-secondary" id="goTt"><span>タイムテーブル・シフト</span><small>出演・スタッフ配置</small></button>
     </div>
+
+    <div class="card"><div class="card-title">参加予定メンバー</div><div class="sub-text">${(ev.participants||[]).length}名登録</div><div class="participant-home-list">${(ev.participants||[]).map(id=>{const m=(db.members||[]).find(x=>x.id===id);const done=(state.receptionHistory||[]).some(r=>(r.guests||[]).some(g=>g.type==="tmp"&&(g.memberId===id||(!g.memberId&&g.name===m?.name))));return `<span>${esc(m?memberDisplayName(m):"名簿から削除済み")} <b class="${done?"checked":"pending"}">${done?"受付済み":"未受付"}</b></span>`}).join("")||`<span class="sub-text">参加予定はまだ登録されていません。</span>`}</div></div>
+    
     ${arc && ctx.dirty ? `<button class="btn btn-secondary" id="saveEv">変更を保存</button><div class="gap"></div>` : ""}
-    <button class="btn btn-secondary" id="goMembers">メンバー名簿・参加予定</button><div class="gap"></div><button class="btn btn-secondary" id="editEv">名前・日付・フライヤーを編集</button><div class="gap"></div>
+    <button class="btn btn-secondary" id="goMembers">メンバー名簿・参加予定</button><div class="gap"></div><button class="btn btn-secondary" id="editPricing">料金設定（この回）</button><div class="gap"></div><button class="btn btn-secondary" id="editEv">名前・日付・フライヤーを編集</button><div class="gap"></div>
     <button class="btn btn-secondary" id="arcEv">${arc ? "アーカイブを解除（開催中に戻す）" : "この回をアーカイブする"}</button><div class="gap"></div>
     <button class="btn btn-danger" id="delEv">この回を削除</button>`;
   document.getElementById("goRec").onclick = () => navigate(state.initialized ? renderHome : renderSetup);
   document.getElementById("goBar").onclick = () => navigate(ensureBar(ctx.bar).started ? renderBarHome : renderBarSetup);
   document.getElementById("goTt").onclick = () => navigate(renderTimetable);
   document.getElementById("goMembers").onclick = () => navigate(renderMembers);
+  document.getElementById("exportEventCsv").onclick = downloadCurrentEventCsv;
   document.getElementById("editEv").onclick = () => navigate(renderEventEdit);
+  document.getElementById("editPricing").onclick = () => navigate(renderEventPricing);
   const sv = document.getElementById("saveEv");
   if (sv) sv.onclick = () => { if (confirm("変更を保存しますか？")) { commitCtx(); renderEventPage(); updateBackButton(); } };
   document.getElementById("arcEv").onclick = () => {
     if (ctx.dirty && !confirm("未保存の変更があります。保存して切り替えますか？")) return;
     if (ctx.dirty) commitCtx();
     if (arc) {
-      ev.archived = false; ctx.mode = "live"; state = ev.state; ctx.bar = ev.bar; ctx.tt = ev.tt;
+      ev.archived = false; ctx.mode = "live"; state = ev.state; ctx.pricing = normalizePricing(ev.pricing); ctx.bar = ev.bar; ctx.tt = ev.tt;
     } else {
       if (!confirm("この回をアーカイブしますか？\n以降の編集時は保存確認が出ます。")) return;
-      ev.archived = true; ctx.mode = "archive"; state = structuredClone(ev.state); ctx.bar = structuredClone(ev.bar); ctx.tt = structuredClone(ev.tt);
+      ev.archived = true; ctx.mode = "archive"; state = structuredClone(ev.state); ctx.pricing = normalizePricing(ev.pricing); ctx.bar = structuredClone(ev.bar); ctx.tt = structuredClone(ev.tt);
     }
     ev.u.meta = Date.now(); persistDb(); renderEventPage(); updateBackButton();
   };
@@ -3005,6 +3070,39 @@ function renderEventPage() {
     ev.deleted = true; ev.u.meta = Date.now(); ctx = null; persistDb();
     pageHistory = []; navigate(renderEventList);
   };
+}
+
+
+function renderEventPricing() {
+  const p = getPricing();
+  screen.innerHTML = `
+    <div class="card">
+      <div class="eyebrow">EVENT / PRICING</div>
+      <div class="card-title">このイベントの料金設定</div>
+      <p class="sub-text">変更した金額は、このイベントの受付・割引・精算・利益計算・CSV出力に反映されます。他のイベントには影響しません。</p>
+      <div class="form-row"><label for="priceEntry">エントランス代（円）</label><input id="priceEntry" type="number" min="0" step="1" value="${p.entryFee}"></div>
+      <div class="form-row"><label for="priceDrink">ドリンクチケット代（円）</label><input id="priceDrink" type="number" min="0" step="1" value="${p.drinkFee}"></div>
+      <div class="form-row"><label for="priceBox">箱代（円）</label><input id="priceBox" type="number" min="0" step="1" value="${p.boxFee}"></div>
+      <div class="form-row"><label for="priceDiscount1">割引額 1（円）</label><input id="priceDiscount1" type="number" min="0" step="1" value="${p.discount1}"></div>
+      <div class="form-row"><label for="priceDiscount2">割引額 2（円）</label><input id="priceDiscount2" type="number" min="0" step="1" value="${p.discount2}"></div>
+      <p class="sub-text">割引額を0円にすると、その割引ボタンは受付画面に表示されません。</p>
+      <div class="gap"></div>
+      <button class="btn btn-primary btn-large" id="savePricing">料金設定を保存</button>
+      <div class="gap"></div>
+      <button class="btn btn-secondary" id="cancelPricing">キャンセル</button>
+    </div>`;
+  document.getElementById("savePricing").onclick = () => {
+    const read = id => Math.max(0, Math.round(Number(document.getElementById(id).value || 0)));
+    const next = { entryFee: read("priceEntry"), drinkFee: read("priceDrink"), boxFee: read("priceBox"), discount1: read("priceDiscount1"), discount2: read("priceDiscount2") };
+    if (next.discount1 > next.entryFee + next.drinkFee || next.discount2 > next.entryFee + next.drinkFee) {
+      if (!confirm("割引額が入場料金の合計を上回っています。このまま保存しますか？")) return;
+    }
+    ctx.pricing = next;
+    if (ctx.mode === "archive") ctx.dirty = true;
+    else { ctx.ev.pricing = normalizePricing(next); ctx.ev.u.meta = Date.now(); persistDb(); }
+    navigate(renderEventPage);
+  };
+  document.getElementById("cancelPricing").onclick = () => navigate(renderEventPage);
 }
 
 function memberDisplayName(member) { const nickname = String(member?.nickname ?? "").trim(); return nickname || String(member?.name ?? "登録外メンバー"); }
@@ -3453,7 +3551,7 @@ function renderBarHome() {
   </div>
 
   <div class="card" data-bar-section="cash">
-    <div class="card-title">確認・ドリチケ照合</div>
+    <div class="card-title">確認・ドリチケ照合(試行運用)</div>
     <div class="ticket-reconciliation">
       <div class="ticket-reconciliation-heading"><strong>受付・販売記録から自動集計</strong><span>クラウド同期</span></div>
       <div class="ticket-reconciliation-grid">
@@ -3563,48 +3661,64 @@ function renderBarHome() {
     if (!barCart.length) { alert("商品をカートに追加してください"); return; }
     const total = cartTotal();
     let paid = 0;
-    screen.insertAdjacentHTML("beforeend", `
-      <div class="cashier-overlay" id="barCashierOverlay">
-        <div class="cashier-dialog">
-          <div class="cashier-head"><h2>預かり金額</h2><button class="cashier-cancel" id="barCashierCancel">中断</button></div>
-          <div class="cashier-total-row"><span>合計</span><strong>¥${formatMoney(total)}</strong></div>
-          <div class="cashier-paid" id="barCashierPaid">¥0</div>
-          <div class="cashier-status short" id="barCashierStatus">受け取ったお札・硬貨のボタンを押して積み上げてください</div>
-          <button type="button" class="cashier-exact-button" id="barCashierExact">ちょうど受け取った</button>
-          <div class="cashier-keypad">
-            <button data-bar-add-cash="100">+100</button><button data-bar-add-cash="500">+500</button><button data-bar-add-cash="1000">+1000</button>
-            <button data-bar-add-cash="5000">+5000</button><button data-bar-add-cash="10000">+10000</button><button id="barCashierClear">C</button>
-          </div>
-          <p class="cashier-help">受け取ったお札・硬貨のボタンを押して積み上げてください（押し間違いはC）</p>
-          <div class="bar-payment-checklist" aria-label="現金受け取り確認">
-            <label><input type="checkbox" id="barCashReceivedCheck"><span>現金を受け取った</span></label>
-            <label><input type="checkbox" id="barChangeGivenCheck"><span>お釣りを渡した</span></label>
-          </div>
-          <button class="cashier-confirm" id="barCashierConfirm" disabled>会計を確定</button>
+    screen.insertAdjacentHTML("beforeend", `<div class="cashier-overlay" id="barCashierOverlay"><div class="cashier-dialog" id="barCashierDialog"></div></div>`);
+    const overlay = $("barCashierOverlay"), dialog = $("barCashierDialog");
+
+    // 手順1：預かり金額（受付と同じ。チェックボックスは出さない）
+    const renderAmountStep = () => {
+      dialog.innerHTML = `
+        <div class="cashier-head"><h2>預かり金額</h2><button class="cashier-cancel" id="barCashierCancel">中断</button></div>
+        <div class="cashier-total-row"><span>合計</span><strong>${yen(total)}</strong></div>
+        <div class="cashier-paid" id="barCashierPaid">¥0</div>
+        <div class="cashier-status short" id="barCashierStatus">受け取ったお札・硬貨のボタンを押して積み上げてください</div>
+        <button type="button" class="cashier-exact-button" id="barCashierExact">ちょうど受け取った</button>
+        <div class="cashier-keypad">
+          <button data-bar-add-cash="100">+100</button><button data-bar-add-cash="500">+500</button><button data-bar-add-cash="1000">+1000</button>
+          <button data-bar-add-cash="5000">+5000</button><button data-bar-add-cash="10000">+10000</button><button id="barCashierClear">C</button>
         </div>
-      </div>`);
-    const paidEl = $("barCashierPaid"), statusEl = $("barCashierStatus"), confirmBtn = $("barCashierConfirm");
-    const refreshPayment = () => {
-      paidEl.textContent = yen(paid);
-      const diff = paid - total;
-      if (paid === total) { statusEl.textContent = "💵 ちょうど頂きました"; statusEl.className = "cashier-status exact"; }
-      else if (paid > total) { statusEl.textContent = `お釣り ${yen(diff)}`; statusEl.className = "cashier-status change"; }
-      else { statusEl.textContent = `あと ${yen(total - paid)} 不足しています`; statusEl.className = "cashier-status short"; }
-      const cashReceived = $("barCashReceivedCheck")?.checked === true;
-      const changeGiven = $("barChangeGivenCheck")?.checked === true;
-      confirmBtn.disabled = paid < total || !cashReceived || !changeGiven;
+        <p class="cashier-help">受け取ったお札・硬貨のボタンを押して積み上げてください（押し間違いはC）</p>
+        <button class="cashier-confirm" id="barCashierConfirm" disabled>確認へ</button>`;
+      const paidEl = $("barCashierPaid"), statusEl = $("barCashierStatus"), confirmBtn = $("barCashierConfirm");
+      const refreshPayment = () => {
+        paidEl.textContent = yen(paid);
+        const diff = paid - total;
+        if (paid === total) { statusEl.textContent = "💵 ちょうど頂きました"; statusEl.className = "cashier-status exact"; }
+        else if (paid > total) { statusEl.textContent = `お釣り ${yen(diff)}`; statusEl.className = "cashier-status change"; }
+        else { statusEl.textContent = `あと ${yen(total - paid)} 不足しています`; statusEl.className = "cashier-status short"; }
+        confirmBtn.disabled = paid < total;
+      };
+      dialog.querySelectorAll("[data-bar-add-cash]").forEach(btn => btn.onclick = () => { paid += Number(btn.dataset.barAddCash); refreshPayment(); });
+      $("barCashierExact").onclick = () => { paid = total; refreshPayment(); };
+      $("barCashierClear").onclick = () => { paid = 0; refreshPayment(); };
+      $("barCashierCancel").onclick = () => overlay.remove();
+      confirmBtn.onclick = () => { if (paid >= total) renderChecklistStep(); };
+      refreshPayment();
     };
-    $("barCashReceivedCheck").onchange = refreshPayment;
-    $("barChangeGivenCheck").onchange = refreshPayment;
-    screen.querySelectorAll("[data-bar-add-cash]").forEach(btn => btn.onclick = () => { paid += Number(btn.dataset.barAddCash); refreshPayment(); });
-    $("barCashierExact").onclick = () => { paid = total; refreshPayment(); };
-    $("barCashierClear").onclick = () => { paid = 0; refreshPayment(); };
-    $("barCashierCancel").onclick = () => $("barCashierOverlay").remove();
-    confirmBtn.onclick = () => {
-      b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "cash", items: structuredClone(barCart), totalAmount: total, paidAmount: paid, change: paid - total });
-      barCart = []; barCheckoutPage = false; barOrderComplete = true; saveBar(); renderBarHome();
+
+    // 手順2：会計確認（受付と同じ。金額確定後にチェックボックスを表示）
+    const renderChecklistStep = () => {
+      dialog.innerHTML = `
+        <div class="cashier-head"><h2>会計確認</h2><button class="cashier-cancel" id="barCashierBack">戻る</button></div>
+        <div class="cashier-total-row"><span>合計</span><strong>${yen(total)}</strong></div>
+        <div class="cashier-total-row"><span>預かり</span><strong>${yen(paid)}</strong></div>
+        <div class="cashier-status change" id="barChangeDisplay">お釣り ${yen(paid - total)}</div>
+        <div class="bar-payment-checklist" aria-label="現金受け取り確認">
+          <label><input type="checkbox" id="barCashReceivedCheck"><span>現金を受け取った</span></label>
+          <label><input type="checkbox" id="barChangeGivenCheck"><span>お釣りを渡した</span></label>
+        </div>
+        <button class="cashier-confirm" id="barCashierSubmit" disabled>会計を確定</button>`;
+      const submit = $("barCashierSubmit"), c1 = $("barCashReceivedCheck"), c2 = $("barChangeGivenCheck");
+      const refreshChecks = () => { submit.disabled = !(c1.checked && c2.checked); };
+      c1.onchange = refreshChecks; c2.onchange = refreshChecks;
+      $("barCashierBack").onclick = renderAmountStep;
+      submit.onclick = () => {
+        if (submit.disabled) return;
+        submit.disabled = true;                      // 二重確定防止
+        b.sales.unshift({ id: uid(), timestamp: Date.now(), paymentMethod: "cash", items: structuredClone(barCart), totalAmount: total, paidAmount: paid, change: paid - total });
+        barCart = []; barCheckoutPage = false; barOrderComplete = true; saveBar(); renderBarHome();
+      };
     };
-    refreshPayment();
+    renderAmountStep();
   };
   const ticketCheckoutButton = $("barTicketCheckout");
   if (ticketCheckoutButton) ticketCheckoutButton.onclick = () => {
@@ -3689,7 +3803,9 @@ function renderBarHome() {
     const sale = b.sales.find(x => x.id === saleId);
     if (!sale) return;
     b.deletedSales = pruneDeletionLog(b.deletedSales || []);
-    b.deletedSales.unshift({ sale: structuredClone(sale), deletedAt: Date.now(), restoredAt: 0 });
+    const prevFloor = b.deletedSales.filter(x => x.sale?.id === saleId).reduce((m, x) => Math.max(m, Number(x.deletedAt||0), Number(x.restoredAt||0)), 0);
+    b.deletedSales = b.deletedSales.filter(x => x.sale?.id !== saleId);
+    b.deletedSales.unshift({ sale: structuredClone(sale), deletedAt: Math.max(Date.now(), prevFloor + 1), restoredAt: 0 });
     b.voidedSales = [...new Set([...(b.voidedSales || []), saleId])];
     b.sales = b.sales.filter(x => x.id !== saleId);
     saveBar(); renderBarHome();
@@ -3698,7 +3814,7 @@ function renderBarHome() {
     if (!confirm("この販売履歴を復元しますか？売上集計にも再び反映されます。")) return;
     const item = b.deletedSales.find(x => x.sale?.id === btn.dataset.restoreSale && Number(x.restoredAt||0) <= Number(x.deletedAt||0));
     if (!item) return;
-    item.restoredAt = Date.now();
+    item.restoredAt = Math.max(Date.now(), Number(item.deletedAt || 0) + 1);
     if (!b.sales.some(x => x.id === item.sale.id)) b.sales.unshift(structuredClone(item.sale));
     b.voidedSales = (b.voidedSales || []).filter(id => id !== item.sale.id);
     saveBar(); renderBarHome();
@@ -3893,7 +4009,7 @@ function nowHtml(tt, ev) {
   html += `</div></div>`;
   html += `<div class="schedule-section"><div class="now-label">シフト</div><div class="schedule-columns">`;
   html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${shiftNow.length ? shiftNow.map(item => `<div class="schedule-item"><strong>${esc(item.role)}：${esc(recordMemberDisplay(item))}</strong><small>${esc(scheduleRangeLabel(item))}</small></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
-  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(recordMemberDisplay(shiftNext))}</strong><small>${esc(shiftNext.start)}–${esc(shiftNext.end)}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
+  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(recordMemberDisplay(shiftNext))}</strong><small>${esc(scheduleRangeLabel(shiftNext))}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
   html += `</div></div>`;
   html += `</div>`;
   return html;
@@ -3915,11 +4031,77 @@ function updateNow(options = {}) {
   }
 }
 function renderEventTimeline(){
- const host=document.getElementById("eventTimeline");if(!host)return;const tt=ctx.tt,all=(tt.acts||[]).map(a=>({...a,_kind:"act"})).sort((a,b)=>actSlotRange(a)[0]-actSlotRange(b)[0]);
- if(!all.length){host.innerHTML='<p class="sub-text">出番を登録するとタイムラインが表示されます。</p>';return;}
- const now=(Date.now()-new Date(ctx.ev.date+"T00:00:00").getTime())/60000,starts=all.map(a=>actSlotRange(a)[0]),ends=all.map(a=>actSlotRange(a)[1]);const min=Math.min(...starts,Math.floor(now/60)*60),max=Math.max(...ends,min+60);const span=Math.max(60,max-min);
+ const host=document.getElementById("eventTimeline");
+ if(!host)return;
+ const tt=ctx.tt;
+ const all=(tt.acts||[]).map(a=>({...a,_kind:"act"}))
+   .sort((a,b)=>actSlotRange(a)[0]-actSlotRange(b)[0] || actSlotRange(a)[1]-actSlotRange(b)[1]);
+
+ if(!all.length){
+   host.innerHTML='<p class="sub-text">出番を登録するとタイムラインが表示されます。</p>';
+   return;
+ }
+
+ // 重なり合う時間帯ごとにグループ化し、各項目へ横並び用のレーンを割り当てる
+ const components=[];
+ let component=null;
+ all.forEach(item=>{
+   const [start,end]=actSlotRange(item);
+   if(!component || start>=component.end){
+     component={items:[],end};
+     components.push(component);
+   }else{
+     component.end=Math.max(component.end,end);
+   }
+   component.items.push(item);
+ });
+
+ const laneById=new Map();
+ components.forEach(group=>{
+   const laneEnds=[];
+   group.items.forEach(item=>{
+     const [start,end]=actSlotRange(item);
+     let lane=laneEnds.findIndex(lastEnd=>lastEnd<=start);
+     if(lane<0)lane=laneEnds.length;
+     laneEnds[lane]=end;
+     laneById.set(item.id,{lane,count:0});
+   });
+   group.items.forEach(item=>{
+     const slot=laneById.get(item.id);
+     slot.count=laneEnds.length;
+   });
+ });
+
+ const now=(Date.now()-new Date(ctx.ev.date+"T00:00:00").getTime())/60000;
+ const starts=all.map(a=>actSlotRange(a)[0]);
+ const ends=all.map(a=>actSlotRange(a)[1]);
+ const scheduleMin=Math.min(...starts);
+ const scheduleMax=Math.max(...ends);
+ const min=now>=scheduleMin&&now<=scheduleMax?Math.min(scheduleMin,Math.floor(now/60)*60):scheduleMin;
+ const max=Math.max(scheduleMax,min+60);
+ const span=Math.max(60,max-min);
+
+ // 短い出番でもカードが読める高さを確保し、同時刻のカードは同じ縦位置で横に並べる
+ const pxPerMinute=Math.max(1.2,...all.map(a=>60/Math.max(1,actSlotRange(a)[1]-actSlotRange(a)[0])));
+ const trackHeight=Math.max(380,Math.ceil(span*pxPerMinute));
  const marker=Math.max(0,Math.min(100,(now-min)/span*100));
- host.innerHTML=`<div class="timeline-axis"><span>${formatOffsetTime(min)}</span><span>${formatOffsetTime(max)}</span></div><div class="timeline-track" style="height:${Math.max(380,Math.min(1200,span*1.2))}px"><div class="timeline-now-line" style="top:${marker}%"><span>NOW</span></div>${all.map(a=>{const [st,en]=actSlotRange(a),top=(st-min)/span*100,height=Math.max(3,(en-st)/span*100),active=now>=st&&now<en,x=adjustedTime(a);return `<div class="timeline-item ${active?"active":""}" style="top:${top}%;height:${height}%"><span class="timeline-time">${esc(x.start)}–${esc(x.end)}</span><strong>${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))}：${esc(recordMemberDisplay(a))}</strong></div>`}).join("")}</div>`;
+
+ const cards=all.map(a=>{
+   const [st,en]=actSlotRange(a);
+   const top=(st-min)/span*100;
+   const height=Math.max(3,(en-st)/span*100);
+   const active=now>=st&&now<en;
+   const x=adjustedTime(a);
+   const lane=laneById.get(a.id)||{lane:0,count:1};
+   const parallel=lane.count>1;
+   const gap=8;
+   const left=parallel?`calc(16px + ${lane.lane*100/lane.count}%)`:"16px";
+   const width=parallel?`calc(${100/lane.count}% - ${16+gap}px)`:"auto";
+   const style=`top:${top}%;height:${height}%;left:${left};${parallel?`width:${width};right:auto;`:"right:0;"}`;
+   return `<div class="timeline-item ${active?"active":""} ${parallel?"parallel":""} ${lane.count>2?"parallel-crowded":""}" style="${style}" aria-label="${esc(x.start)}から${esc(x.end)} ${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))} ${esc(recordMemberDisplay(a))}"><span class="timeline-time">${esc(x.start)}–${esc(x.end)}</span><strong>${esc(a.type==="その他"?(a.customType||"その他"):(a.type||"DJ"))}：${esc(recordMemberDisplay(a))}</strong></div>`;
+ }).join("");
+
+ host.innerHTML=`<div class="timeline-axis"><span>${formatOffsetTime(min)}</span><span>${formatOffsetTime(max)}</span></div><div class="timeline-track" style="height:${trackHeight}px"><div class="timeline-now-line" style="top:${marker}%"><span>NOW</span></div>${cards}</div>`;
 }
 
 function renderTimetable() {
