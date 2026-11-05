@@ -1437,7 +1437,7 @@ function renderPaymentScreen() {
         <div class="cashier-total-row"><span>合計</span><strong>¥${formatMoney(total)}</strong></div>
         <div class="cashier-paid" id="cashierPaid">¥0</div>
         <div class="cashier-status" id="cashierStatus">受け取ったお札・硬貨のボタンを押して積み上げてください</div>
-        <button type="button" class="cashier-exact-button" id="cashierExact">ちょうど受け取った</button>
+        <button type="button" class="cashier-exact-button" id="cashierExact">ちょうど受け取り</button>
         <div class="cashier-keypad">
           <button data-add-cash="100">+100</button><button data-add-cash="500">+500</button><button data-add-cash="1000">+1000</button>
           <button data-add-cash="5000">+5000</button><button data-add-cash="10000">+10000</button><button id="cashierClear">C</button>
@@ -1452,7 +1452,7 @@ function renderPaymentScreen() {
   const refresh = () => {
     paidEl.textContent = `¥${formatMoney(paid)}`;
     const diff = paid - total;
-    if (paid === total) { statusEl.textContent = "💵 ちょうど頂きました"; statusEl.className = "cashier-status exact"; }
+    if (paid === total) { statusEl.textContent = "お釣り ¥0"; statusEl.className = "cashier-status exact"; }
     else if (paid > total) { statusEl.textContent = `お釣り ¥${formatMoney(diff)}`; statusEl.className = "cashier-status change"; }
     else { statusEl.textContent = `あと ¥${formatMoney(total-paid)} 不足しています`; statusEl.className = "cashier-status short"; }
     confirmBtn.disabled = paid < total;
@@ -3634,7 +3634,7 @@ function renderBarHome() {
         <div class="cashier-total-row"><span>合計</span><strong>${yen(total)}</strong></div>
         <div class="cashier-paid" id="barCashierPaid">¥0</div>
         <div class="cashier-status short" id="barCashierStatus">受け取ったお札・硬貨のボタンを押して積み上げてください</div>
-        <button type="button" class="cashier-exact-button" id="barCashierExact">ちょうど受け取った</button>
+        <button type="button" class="cashier-exact-button" id="barCashierExact">ちょうど受け取り</button>
         <div class="cashier-keypad">
           <button data-bar-add-cash="100">+100</button><button data-bar-add-cash="500">+500</button><button data-bar-add-cash="1000">+1000</button>
           <button data-bar-add-cash="5000">+5000</button><button data-bar-add-cash="10000">+10000</button><button id="barCashierClear">C</button>
@@ -3645,7 +3645,7 @@ function renderBarHome() {
       const refreshPayment = () => {
         paidEl.textContent = yen(paid);
         const diff = paid - total;
-        if (paid === total) { statusEl.textContent = "💵 ちょうど頂きました"; statusEl.className = "cashier-status exact"; }
+        if (paid === total) { statusEl.textContent = "お釣り ¥0"; statusEl.className = "cashier-status exact"; }
         else if (paid > total) { statusEl.textContent = `お釣り ${yen(diff)}`; statusEl.className = "cashier-status change"; }
         else { statusEl.textContent = `あと ${yen(total - paid)} 不足しています`; statusEl.className = "cashier-status short"; }
         confirmBtn.disabled = paid < total;
