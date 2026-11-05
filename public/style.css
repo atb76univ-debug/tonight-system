@@ -2867,516 +2867,358 @@ button,input,select,textarea,optgroup,option{
 }
 
 
+
 /* =========================================================
-   tonight! Global Apple-inspired visual language
-   全ページ共通の色・面・境界線・操作色を統一
+   tonight! Design System — Apple-inspired unified theme
+   v1.0 / 2026-11-06
+   すべての画面で色・階層・操作表現を統一する最終テーマ
    ========================================================= */
-:root{
-  --tn-bg:#f5f5f7;
-  --tn-surface:#ffffff;
-  --tn-surface-raised:#ffffff;
-  --tn-surface-soft:#f2f2f5;
-  --tn-surface-muted:#e8e8ed;
-  --tn-border:rgba(60,60,67,.14);
-  --tn-border-strong:rgba(60,60,67,.20);
-  --tn-text:#1d1d1f;
-  --tn-secondary:#6e6e73;
-  --tn-tertiary:#86868b;
-  --tn-blue:#0071e3;
-  --tn-blue-hover:#0077ed;
-  --tn-green:#248a3d;
-  --tn-red:#d70015;
-  --tn-radius:18px;
-  --tn-shadow:0 2px 10px rgba(0,0,0,.035),0 10px 28px rgba(0,0,0,.035);
+:root {
+  color-scheme: light;
+
+  /* Core surfaces */
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --surface: #ffffff;
+  --surface-secondary: #f5f5f7;
+  --surface-tertiary: #eaeaef;
+
+  /* Text */
+  --text: #1d1d1f;
+  --sub: #6e6e73;
+  --text-tertiary: #86868b;
+
+  /* Actions */
+  --primary: #0071e3;
+  --accent: #0071e3;
+  --ui-blue: #0071e3;
+  --success: #248a3d;
+  --danger: #d70015;
+  --warning: #9a6700;
+
+  /* Structure */
+  --border: rgba(60, 60, 67, .16);
+  --ui-border: rgba(60, 60, 67, .16);
+  --radius: 18px;
+  --radius-sm: 12px;
+  --radius-lg: 22px;
+  --shadow: 0 2px 8px rgba(0,0,0,.035), 0 10px 28px rgba(0,0,0,.035);
+  --shadow-raised: 0 8px 28px rgba(0,0,0,.09);
+  --apple-ease: cubic-bezier(.2,.8,.2,1);
+
+  --ui-bg: #f5f5f7;
+  --ui-surface: #fff;
+  --ui-surface-2: #f5f5f7;
+  --ui-surface-3: #eaeaef;
+  --ui-text: #1d1d1f;
+  --ui-secondary: #6e6e73;
+  --ui-green: #248a3d;
+  --ui-red: #d70015;
 }
 
-/* Base canvas and typography color */
-html,body{background:var(--tn-bg)!important;color:var(--tn-text)!important}
-#app{color:var(--tn-text)}
-h1,h2,h3,h4,h5,strong,b,.card-title,.section-title,.page-title{color:var(--tn-text)}
-p,small,.sub-text,.hint,.muted,.description{color:var(--tn-secondary)}
-hr, .divider, .section-divider{border-color:var(--tn-border)!important}
-
-/* Universal card/surface family */
-.card,.guide-step,.event-month,.tt-form-panel,.member-panel,.bar-panel,
-.result-panel,.reception-card,.discount-card,.history-card,.stat-card,
-.product-management,.bar-latest-orders,.checkout-panel,.schedule-panel,
-.member-picker,.cashier-panel{
-  background:var(--tn-surface)!important;
-  color:var(--tn-text)!important;
-  border:1px solid var(--tn-border)!important;
-  border-radius:var(--tn-radius)!important;
-  box-shadow:var(--tn-shadow)!important;
+html, body {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", Arial, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+body * ,
+body *::before,
+body *::after {
+  font-family: inherit;
+}
+button, input, select, textarea {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  transition: background-color .16s var(--apple-ease),
+    border-color .16s var(--apple-ease),
+    box-shadow .16s var(--apple-ease),
+    transform .16s var(--apple-ease),
+    color .16s var(--apple-ease);
+}
+button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, a:focus-visible {
+  outline: 3px solid rgba(0,113,227,.24) !important;
+  outline-offset: 2px;
 }
 
-/* Form and selection surfaces */
+/* App chrome */
+.topbar {
+  background: rgba(255,255,255,.92) !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 1px 8px rgba(0,0,0,.035) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+.topbar h1, #pageTitle, .header-main {
+  color: var(--text) !important;
+}
+.brand-mini, .sub-text, .section-label, .sync-state,
+.event-pulse-hint, .schedule-status {
+  color: var(--sub) !important;
+}
+#app {
+  color: var(--text);
+}
+.card, .panel, .settings-card, .member-card, .product-card,
+.history-card, .summary-card, .schedule-card, .result-card,
+.stat, .stat-card {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+.card, .panel, .settings-card, .member-card, .product-card {
+  border-radius: var(--radius) !important;
+}
+.card-title, .section-title, .page-section-title {
+  color: var(--text) !important;
+}
+
+/* Neutral controls — same treatment throughout the app */
 input:not([type="checkbox"]):not([type="radio"]),
-select,textarea,.member-picker-select,.search-input{
-  background:#fff!important;
-  color:var(--tn-text)!important;
-  border:1px solid var(--tn-border-strong)!important;
-  border-radius:12px!important;
-  box-shadow:none!important;
+select, textarea,
+.tmp-member-toggle, .tmp-member-free-input,
+.tmp-member-search-input {
+  color: var(--text) !important;
+  background: #fff !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.015);
 }
-input::placeholder,textarea::placeholder{color:#98989d!important}
-input:focus,select:focus,textarea:focus{
-  border-color:rgba(0,113,227,.55)!important;
-  box-shadow:0 0 0 4px rgba(0,113,227,.11)!important;
-  outline:0!important;
+input::placeholder, textarea::placeholder {
+  color: #98989d !important;
 }
-
-/* Buttons: blue is reserved for the primary action, gray for secondary */
-.btn-primary,.primary-button,.button-primary,.btn-ticket,
-#confirmOrder,#aAdd,#sAdd{
-  background:var(--tn-blue)!important;
-  color:#fff!important;
-  border:1px solid var(--tn-blue)!important;
-  box-shadow:0 2px 6px rgba(0,113,227,.16)!important;
+input:focus, select:focus, textarea:focus {
+  border-color: rgba(0,113,227,.55) !important;
+  box-shadow: 0 0 0 4px rgba(0,113,227,.10) !important;
+  outline: none !important;
 }
-.btn-primary:hover,.primary-button:hover,.button-primary:hover,.btn-ticket:hover{
-  background:var(--tn-blue-hover)!important;
-  border-color:var(--tn-blue-hover)!important;
-}
-.btn-secondary,.secondary-button,.button-secondary,.icon-btn,
-.event-home-btn,.tt-edit-btn,.offset-controls .btn,
-.history-actions button,.text-button{
-  background:var(--tn-surface-soft)!important;
-  color:#3a3a3c!important;
-  border:1px solid var(--tn-border)!important;
-  box-shadow:none!important;
-}
-.btn-secondary:hover,.secondary-button:hover,.button-secondary:hover,
-.icon-btn:hover,.event-home-btn:hover,.tt-edit-btn:hover{
-  background:var(--tn-surface-muted)!important;
-}
-.btn-danger,.danger-button,.mini-danger{
-  background:#fff1f0!important;
-  color:var(--tn-red)!important;
-  border:1px solid rgba(215,0,21,.16)!important;
-  box-shadow:none!important;
-}
-button:disabled,.btn:disabled{
-  opacity:1!important;
-  background:#e5e5ea!important;
-  color:#98989d!important;
-  border-color:#e5e5ea!important;
-  box-shadow:none!important;
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--primary) !important;
 }
 
-/* Navigation tabs: consistent neutral segmented controls */
-.reception-page-nav,.bar-page-nav,.page-tabs,.section-tabs,.tab-nav{
-  background:var(--tn-surface-soft)!important;
-  border:1px solid var(--tn-border)!important;
-  border-radius:16px!important;
-  box-shadow:none!important;
+/* Primary / secondary / destructive actions */
+.btn-primary, .primary-button, .button-primary,
+.cashier-confirm, .confirm-button, .submit-button,
+button.primary, button.is-primary {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(0,113,227,.16) !important;
 }
-.reception-page-tab,.bar-page-tab,.page-tab,.section-tab{
-  background:transparent!important;
-  color:#636366!important;
-  border:1px solid transparent!important;
-  border-radius:12px!important;
-  font-weight:600!important;
+.btn-primary:hover, .primary-button:hover, .button-primary:hover,
+.cashier-confirm:hover:not(:disabled), .confirm-button:hover,
+.submit-button:hover {
+  background: #0077ed !important;
+  border-color: #0077ed !important;
 }
-.reception-page-tab.active,.bar-page-tab.active,.page-tab.active,.section-tab.active{
-  background:#1d1d1f!important;
-  color:#fff!important;
-  border-color:#1d1d1f!important;
-  box-shadow:0 2px 6px rgba(0,0,0,.12)!important;
+.btn-primary:active, .primary-button:active, .button-primary:active,
+.cashier-confirm:active, .confirm-button:active {
+  transform: scale(.985);
 }
-
-/* Timetable, shift and schedule surfaces */
-.tt-record,.shift-record,.schedule-shift-row,.bar-latest-order,
-.product-admin-row,.member-record,.history-item,.deleted-history-row,
-.checkout-item,.cart-item,.order-item{
-  background:#fff!important;
-  color:var(--tn-text)!important;
-  border-color:var(--tn-border)!important;
+.btn-secondary, .secondary-button, .button-secondary,
+button.secondary, .cashier-cancel {
+  background: #f5f5f7 !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
 }
-.tt-record-time,.timeline-time,.schedule-time{color:var(--tn-secondary)!important}
-.tt-form-panel{background:#f8f8fa!important;border-color:var(--tn-border)!important}
-.tt-form-heading{color:var(--tn-text)!important}
-.event-pulse,.event-pulse.is-compact{
-  background:rgba(242,242,245,.96)!important;
-  color:var(--tn-text)!important;
-  border-color:var(--tn-border)!important;
-  box-shadow:0 5px 18px rgba(0,0,0,.055)!important;
+.btn-secondary:hover, .secondary-button:hover, .button-secondary:hover,
+.cashier-cancel:hover {
+  background: #eaeaef !important;
 }
-.event-pulse .now-label,.event-pulse .schedule-tag{
-  background:#e5e5ea!important;color:#424248!important;
+.btn-danger, .danger-button, .button-danger,
+button.danger {
+  background: var(--danger) !important;
+  border-color: var(--danger) !important;
+  color: #fff !important;
 }
-.event-pulse .schedule-shift-row{
-  background:#fff!important;border:1px solid var(--tn-border)!important;
-}
-
-/* Drink catalogue: tiles and product management share the same neutral palette */
-.product-tile{
-  background:#fff!important;
-  color:var(--tn-text)!important;
-  border:1px solid var(--tn-border)!important;
-  border-radius:16px!important;
-  box-shadow:0 2px 8px rgba(0,0,0,.035)!important;
-}
-.product-tile:hover{background:#fafafa!important;border-color:var(--tn-border-strong)!important}
-.product-tile-name,.product-tile strong,.product-admin-row strong{color:var(--tn-text)!important}
-.product-tile small,.product-admin-row small{color:var(--tn-secondary)!important}
-.product-management summary{color:var(--tn-text)!important}
-.bar-cart-dock,.bar-latest-orders{
-  background:rgba(255,255,255,.96)!important;
-  border:1px solid var(--tn-border)!important;
-  color:var(--tn-text)!important;
-  box-shadow:var(--tn-shadow)!important;
+button:disabled, .btn:disabled, .cashier-confirm:disabled {
+  background: #d1d1d6 !important;
+  border-color: #d1d1d6 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
 }
 
-/* Neutralize old page-specific blue/purple panel fills while preserving status colors */
-.offset-controls,.schedule-columns,.member-picker-controls,
-.checkout-summary,.cart-summary,.result-summary,.reception-summary{
-  color:var(--tn-text);
+/* Navigation and selected states */
+.bar-page-tab, .reception-page-tab {
+  background: #fff !important;
+  color: var(--sub) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
 }
-.offset-controls .btn{background:var(--tn-surface-soft)!important}
-.stat,.stat-card,.discount-counts div,.counter-row,.money-display,
-.success-summary,.checklist label{
-  background:var(--tn-surface-soft)!important;
-  border:1px solid var(--tn-border)!important;
-  color:var(--tn-text)!important;
+.bar-page-tab.active, .reception-page-tab.active,
+.schedule-switch-btn,
+.tab.active, .nav-tab.active, .filter-tab.active {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 2px 7px rgba(0,113,227,.16) !important;
 }
-
-/* Keep semantic states recognizable, but soften their fills */
-.status-live,.event-card-status.live,.live-badge,.sold-out-badge{
-  /* semantic status colors are intentionally retained */
+.schedule-switch-btn {
+  background: #f5f5f7 !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
 }
-.success,.status-success,.is-success{
-  border-color:rgba(36,138,61,.18)!important;
-}
-.warning,.status-warning{
-  border-color:rgba(255,159,10,.22)!important;
-}
-
-/* Modal and overlays use one shared visual language */
-.modal,.dialog,.cashier-dialog,.confirm-dialog{
-  background:rgba(255,255,255,.98)!important;
-  color:var(--tn-text)!important;
-  border:1px solid rgba(255,255,255,.78)!important;
-  border-radius:24px!important;
-  box-shadow:0 24px 70px rgba(0,0,0,.18)!important;
-}
-.modal-overlay,.dialog-overlay,.cashier-overlay{
-  background:rgba(20,20,24,.36)!important;
-  backdrop-filter:blur(10px) saturate(140%);
+.schedule-switch-btn:hover {
+  background: #eaeaef !important;
 }
 
-/* Consistent focus and interaction feedback */
-button:focus-visible,a:focus-visible,[role="button"]:focus-visible{
-  outline:3px solid rgba(0,113,227,.24)!important;
-  outline-offset:2px!important;
+/* Repeated information blocks */
+.stat, .stat-card, .counter-row, .discount-card,
+.money-display, .success-summary, .ticket-confirm-item,
+.env, .history-item, .member-record, .product-row,
+.cashier-keypad button, .bar-payment-checklist label {
+  background: var(--surface-secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
 }
-@media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{transition:none!important;animation:none!important}
+.stat-label, .counter-label small, .money-display .label,
+.success-summary span, .form-row label {
+  color: var(--sub) !important;
+}
+.stat-value, .money, .money-display .amount,
+.counter-value, .ticket-count, .cashier-paid {
+  color: var(--text) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Event pulse / NOW-NEXT */
+.event-pulse {
+  background: rgba(245,245,247,.96) !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,.045) !important;
+}
+.event-pulse .now-label {
+  background: #e5e5ea !important;
+  color: #424248 !important;
+}
+.event-pulse .now-main,
+.event-pulse .schedule-shift-row strong {
+  color: var(--text) !important;
+}
+.event-pulse .schedule-shift-row {
+  background: #fff !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* Cashier / modal surfaces */
+.cashier-overlay, .modal-overlay, .dialog-overlay {
+  background: rgba(20,20,24,.38) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+.cashier-dialog, .modal, .dialog {
+  background: rgba(255,255,255,.98) !important;
+  color: var(--text) !important;
+  border: 1px solid rgba(255,255,255,.75) !important;
+  box-shadow: var(--shadow-raised) !important;
+}
+.cashier-dialog h1, .cashier-dialog h2, .cashier-dialog h3,
+.modal h1, .modal h2, .modal h3 {
+  color: var(--text) !important;
+}
+.cashier-keypad button {
+  background: #f5f5f7 !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+.cashier-keypad button:hover {
+  background: #eaeaef !important;
+}
+.cashier-status {
+  background: #f5f5f7 !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+.cashier-status.exact {
+  background: #edf7ef !important;
+  border-color: rgba(36,138,61,.18) !important;
+  color: #216e35 !important;
+}
+.cashier-status.change {
+  background: #eef5fc !important;
+  border-color: rgba(0,113,227,.15) !important;
+  color: #0759a5 !important;
+}
+
+/* Semantic colors: reserved for status, not decoration */
+.badge, .status-badge, .live-badge {
+  border-radius: 999px;
+}
+.ok, .success, .success-text, .highlight-green {
+  color: var(--success) !important;
+}
+.ng, .error, .danger, .highlight-red {
+  color: var(--danger) !important;
+}
+.highlight-blue, .link, a {
+  color: var(--primary);
+}
+.banner, .warning, .notice {
+  background: #fff8e7 !important;
+  border-color: #f0d28a !important;
+  color: #76520c !important;
+}
+.badge.arc {
+  background: #eaeaef !important;
+  color: var(--sub) !important;
+}
+
+/* Remove legacy purple / navy identity from shared interactive controls */
+.bar-page-tab.active, .reception-page-tab.active,
+.cashier-confirm, .bar-cart-dock-next,
+button[style*="#263b5b"], button[style*="#7357ff"] {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+}
+.cashier-dialog .bar-payment-checklist input[type="checkbox"]:checked {
+  background: var(--success) !important;
+  border-color: var(--success) !important;
+}
+
+/* Consistent geometry and touch behavior */
+.icon-btn, .event-home-btn, .schedule-switch-btn,
+.pulse-control, .tmp-name-delete {
+  border-radius: 12px !important;
+}
+.icon-btn, .event-home-btn, .pulse-control {
+  background: #fff !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+}
+.card, .btn, button, input, select, textarea {
+  -webkit-appearance: none;
+}
+button, .event-card, .member-record, .product-card {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep event artwork expressive; unify only the application chrome around it. */
+.event-card, .flyer-hero, .flyer-empty {
+  border-radius: var(--radius) !important;
 }
 
 
-/* =========================================================
-   FINAL VISUAL QA PATCH — tonight!
-   Apple-like neutral surfaces, strong text contrast, semantic states.
-   This block intentionally comes last to prevent older page CSS from
-   reintroducing conflicting colors or the tab container rectangle.
-   ========================================================= */
-:root{
-  --bg:#f5f5f7;
-  --card:#ffffff;
-  --border:rgba(60,60,67,.14);
-  --text:#1d1d1f;
-  --sub:#6e6e73;
-  --primary:#0071e3;
-  --accent:#0071e3;
-  --success:#1e7434;
-  --danger:#b4232c;
-  --tn-bg:#f5f5f7;
-  --tn-surface:#ffffff;
-  --tn-surface-raised:#ffffff;
-  --tn-surface-soft:#f2f2f5;
-  --tn-surface-muted:#e8e8ed;
-  --tn-border:rgba(60,60,67,.14);
-  --tn-border-strong:rgba(60,60,67,.22);
-  --tn-text:#1d1d1f;
-  --tn-secondary:#6e6e73;
-  --tn-tertiary:#6e6e73;
-  --tn-blue:#0071e3;
-  --tn-blue-hover:#0077ed;
-  --tn-green:#1e7434;
-  --tn-red:#b4232c;
+/* Final component-specific palette alignment */
+.member-chip {
+  background: #eef5fc !important;
+  border-color: rgba(0,113,227,.18) !important;
+  color: #0759a5 !important;
 }
-
-/* Base: avoid washed-out gray text and preserve the consistent light canvas. */
-html,body{background:var(--tn-bg)!important;color:var(--tn-text)!important}
-#app{color:var(--tn-text)}
-.sub-text,.eyebrow,.section-label,.form-row label,.hint,.muted,
-.event-pulse-hint,.event-pulse-title{color:var(--tn-secondary)!important}
-
-/* FIX: no background plate/container behind horizontal tabs.
-   The tabs themselves remain individual, visible controls. */
-.reception-page-nav,.bar-page-nav{
-  background:transparent!important;
-  background-color:transparent!important;
-  border:0!important;
-  border-color:transparent!important;
-  border-radius:0!important;
-  box-shadow:none!important;
-  -webkit-backdrop-filter:none!important;
-  backdrop-filter:none!important;
-  padding:0!important;
-  margin:0 0 16px!important;
-  overflow:visible!important;
-}
-.reception-page-nav{
-  display:grid!important;
-  grid-template-columns:repeat(5,minmax(0,1fr))!important;
-  gap:8px!important;
-}
-.bar-page-nav{
-  display:grid!important;
-  grid-template-columns:repeat(4,minmax(0,1fr))!important;
-  gap:8px!important;
-}
-.reception-page-tab,.bar-page-tab{
-  min-width:0!important;
-  min-height:46px!important;
-  padding:9px 7px!important;
-  border:1px solid #d8d8de!important;
-  border-radius:13px!important;
-  background:#e8e8ed!important;
-  background-color:#e8e8ed!important;
-  color:#3a3a3c!important;
-  font-size:13px!important;
-  font-weight:650!important;
-  line-height:1.25!important;
-  box-shadow:none!important;
-  text-shadow:none!important;
-  opacity:1!important;
-}
-.reception-page-tab:hover,.bar-page-tab:hover{
-  background:#dedee4!important;
-  border-color:#c8c8cf!important;
-  color:#1d1d1f!important;
-  transform:none!important;
-}
-.reception-page-tab.active,.bar-page-tab.active{
-  background:#1d1d1f!important;
-  background-color:#1d1d1f!important;
-  border-color:#1d1d1f!important;
-  color:#ffffff!important;
-  box-shadow:0 2px 7px rgba(0,0,0,.14)!important;
-}
-.reception-page-tab:focus-visible,.bar-page-tab:focus-visible{
-  outline:3px solid rgba(0,113,227,.28)!important;
-  outline-offset:2px!important;
-}
-@media(max-width:520px){
-  .reception-page-nav,.bar-page-nav{gap:5px!important}
-  .reception-page-tab,.bar-page-tab{font-size:11px!important;padding:8px 3px!important}
-}
-
-/* Secondary actions: readable dark text on neutral gray. */
-.btn-secondary,.secondary-button,.button-secondary,.icon-btn,.event-home-btn,
-.tt-edit-btn,.offset-controls .btn,.cashier-cancel,.pulse-control,
-.history-actions button,.text-button,.qty-btn{
-  background:#f2f2f5!important;
-  background-color:#f2f2f5!important;
-  color:#3a3a3c!important;
-  border:1px solid #d8d8de!important;
-  box-shadow:none!important;
-  text-shadow:none!important;
-}
-.btn-secondary:hover,.secondary-button:hover,.button-secondary:hover,
-.icon-btn:hover,.event-home-btn:hover,.tt-edit-btn:hover,
-.offset-controls .btn:hover,.cashier-cancel:hover,.pulse-control:hover,
-.qty-btn:hover{
-  background:#e8e8ed!important;
-  color:#1d1d1f!important;
-}
-.btn-primary,.primary-button,.button-primary,.btn-ticket,
-#confirmOrder,#aAdd,#sAdd,.cashier-confirm{
-  background:#0071e3!important;
-  color:#ffffff!important;
-  border-color:#0071e3!important;
-  text-shadow:none!important;
-}
-.btn-primary:hover,.primary-button:hover,.button-primary:hover,.btn-ticket:hover,
-#confirmOrder:hover,#aAdd:hover,#sAdd:hover,.cashier-confirm:hover:not(:disabled){
-  background:#0066cc!important;
-  border-color:#0066cc!important;
-}
-.btn-danger,.danger-button,.mini-danger,.btn-delete{
-  background:#fff1f0!important;
-  color:#a61b26!important;
-  border:1px solid #efc7c9!important;
-  box-shadow:none!important;
-}
-button:disabled,.btn:disabled,.cashier-confirm:disabled{
-  background:#e5e5ea!important;
-  color:#626267!important;
-  border-color:#d4d4da!important;
-  box-shadow:none!important;
-  opacity:1!important;
-  cursor:not-allowed!important;
-}
-
-/* Product catalogue: selected, normal and sold-out states must remain distinct. */
-.product-tile{
-  background:#ffffff!important;
-  color:#1d1d1f!important;
-  border:1px solid #dedee3!important;
-  box-shadow:0 2px 8px rgba(0,0,0,.035)!important;
-}
-.product-tile .product-tile-name,.product-tile strong{color:#1d1d1f!important}
-.product-tile small{color:#6e6e73!important}
-.product-tile.has-selection{
-  background:#e8e8ed!important;
-  border:1.5px solid #8e8e93!important;
-  color:#1d1d1f!important;
-  filter:none!important;
-}
-.product-tile.has-selection .product-tile-name,
-.product-tile.has-selection strong,
-.product-tile.has-selection small{
-  color:#1d1d1f!important;
-  opacity:1!important;
-}
-.product-tile.sold-out,.product-tile.sold-out:disabled{
-  background:#fff0f0!important;
-  border:1.5px solid #d66b73!important;
-  color:#8f1721!important;
-  box-shadow:none!important;
-  opacity:1!important;
-}
-.product-tile.sold-out .product-tile-name,
-.product-tile.sold-out strong{color:#8f1721!important}
-.product-tile.sold-out small{
-  background:#a61b26!important;
-  color:#ffffff!important;
-  border-radius:999px!important;
-}
-
-/* Event pulse: keep the neutral surface, with distinct readable NOW/NEXT tags. */
-.event-pulse,.event-pulse.is-compact{
-  background:rgba(242,242,245,.97)!important;
-  color:#1d1d1f!important;
-  border-color:#dedee3!important;
-  box-shadow:0 5px 18px rgba(0,0,0,.055)!important;
-}
-.event-pulse .now-label{
-  background:#dedee3!important;
-  color:#3a3a3c!important;
-}
-.event-pulse .now-main,.event-pulse .schedule-shift-row strong{color:#1d1d1f!important}
-.event-pulse .schedule-shift-row{
-  background:#ffffff!important;
-  border:1px solid #dedee3!important;
-  color:#1d1d1f!important;
-}
-.schedule-tag.current,.event-pulse .schedule-tag.current{
-  background:#d9f3e6!important;
-  color:#14643f!important;
-}
-.schedule-tag.next,.event-pulse .schedule-tag.next{
-  background:#e2eaff!important;
-  color:#294d91!important;
-}
-.event-pulse .schedule-tag:not(.current):not(.next){
-  background:#e5e5ea!important;
-  color:#424248!important;
-}
-.pulse-control{background:#ffffff!important;color:#3a3a3c!important}
-
-/* Status badges and payment types: dark text on light fills or white on strong fills. */
-.badge,.event-card-status.live,.live-badge{
-  background:#1e7434!important;
-  color:#ffffff!important;
-}
-.badge.arc,.event-card-status.archived{
-  background:#5d5d64!important;
-  color:#ffffff!important;
-}
-.bar-order-payment.is-cash{
-  background:#e8f4eb!important;
-  color:#216638!important;
-}
-.bar-order-payment.is-ticket{
-  background:#fff1dc!important;
-  color:#7a4b0b!important;
-}
-.ticket-result-note.is-ok{
-  background:#eaf8ef!important;
-  color:#216638!important;
-}
-.ticket-result-note.is-warning{
-  background:#fff2e8!important;
-  color:#7a3515!important;
-}
-.cashier-status.exact{
-  background:#edf7ef!important;
-  border-color:#b8d9c0!important;
-  color:#216638!important;
-}
-.cashier-status.change{
-  background:#eef5fc!important;
-  border-color:#c3d8f0!important;
-  color:#0759a5!important;
-}
-.cashier-status.short{
-  background:#f2f2f5!important;
-  border-color:#d8d8de!important;
-  color:#424248!important;
-}
-.cashier-exact-button{
-  background:#edf7ef!important;
-  color:#216638!important;
-  border-color:#b8d9c0!important;
-}
-.cashier-keypad button{
-  background:#f2f2f5!important;
-  color:#1d1d1f!important;
-  border-color:#d8d8de!important;
-}
-.cashier-keypad button:hover{background:#e8e8ed!important}
-.cashier-dialog .bar-payment-checklist label{
-  background:#f7f7f9!important;
-  color:#1d1d1f!important;
-  border-color:#dedee3!important;
-}
-.cashier-dialog .bar-payment-checklist label:has(input:checked){
-  background:#edf7ef!important;
-  color:#1d1d1f!important;
-  border-color:#b8d9c0!important;
-}
-
-/* Selected timetable rows/forms: a restrained blue edge, dark text, pale surface. */
-.tt-record.is-selected{
-  background:#eef5fc!important;
-  border:1.5px solid #8bb8e6!important;
-  color:#1d1d1f!important;
-  box-shadow:0 3px 10px rgba(0,113,227,.08)!important;
-  transform:none!important;
-}
-.tt-record.is-selected *{color:#1d1d1f}
-.tt-form-panel.is-editing{
-  background:#f3f8ff!important;
-  border:1.5px solid #8bb8e6!important;
-  color:#1d1d1f!important;
-  box-shadow:0 4px 14px rgba(0,113,227,.07)!important;
-}
-.tt-form-panel.is-editing .tt-form-heading{color:#1d1d1f!important}
-
-/* Restored/deleted history is indicated by labels and borders, not low-opacity text. */
-.deleted-history-row.is-restored{
-  opacity:1!important;
-  background:#f2f2f5!important;
-  color:#6e6e73!important;
-}
-.deleted-history-row.is-restored .sub-text{color:#6e6e73!important}
-
-/* Keep ordinary body text comfortably readable on light surfaces. */
-.card,.card p,.card span,.card label,.card li,.card td,
-.guide-step,.guide-step p,.tt-record,.tt-record span,
-.member-record,.member-record span,.history-item,.history-item span{
-  text-shadow:none!important;
+.member-chip button {
+  background: #dcecff !important;
+  color: #0759a5 !important;
 }
