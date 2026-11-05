@@ -2465,3 +2465,53 @@ td,th{border-color:var(--border)!important}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
+
+
+/* ===== Header layout correction: keep title and action buttons on one row ===== */
+.event-list-toolbar{
+  display:flex !important;
+  flex-flow:row nowrap !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:24px !important;
+  width:100%;
+}
+.event-list-brand{
+  display:flex !important;
+  flex:1 1 auto !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  min-width:0 !important;
+}
+.event-list-brand > div{min-width:0}
+.event-list-actions{
+  display:flex !important;
+  flex:0 0 auto !important;
+  flex-flow:row nowrap !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:12px !important;
+  margin:0 !important;
+  white-space:nowrap !important;
+}
+.event-list-actions .btn{
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:max-content;
+  white-space:nowrap !important;
+}
+@media(max-width:700px){
+  .event-list-toolbar{
+    flex-direction:column !important;
+    align-items:stretch !important;
+    gap:16px !important;
+  }
+  .event-list-brand{width:100%}
+  .event-list-actions{
+    width:100%;
+    justify-content:flex-end !important;
+  }
+}
