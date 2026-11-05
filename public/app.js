@@ -815,26 +815,6 @@ function renderHome() {
   </button>
 
   <br><br>
-
-  <button
-    class="btn btn-secondary btn-large"
-    id="historyBtn"
-  >
-    履歴
-  </button>
-
-  <br><br>
-
-  <button
-    class="btn btn-secondary btn-large"
-    id="resultBtn"
-  >
-    リザルト(精算画面へ)
-  </button>
-
-  <br><br>
-  <br><br>
-  <br><br>
   <br><br>
 
   <div class="card drink-ticket-card">
