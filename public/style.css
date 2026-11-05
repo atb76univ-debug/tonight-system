@@ -2832,3 +2832,36 @@ html,body,button,input,select,textarea{
 @media(max-width:520px){
   .schedule-switch-btn{padding:7px 10px;font-size:12px}
 }
+
+
+/* =========================================================
+   Global typography: one Apple-style system font everywhere.
+   商品一覧・受付・バー・管理画面・モーダル等の個別指定を統一
+   ========================================================= */
+:root{
+  --tonight-font-stack:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif;
+}
+html,body{
+  font-family:var(--tonight-font-stack)!important;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+body * ,
+body *::before,
+body *::after{
+  font-family:var(--tonight-font-stack)!important;
+}
+/* Native form controls sometimes use the browser/OS default font. */
+button,input,select,textarea,optgroup,option{
+  font-family:var(--tonight-font-stack)!important;
+  -webkit-font-smoothing:antialiased;
+}
+/* Keep icon glyphs and emoji from inheriting a text font if an icon font is used. */
+.material-icons,.material-symbols-outlined,[class^="icon-"],[class*=" icon-"]{
+  font-family:inherit!important;
+}
+/* Keep numerical product prices and counters aligned consistently. */
+.product-price,.price,.amount,.money,.cashier-paid,.cashier-total-row strong,
+.stat-value,.ticket-count,.product-quantity{
+  font-variant-numeric:tabular-nums;
+}
