@@ -509,7 +509,7 @@ function renderCashBreakdown(breakdown) {
 function renderSetup() {
   screen.innerHTML = `
     <div class="card">
-      <div class="eyebrow">RECEPTION / SETUP</div>
+      
       <div class="card-title">受付開始準備</div>
       <p class="sub-text">受付開始前に、金庫に入っている現金を金種ごとに登録してください。</p>
       <div class="cash-entry-heading"><span>STARTING CASH</span><small>金種ごとの枚数を入力してください</small></div>
@@ -610,7 +610,7 @@ function startEvent() {
 function renderEditStartCash() {
   screen.innerHTML = `
     <div class="card">
-      <div class="eyebrow">RECEPTION / CASH</div>
+      
       <div class="card-title">初期金庫額を編集</div>
       <p class="sub-text">金種ごとの枚数を変更してください。</p>
       <div class="cash-entry-heading"><span>STARTING CASH</span><small>金種ごとの枚数を入力してください</small></div>
@@ -2422,7 +2422,7 @@ function renderResult() {
 function renderCashCheck() {
   screen.innerHTML = `
     <div class="card">
-      <div class="eyebrow">RECEPTION / CASH CHECK</div>
+      
       <div class="card-title">金庫照合</div>
       <p class="sub-text">金庫に残っている現金を、金種ごとに数えて入力してください。</p>
       <div class="cash-entry-heading">
@@ -2849,7 +2849,7 @@ function renderEventList() {
   evs.forEach(e => { (months[e.date.slice(0, 7)] = months[e.date.slice(0, 7)] || []).push(e); });
 
   let html = `<div class="event-list-toolbar">
-    <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="eyebrow">TSUKUBA MUSIC PROJECT</div><div class="list-heading">パーティを始めよう。</div></div></div>
+    <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="list-heading">パーティを始めよう。</div></div></div>
     <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
   </div>`;
   if (!evs.length) html += `<div class="card sub-text">まだ回がありません。「新しい回」から作成してください。</div>`;
@@ -2895,7 +2895,7 @@ function guideIllustration(kind) {
 
 function renderGuide() {
   screen.innerHTML = `
-    <div class="guide-intro"><div class="eyebrow">QUICK GUIDE</div><h2>tonight! の使い方</h2><p>イベントを作成して、受付・ドリンク販売・メンバー名簿・タイムテーブルをまとめて管理できます。</p></div>
+    <div class="guide-intro"><h2>tonight! の使い方</h2><p>イベントを作成して、受付・ドリンク販売・メンバー名簿・タイムテーブルをまとめて管理できます。</p></div>
     <section class="guide-step"><div class="guide-visual">${guideIllustration("event")}</div><div class="guide-copy"><span class="guide-number">01</span><h3>イベントを作成</h3><p>「＋ 新しい回」からイベント名と開催日を登録します。フライヤーも設定できます。作成したイベントを選ぶと、その回の管理画面に進みます。</p></div></section>
     <section class="guide-step"><div class="guide-visual">${guideIllustration("reception")}</div><div class="guide-copy"><span class="guide-number">02</span><h3>受付を管理</h3><p>最初に金庫の初期金額などを設定します。受付では来場区分・割引・支払金額を入力し、履歴やリザルト、金庫照合を確認できます。</p></div></section>
     <section class="guide-step"><div class="guide-visual">${guideIllustration("bar")}</div><div class="guide-copy"><span class="guide-number">03</span><h3>ドリンクを販売</h3><p>最初に金庫の準備を行い、商品管理で共通のドリンクラインナップを登録します。登録内容はすべての回で共有され、追加・削除・価格変更も各回に反映されます。販売画面で商品・数量・支払方法を選択して会計します。</p></div></section>
@@ -3082,7 +3082,7 @@ function renderEventPricing() {
   const p = getPricing();
   screen.innerHTML = `
     <div class="card">
-      <div class="eyebrow">EVENT / PRICING</div>
+      
       <div class="card-title">このイベントの料金設定</div>
       <p class="sub-text">変更した金額は、このイベントの受付・割引・精算・利益計算・CSV出力に反映されます。他のイベントには影響しません。</p>
       <div class="form-row"><label for="priceEntry">エントランス代（円）</label><input id="priceEntry" type="number" min="0" step="1" value="${p.entryFee}"></div>
@@ -3320,7 +3320,7 @@ function renderEventEdit() {
 /* ---------- バーカウンター初回準備 ---------- */
 function renderBarSetup() {
   const b = ensureBar(ctx.bar);
-  screen.innerHTML = `<div class="card"><div class="eyebrow">BAR COUNTER / SETUP</div>
+  screen.innerHTML = `<div class="card">
     <div class="card-title">バーカウンター開始準備</div>
     <p class="sub-text">営業開始前に、金庫に入っている現金を金種ごとに登録してください。登録後、販売画面へ進みます。</p>
     <div class="cash-entry-heading"><span>STARTING CASH</span><small>金種ごとの枚数を入力してください</small></div>
