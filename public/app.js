@@ -4095,7 +4095,6 @@ function renderTimetable() {
   const sorted = l => l.slice().sort((a, b) => slotRange(a)[0] - slotRange(b)[0]);
   screen.innerHTML = `
   <div class="card"><div class="card-title">進行時間の調整</div><div class="offset-controls"><button class="btn btn-secondary" data-offset="-5">−5分</button><button class="btn btn-secondary" data-offset="-1">−1分</button><strong id="offsetValue">${Number(tt.offsetMinutes||0)>=0?"+":""}${Number(tt.offsetMinutes||0)}分</strong><button class="btn btn-secondary" data-offset="1">＋1分</button><button class="btn btn-secondary" data-offset="5">＋5分</button><button class="btn btn-secondary" id="resetOffset">リセット</button></div><small class="sub-text">マイナスは巻き、プラスは押し。出番の表示時刻に反映されます。</small></div>
-  <div class="card"><div id="nowBox">${nowHtml(tt, ctx.ev)}</div></div>
   <div class="card"><div class="card-title">タイムライン</div><div class="timeline" id="eventTimeline"></div></div>
 
   <div class="card">
@@ -4116,7 +4115,7 @@ function renderTimetable() {
     <p class="sub-text">開始日・開始時刻と終了日・終了時刻をそれぞれ指定してください。日付をまたぐ予定も、終了日を翌日に設定すれば登録できます。</p>
   </div>
 
-  <div class="card">
+  <div class="card shift-management-card ${currentRender === renderShifts ? "" : "hidden"}">
     <div class="card-title">シフト</div>
     ${sorted(tt.shifts).map(s => `<div class="tt-record" data-shift-row="${esc(s.id)}"><div class="tt-record-main"><span class="tt-record-time">${esc(scheduleRangeLabel(s))}</span><strong>${esc(s.role)}：${esc(s.name)}</strong></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-es="${esc(s.id)}">編集</button><button type="button" class="x" data-ds="${esc(s.id)}" aria-label="削除">×</button></div></div>`).join("") || `<div class="sub-text">まだ登録がありません</div>`}
     <div class="tt-form-panel" id="shiftFormPanel"><div class="tt-form-heading" id="shiftFormHeading">シフトを追加</div><div class="inline-form">
@@ -4200,6 +4199,7 @@ function renderShifts() {
   let timelineCard = cards.find(card => card.querySelector(".card-title")?.textContent.trim() === "タイムライン");
   cards.forEach(card => { if (card !== shiftCard && card !== timelineCard) card.remove(); });
   if (!shiftCard) return;
+  shiftCard.classList.remove("hidden");
   if (!timelineCard) {
     timelineCard = document.createElement("section");
     timelineCard.className = "card";
