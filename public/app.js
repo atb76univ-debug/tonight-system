@@ -3482,9 +3482,11 @@ function renderBarHome() {
         ${b.products.map(p => `<div class="product-admin-row" data-product-row="${esc(p.id)}">
           <input type="text" value="${esc(p.name)}" aria-label="商品名" data-product-name="${esc(p.id)}">
           <input type="number" min="1" step="1" value="${Number(p.price || 0)}" aria-label="価格" data-product-price="${esc(p.id)}">
-          <button class="btn btn-secondary" data-save-product="${esc(p.id)}">更新</button>
-          <button class="btn ${p.soldOut ? "btn-primary" : "btn-secondary"}" data-toggle-soldout="${esc(p.id)}">${p.soldOut ? "販売再開" : "売切れ"}</button>
-          <button class="mini-danger" data-delete-product="${esc(p.id)}">削除</button>
+          <div class="product-admin-actions">
+            <button type="button" class="btn btn-secondary" data-save-product="${esc(p.id)}">更新</button>
+            <button type="button" class="btn ${p.soldOut ? "btn-primary" : "btn-secondary"}" data-toggle-soldout="${esc(p.id)}">${p.soldOut ? "販売再開" : "売切れ"}</button>
+            <button type="button" class="mini-danger" data-delete-product="${esc(p.id)}">削除</button>
+          </div>
         </div>`).join("")}
       </div>
       <div class="add-product-form">
