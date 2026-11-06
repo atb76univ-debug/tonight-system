@@ -3612,9 +3612,20 @@ function renderBarHome() {
   };
 
   const goCheckout = $("barGoCheckout");
-  if (goCheckout) goCheckout.onclick = () => { if (!barCart.length) return; barCheckoutPage = true; renderBarHome(); };
+  if (goCheckout) goCheckout.onclick = () => {
+    if (!barCart.length) return;
+    barCheckoutPage = true;
+    renderBarHome();
+    // 商品選択画面でのスクロール位置を引き継がず、会計画面の先頭から表示する。
+    requestAnimationFrame(() => window.scrollTo(0, 0));
+  };
   const backToProducts = $("barBackToProducts");
-  if (backToProducts) backToProducts.onclick = () => { barCheckoutPage = false; renderBarHome(); };
+  if (backToProducts) backToProducts.onclick = () => {
+    barCheckoutPage = false;
+    renderBarHome();
+    // 商品選択画面へ戻る場合も先頭から表示する。
+    requestAnimationFrame(() => window.scrollTo(0, 0));
+  };
   screen.querySelectorAll("[data-add-product]").forEach(btn => btn.onclick = () => {
     const p = b.products.find(x => x.id === btn.dataset.addProduct); if (!p || p.soldOut) return;
     let line = barCart.find(x => x.productId === p.id);
