@@ -3929,6 +3929,10 @@ function renderBarHome() {
           </div>
         </div>`).join("")}
       </div>
+      <div class="member-import">
+        <label>CSV／Excelを読み込む<input type="file" id="drinkMenuFile" accept=".csv,.xlsx,.xls"></label>
+        <small>「商品名（ドリンク名）」と「価格」の列を読み込みます。同じ商品名が登録済みの場合は価格を更新し、新しい商品は追加します。</small>
+      </div>
       <div class="add-product-form">
         <input id="newProductName" placeholder="商品名（例：ビール）" aria-label="追加する商品名">
         <input id="newProductPrice" type="number" min="1" step="1" value="500" aria-label="販売価格">
@@ -4219,6 +4223,99 @@ function renderBarHome() {
     try { await syncDrinkLineup(); saveBar(); renderBarHome(); }
     catch (error) { setSync("同期エラー"); alert(error.message || "クラウド同期に失敗しました。"); }
   });
+  const drinkMenuFile = $("drinkMenuFile");
+  if (drinkMenuFile) drinkMenuFile.onchange = async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      let table = [];
+      if (/\.csv$/i.test(file.name)) {
+        table = parseMemberCSVRows(await file.text());
+      } else {
+        if (!window.XLSX) throw new Error("Excel読み込みライブラリを読み込めません。CSV形式で保存して取り込んでください。");
+        const data = new Uint8Array(await file.arrayBuffer());
+        const wb = XLSX.read(data, { type: "array", cellDates: false });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+      }
+
+      const normHeader = value => String(value ?? "").replace(/^\uFEFF/, "").normalize("NFKC").toLowerCase().replace(/[\s　_*・:：()（）「」【】\[\]\-]/g, "");
+      const findColumn = (headers, type) => {
+        const values = headers.map(normHeader);
+        const exact = type === "name"
+          ? ["商品名", "ドリンク名", "品名", "商品", "メニュー名", "name", "product", "drink", "item"]
+          : ["価格", "販売価格", "単価", "金額", "price", "amount"];
+        let index = values.findIndex(value => exact.some(alias => normHeader(alias) === value));
+        if (index >= 0) return index;
+        return type === "name"
+          ? values.findIndex(value => value.includes("商品名") || value.includes("ドリンク名") || value.includes("品名") || value === "name")
+          : values.findIndex(value => value.includes("価格") || value.includes("単価") || value === "price" || value === "amount");
+      };
+
+      let headerIndex = -1, nameCol = -1, priceCol = -1;
+      for (let r = 0; r < Math.min(table.length, 30); r++) {
+        const headers = table[r] || [];
+        const n = findColumn(headers, "name"), p = findColumn(headers, "price");
+        if (n >= 0 && p >= 0) { headerIndex = r; nameCol = n; priceCol = p; break; }
+      }
+      if (headerIndex < 0) {
+        const preview = (table[0] || []).map(value => String(value ?? "").trim()).filter(Boolean).join(" / ");
+        throw new Error(`見出し行を特定できませんでした。商品名と価格の列見出しを確認してください。1行目：${preview || "空行"}`);
+      }
+
+      const clean = value => String(value ?? "").replace(/^\uFEFF/, "").trim();
+      const normalizeName = value => normHeader(value).replace(/[\s　]/g, "");
+      let added = 0, updated = 0, skipped = 0;
+      const imported = [];
+      const lineup = Array.isArray(db.drinkLineup) ? db.drinkLineup : [];
+      for (const row of table.slice(headerIndex + 1)) {
+        const name = clean(row[nameCol]);
+        const rawPrice = clean(row[priceCol]).replace(/[￥¥,\s]/g, "").replace(/円$/, "");
+        const price = Number(rawPrice);
+        if (!name || !rawPrice || !Number.isInteger(price) || price <= 0) { skipped++; continue; }
+        const existing = lineup.find(item => normalizeName(item.name) === normalizeName(name));
+        if (existing) {
+          if (existing.name !== name || Number(existing.price) !== price) updated++;
+          existing.name = name;
+          existing.price = price;
+        } else {
+          lineup.push({ id: uid(), name, price });
+          added++;
+        }
+        imported.push({ name, price });
+      }
+      if (!imported.length) throw new Error("取り込める商品がありませんでした。商品名と1円以上の整数価格を確認してください。");
+
+      db.drinkLineup = lineup;
+      touchDrinkLineup();
+      for (const event of db.events || []) {
+        if (!event.bar) continue;
+        const oldProducts = event.bar.products || [];
+        event.bar.products = lineup.map(item => {
+          const previous = oldProducts.find(product => product.id === item.id);
+          return { ...item, soldOut: Boolean(previous?.soldOut) };
+        });
+      }
+      b.products = lineup.map(item => {
+        const previous = b.products.find(product => product.id === item.id);
+        return { ...item, soldOut: Boolean(previous?.soldOut) };
+      });
+      try {
+        await syncDrinkLineup();
+        saveBar();
+        alert(`ドリンクメニューの取り込みが完了しました\n商品名列：${table[headerIndex][nameCol]}\n価格列：${table[headerIndex][priceCol]}\n新規追加：${added}件／更新：${updated}件${skipped ? `／スキップ：${skipped}行` : ""}`);
+        renderBarHome();
+      } catch (error) {
+        setSync("同期エラー");
+        alert(error.message || "クラウド同期に失敗しました。");
+      }
+    } catch (error) {
+      console.error("[ドリンクメニューインポート失敗]", error);
+      alert(`読み込みに失敗しました：${error.message}`);
+    }
+    e.target.value = "";
+  };
+
   $("addBarProduct").onclick = async () => {
     const name = $("newProductName").value.trim(), price = Number($("newProductPrice").value);
     if (!name || !Number.isInteger(price) || price <= 0) { alert("商品名と1円以上の整数価格を入力してください"); return; }
