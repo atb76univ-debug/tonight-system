@@ -1,9 +1,10 @@
-// /api/db: 全データの読み書き（回ごと・部分ごとに新しい方を採用してマージ）
-// /api/flyer/<id>: フライヤー画像の保存と配信
+// tonight! security hardening
+// Admin APIs require an HttpOnly signed session. Visitor APIs expose only public data.
 const DELETION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_COOKIE = 'tonight_admin_session';
+const SESSION_TTL_SECONDS = 12 * 60 * 60;
 
-
-const RECEPTION_PER_PERSON = 1500; // 入場料1000円 + ドリンク代500円（app.js の ENTRY_FEE + DRINK_FEE と同じ）
+const RECEPTION_PER_PERSON = 1500;
 const tombVersion = t => Math.max(Number(t?.deletedAt || 0), Number(t?.restoredAt || 0));
 const tombRestored = t => Number(t?.restoredAt || 0) > Number(t?.deletedAt || 0);
 
@@ -15,8 +16,6 @@ function applyEntryEffect(st, entry, sign) {
   st.totals.totalDiscount += sign * Number(entry.totalDiscount || 0);
   st.drinkTickets = Math.max(0, Number(st.drinkTickets || 0) - sign * people);
 }
-
-// 受付履歴は1件ごとに「削除／復元の新しい方」を採用（回全体の上書きで復元が消えないようにする）
 function mergeReceptionStates(older, newer) {
   const base = structuredClone(newer || older || {});
   base.totals = { general: 0, tmp: 0, grossEntrance: 0, totalDiscount: 0, ...(base.totals || {}) };
@@ -35,14 +34,8 @@ function mergeReceptionStates(older, newer) {
     }
   }
   const entries = [];
-  for (const [id, e] of live) {
-    const t = tombs.get(id);
-    if (t && !tombRestored(t)) continue;
-    entries.push(structuredClone(e));
-  }
-  for (const [id, t] of tombs) {
-    if (tombRestored(t) && !live.has(id)) entries.push(structuredClone(t.entry));
-  }
+  for (const [id, e] of live) { const t = tombs.get(id); if (t && !tombRestored(t)) continue; entries.push(structuredClone(e)); }
+  for (const [id, t] of tombs) if (tombRestored(t) && !live.has(id)) entries.push(structuredClone(t.entry));
   entries.sort((x, y) => Number(y.id || 0) - Number(x.id || 0));
   const outIds = new Set(entries.map(e => String(e.id)));
   const baseList = Array.isArray(base.receptionHistory) ? base.receptionHistory : [];
@@ -50,18 +43,14 @@ function mergeReceptionStates(older, newer) {
   for (const e of entries) if (!baseIds.has(String(e.id))) applyEntryEffect(base, e, +1);
   for (const e of baseList) if (!outIds.has(String(e.id))) applyEntryEffect(base, e, -1);
   base.receptionHistory = entries;
-  base.deletedReceptionHistory = [...tombs.values()]
-    .filter(t => Number(t.deletedAt || 0) >= cutoff)
-    .sort((x, y) => tombVersion(y) - tombVersion(x))
-    .map(t => structuredClone(t));
+  base.deletedReceptionHistory = [...tombs.values()].filter(t => Number(t.deletedAt || 0) >= cutoff)
+    .sort((x, y) => tombVersion(y) - tombVersion(x)).map(t => structuredClone(t));
   return base;
 }
-
 function mergeBarTransactions(a = {}, b = {}) {
   const resetAt = Math.max(Number(a.resetAt || 0), Number(b.resetAt || 0));
   const voided = new Set([...(a.voidedSales || []), ...(b.voidedSales || [])]);
   const deletedMap = new Map();
-
   [...(a.deletedSales || []), ...(b.deletedSales || [])].forEach(item => {
     if (!item?.sale?.id || Number(item.deletedAt || 0) < Date.now() - DELETION_RETENTION_MS) return;
     const previous = deletedMap.get(item.sale.id);
@@ -69,132 +58,472 @@ function mergeBarTransactions(a = {}, b = {}) {
     const previousVersion = previous ? Math.max(Number(previous.deletedAt || 0), Number(previous.restoredAt || 0)) : -1;
     if (itemVersion > previousVersion) deletedMap.set(item.sale.id, structuredClone(item));
   });
-
   for (const [id, item] of deletedMap) {
-    if (Number(item.restoredAt || 0) > Number(item.deletedAt || 0)) voided.delete(id);
-    else voided.add(id);
+    if (Number(item.restoredAt || 0) > Number(item.deletedAt || 0)) voided.delete(id); else voided.add(id);
   }
-
   const byId = new Map();
   [...(a.sales || []), ...(b.sales || [])].forEach(sale => {
     if (!sale?.id || Number(sale.timestamp || 0) <= resetAt || voided.has(sale.id)) return;
     if (!byId.has(sale.id)) byId.set(sale.id, structuredClone(sale));
   });
-
-  return {
-    sales: [...byId.values()].sort((x, y) => Number(y.timestamp || 0) - Number(x.timestamp || 0)),
-    resetAt,
-    voidedSales: [...voided],
-    deletedSales: [...deletedMap.values()].sort((x, y) => Number(y.deletedAt || 0) - Number(x.deletedAt || 0))
-  };
+  return { sales: [...byId.values()].sort((x, y) => Number(y.timestamp || 0) - Number(x.timestamp || 0)), resetAt,
+    voidedSales: [...voided], deletedSales: [...deletedMap.values()].sort((x, y) => Number(y.deletedAt || 0) - Number(x.deletedAt || 0)) };
 }
-
 function mergeInto(target, source) {
   target.events = Array.isArray(target.events) ? target.events : [];
-
   if (Number(source.membersUpdated || 0) > Number(target.membersUpdated || 0)) {
-    target.members = structuredClone(Array.isArray(source.members) ? source.members : []);
-    target.membersUpdated = Number(source.membersUpdated || 0);
+    target.members = structuredClone(Array.isArray(source.members) ? source.members : []); target.membersUpdated = Number(source.membersUpdated || 0);
   }
   if (Number(source.drinkLineupUpdated || 0) > Number(target.drinkLineupUpdated || 0)) {
-    target.drinkLineup = structuredClone(Array.isArray(source.drinkLineup) ? source.drinkLineup : []);
-    target.drinkLineupUpdated = Number(source.drinkLineupUpdated || 0);
+    target.drinkLineup = structuredClone(Array.isArray(source.drinkLineup) ? source.drinkLineup : []); target.drinkLineupUpdated = Number(source.drinkLineupUpdated || 0);
   }
-
   for (const incoming of (Array.isArray(source.events) ? source.events : [])) {
     if (!incoming?.id) continue;
     const existing = target.events.find(event => event.id === incoming.id);
-    if (!existing) {
-      target.events.push(structuredClone(incoming));
-      continue;
-    }
-
-    existing.u = existing.u || {};
-    const versions = incoming.u || {};
-
+    if (!existing) { target.events.push(structuredClone(incoming)); continue; }
+    existing.u = existing.u || {}; const versions = incoming.u || {};
     if (Number(versions.meta || 0) > Number(existing.u.meta || 0)) {
-      for (const key of ['name', 'date', 'flyer', 'archived', 'deleted', 'participants', 'pricing']) {
+      for (const key of ['name', 'date', 'flyer', 'archived', 'deleted', 'participants', 'pricing', 'venue', 'mapUrl', 'description'])
         if (Object.prototype.hasOwnProperty.call(incoming, key)) existing[key] = structuredClone(incoming[key]);
-      }
       existing.u.meta = Number(versions.meta || 0);
     }
     const incomingNewer = Number(versions.rec || 0) > Number(existing.u.rec || 0);
-    if (incoming.state || existing.state) {
-      existing.state = incomingNewer
-        ? mergeReceptionStates(existing.state, incoming.state)
-        : mergeReceptionStates(incoming.state, existing.state);
-    }
+    if (incoming.state || existing.state) existing.state = incomingNewer ? mergeReceptionStates(existing.state, incoming.state) : mergeReceptionStates(incoming.state, existing.state);
     if (incomingNewer) existing.u.rec = Number(versions.rec || 0);
-
     const mergedTransactions = mergeBarTransactions(existing.bar || {}, incoming.bar || {});
-    if (Number(versions.bar || 0) > Number(existing.u.bar || 0)) {
-      existing.bar = structuredClone(incoming.bar || {});
-      existing.u.bar = Number(versions.bar || 0);
-    }
-    existing.bar = existing.bar || {};
-    existing.bar.sales = mergedTransactions.sales;
-    existing.bar.resetAt = mergedTransactions.resetAt;
-    existing.bar.voidedSales = mergedTransactions.voidedSales;
-    existing.bar.deletedSales = mergedTransactions.deletedSales;
-
-    if (Number(versions.tt || 0) > Number(existing.u.tt || 0)) {
-      existing.tt = structuredClone(incoming.tt || { acts: [], shifts: [], offsetMinutes: 0 });
-      existing.u.tt = Number(versions.tt || 0);
+    if (Number(versions.bar || 0) > Number(existing.u.bar || 0)) { existing.bar = structuredClone(incoming.bar || {}); existing.u.bar = Number(versions.bar || 0); }
+    existing.bar = existing.bar || {}; Object.assign(existing.bar, mergedTransactions);
+    if (Number(versions.tt || 0) > Number(existing.u.tt || 0)) { existing.tt = structuredClone(incoming.tt || { acts: [], shifts: [], offsetMinutes: 0 }); existing.u.tt = Number(versions.tt || 0); }
+    if (Number(versions.gallery || 0) > Number(existing.u.gallery || 0)) {
+      existing.gallery = Array.isArray(incoming.gallery) ? structuredClone(incoming.gallery).slice(0, 60) : []; existing.u.gallery = Number(versions.gallery || 0);
     }
   }
   return target;
+}
+
+const json = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
+const text = (body, status, headers = {}) => new Response(body, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
+function secureResponse(response, requestUrl) {
+  const headers = new Headers(response.headers);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options', 'DENY');
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (requestUrl.protocol === 'https:') headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+function b64url(bytes) {
+  let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+function fromB64url(value) {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
+  const binary = atob(base64); return Uint8Array.from(binary, c => c.charCodeAt(0));
+}
+async function hmac(value, secret) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)));
+}
+function constantTimeEqual(a, b) {
+  const aa = new TextEncoder().encode(String(a)), bb = new TextEncoder().encode(String(b));
+  let diff = aa.length ^ bb.length; const n = Math.max(aa.length, bb.length);
+  for (let i = 0; i < n; i++) diff |= (aa[i % (aa.length || 1)] || 0) ^ (bb[i % (bb.length || 1)] || 0);
+  return diff === 0;
+}
+function configured(env) { return typeof env.ADMIN_PASSWORD === 'string' && env.ADMIN_PASSWORD.length >= 16 && typeof env.SESSION_SECRET === 'string' && env.SESSION_SECRET.length >= 32; }
+function cookieValue(request) {
+  const raw = request.headers.get('Cookie') || '';
+  const part = raw.split(';').map(x => x.trim()).find(x => x.startsWith(SESSION_COOKIE + '='));
+  return part ? decodeURIComponent(part.slice(SESSION_COOKIE.length + 1)) : '';
+}
+async function makeSession(secret) {
+  const expires = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+  const payload = String(expires);
+  return `${payload}.${b64url(await hmac(payload, secret))}`;
+}
+async function validSession(request, env) {
+  if (!configured(env)) return false;
+  const token = cookieValue(request), dot = token.indexOf('.'); if (dot < 1) return false;
+  const expires = Number(token.slice(0, dot)), signature = token.slice(dot + 1);
+  if (!Number.isSafeInteger(expires) || expires <= Math.floor(Date.now() / 1000) || expires > Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS + 60) return false;
+  try { return constantTimeEqual(signature, b64url(await hmac(String(expires), env.SESSION_SECRET))); } catch { return false; }
+}
+function sameOrigin(request) { return request.headers.get('Origin') === new URL(request.url).origin; }
+async function exceedsBodyLimit(request, maxBytes) {
+  const declared = Number(request.headers.get('Content-Length') || 0);
+  if (declared > maxBytes) return true;
+  if (declared > 0) return false;
+  try { return (await request.clone().arrayBuffer()).byteLength > maxBytes; } catch { return true; }
+}
+async function rateLimit(env, key, limit, windowMs, reset = false) {
+  const stub = env.STORE.get(env.STORE.idFromName('main'));
+  const response = await stub.fetch('https://do/rate-limit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, limit, windowMs, reset }) });
+  return response.json();
+}
+async function requireAdmin(request, env) { return await validSession(request, env); }
+const VISITOR_COOKIE = 'tonight_visitor_session';
+async function visitorCookie(request, env) {
+  const raw = request.headers.get('Cookie') || '';
+  const part = raw.split(';').map(x => x.trim()).find(x => x.startsWith(VISITOR_COOKIE + '='));
+  if (!part || !configured(env)) return null;
+  try {
+    const token = decodeURIComponent(part.slice(VISITOR_COOKIE.length + 1));
+    const dot = token.indexOf('.'); if (dot < 1) return null;
+    const payload = token.slice(0, dot), signature = token.slice(dot + 1);
+    const [id, expiresText] = payload.split('.'); const expires = Number(expiresText);
+    if (!/^[A-Za-z0-9_-]{20,80}$/.test(id || '') || !Number.isSafeInteger(expires) || expires <= Math.floor(Date.now()/1000)) return null;
+    return constantTimeEqual(signature, b64url(await hmac(payload, env.SESSION_SECRET))) ? id : null;
+  } catch { return null; }
+}
+async function ensureVisitorCookie(request, env) {
+  const existing = await visitorCookie(request, env); if (existing) return { id: existing, cookie: null };
+  const id = b64url(crypto.getRandomValues(new Uint8Array(24)));
+  const expires = Math.floor(Date.now()/1000) + 365*24*60*60;
+  const payload = `${id}.${expires}`;
+  const token = `${payload}.${b64url(await hmac(payload, env.SESSION_SECRET))}`;
+  return { id, cookie: `${VISITOR_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${365*24*60*60}` };
+}
+async function vapidAuthorization(endpoint, env) {
+  if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) return null;
+  const audience = new URL(endpoint).origin, now = Math.floor(Date.now()/1000);
+  const header = b64url(new TextEncoder().encode(JSON.stringify({ alg:'ES256', typ:'JWT' })));
+  const payload = b64url(new TextEncoder().encode(JSON.stringify({ aud:audience, exp:now+12*60*60, sub:env.VAPID_SUBJECT })));
+  const unsigned = `${header}.${payload}`;
+  const jwk = JSON.parse(env.VAPID_PRIVATE_JWK);
+  const key = await crypto.subtle.importKey('jwk', jwk, { name:'ECDSA', namedCurve:'P-256' }, false, ['sign']);
+  const signature = new Uint8Array(await crypto.subtle.sign({ name:'ECDSA', hash:'SHA-256' }, key, new TextEncoder().encode(unsigned)));
+  return `vapid t=${unsigned}.${b64url(signature)}, k=${env.VAPID_PUBLIC_KEY}`;
+}
+async function sendPushNotifications(env, title, body) {
+  const stub = env.STORE.get(env.STORE.idFromName('main'));
+  const result = await stub.fetch('https://do/push-subscriptions');
+  const subscriptions = await result.json();
+  if (!Array.isArray(subscriptions) || !subscriptions.length) return { sent:0 };
+  if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) return { sent:0, configured:false };
+  let sent=0;
+  await Promise.all(subscriptions.map(async sub => {
+    try {
+      const authorization = await vapidAuthorization(sub.endpoint, env);
+      const response = await fetch(sub.endpoint, { method:'POST', headers:{ Authorization:authorization, TTL:'120', Urgency:'normal' } });
+      if (response.ok || response.status===201) sent++;
+      else if (response.status===404 || response.status===410) await stub.fetch('https://do/push-subscription', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({endpoint:sub.endpoint}) });
+    } catch {}
+  }));
+  return { sent, configured:true };
 }
 
 export class Store {
   constructor(state) { this.state = state; }
   async fetch(req) {
     const path = new URL(req.url).pathname;
+    if (path === '/rate-limit' && req.method === 'POST') {
+      let body; try { body = await req.json(); } catch { return json({ ok: false }, 400); }
+      const key = String(body.key || '').slice(0, 180); if (!key) return json({ ok: false }, 400);
+      const storageKey = `rate:${key}`;
+      if (body.reset) { await this.state.storage.delete(storageKey); return json({ ok: true, reset: true }); }
+      const now = Date.now(), limit = Math.max(1, Math.min(100, Number(body.limit) || 5)), windowMs = Math.max(1000, Math.min(3600000, Number(body.windowMs) || 60000));
+      let record = await this.state.storage.get(storageKey);
+      if (!record || now - Number(record.startedAt || 0) >= windowMs) record = { startedAt: now, count: 0 };
+      if (record.count >= limit) return json({ ok: false, retryAfter: Math.max(1, Math.ceil((windowMs - (now - record.startedAt)) / 1000)) }, 429);
+      record.count++; await this.state.storage.put(storageKey, record);
+      return json({ ok: true, remaining: limit - record.count });
+    }
+    if (path === '/public-db' && req.method === 'GET') {
+      const current = (await this.state.storage.get('db')) || { events: [], members: [], drinkLineup: [] };
+      const members = Array.isArray(current.members) ? current.members : [];
+      const events = (Array.isArray(current.events) ? current.events : []).filter(event => event && !event.deleted).map(event => {
+        const tt = event.tt || {};
+        const acts = (Array.isArray(tt.acts) ? tt.acts : []).map(act => ({ id: String(act.id || ''), startDate: act.startDate || event.date,
+          start: act.start || '', endDate: act.endDate || '', end: act.end || '', type: act.type || 'DJ', customType: act.customType || '',
+          name: String(act.name || ''), memberIds: Array.isArray(act.memberIds) ? act.memberIds.map(String) : [] }));
+        const referencedIds = new Set(acts.flatMap(act => act.memberIds));
+        const publicMembers = members.filter(member => referencedIds.has(String(member.id))).map(member => ({ id: String(member.id),
+          name: String(member.name || ''), nickname: String(member.nickname || ''), bio: String(member.bio || member.profile || ''),
+          instagram: String(member.instagram || ''), genre: String(member.genre || ''), favoriteArtists: String(member.favoriteArtists || ''),
+          favorite: String(member.favorite || ''), photo: /^https:\/\//i.test(String(member.photo || '')) ? String(member.photo) : '',
+          spotifyPlaylist: /^https:\/\//i.test(String(member.spotifyPlaylist || '')) ? String(member.spotifyPlaylist) : '' }));
+        const products = (Array.isArray(event.bar?.products) ? event.bar.products : (Array.isArray(current.drinkLineup) ? current.drinkLineup : []))
+          .map(product => ({ id: String(product.id || ''), name: String(product.name || ''), price: Math.max(0, Number(product.price || 0)), soldOut: Boolean(product.soldOut) }));
+        return { id: String(event.id), name: String(event.name || ''), date: String(event.date || ''), flyer: Number(event.flyer || 0),
+          archived: Boolean(event.archived), acts, members: publicMembers, products, offsetMinutes: Number(tt.offsetMinutes || 0),
+          gallery: Array.isArray(event.gallery) ? event.gallery.filter(x => typeof x === 'string' && (/^https:\/\//.test(x) || /^\/api\/gallery\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(x))).slice(0, 60) : [],
+          venue: String(event.venue || ''), mapUrl: /^https:\/\//i.test(String(event.mapUrl || '')) ? String(event.mapUrl) : '', description: String(event.description || '') };
+      }).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      return json({ events, updated: Number(current.updated || 0) });
+    }
+    if (path === '/public-rsvp') {
+      const url = new URL(req.url), eventId = String(url.searchParams.get('eventId') || '');
+      if (!eventId || eventId.length > 100) return text('bad event', 400);
+      const db = (await this.state.storage.get('db')) || { events: [] };
+      const event = (db.events || []).find(item => String(item.id) === eventId && !item.deleted);
+      if (!event) return text('event not found', 404);
+      const key = 'public-rsvp:' + eventId, records = (await this.state.storage.get(key)) || {};
+      if (req.method === 'GET') {
+        const participants = Object.values(records).filter(item => ['going', 'interested'].includes(item.status))
+          .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0)).map(item => ({ name: item.name, status: item.status, createdAt: item.createdAt }));
+        const visitorId = String(req.headers.get('X-Visitor-Id') || ''), myStatus = visitorId ? (records[visitorId]?.status || null) : null;
+        return json({ participants, count: participants.length, myStatus });
+      }
+      if (req.method === 'DELETE') {
+        const visitorId = String(req.headers.get('X-Visitor-Id') || ''); if (!/^[A-Za-z0-9_-]{20,80}$/.test(visitorId)) return text('visitor identity required', 401);
+        if (records[visitorId]) { delete records[visitorId]; await this.state.storage.put(key, records); }
+        return json({ ok: true, cancelled: true });
+      }
+      if (req.method === 'POST') {
+        let body; try { body = await req.json(); } catch { return text('bad json', 400); }
+        const visitorId = String(req.headers.get('X-Visitor-Id') || ''), name = String(body?.name || '').trim().replace(/[<>]/g, '').slice(0, 30);
+        if (!/^[A-Za-z0-9_-]{20,80}$/.test(visitorId)) return text('visitor identity required', 401);
+        const status = String(body?.status || (body?.going === false ? '' : 'going'));
+        if (!['going', 'interested', 'not-going'].includes(status)) return text('bad status', 400);
+        if (!name) return text('name required', 400);
+        if (Object.keys(records).length >= 1000 && !records[visitorId]) return text('full', 409);
+        records[visitorId] = { name, status, createdAt: Date.now() }; await this.state.storage.put(key, records);
+        return json({ ok: true, count: Object.keys(records).length });
+      }
+      return text('method not allowed', 405, { Allow: 'GET, POST, DELETE' });
+    }
+    if (path === '/messages') {
+      const url = new URL(req.url), eventId = String(url.searchParams.get('eventId') || 'global');
+      if (eventId !== 'global' && !/^[A-Za-z0-9_-]{1,100}$/.test(eventId)) return text('bad event',400);
+      const key = `messages:${eventId}`, messages = (await this.state.storage.get(key)) || [];
+      if (req.method === 'GET') return json(messages);
+      if (req.method === 'POST') {
+        let body; try { body=await req.json(); } catch { return text('bad json',400); }
+        const message = { id: crypto.randomUUID(), text:String(body.text||'').trim().slice(0,2000), html:String(body.html||'').slice(0,10000), createdAt:Date.now(), reactions:{} };
+        if (!message.text) return text('message required',400);
+        messages.push(message); await this.state.storage.put(key,messages.slice(-300)); return json({ok:true,message});
+      }
+      return text('method not allowed',405,{Allow:'GET, POST'});
+    }
+    if (path.startsWith('/messages/') && req.method === 'PUT') {
+      let body; try { body=await req.json(); } catch { return text('bad json',400); }
+      const id=path.slice('/messages/'.length), key='messages:global', messages=(await this.state.storage.get(key))||[], message=messages.find(m=>m.id===id);
+      if(!message)return text('message not found',404);
+      message.html=String(body.html||'').slice(0,10000); message.text=String(body.text||'').trim().slice(0,2000); message.updatedAt=Date.now();
+      if(!message.text && !message.html)return text('message required',400);
+      await this.state.storage.put(key,messages); return json({ok:true,message});
+    }
+    if (path === '/message-reaction' && req.method === 'POST') {
+      let body; try { body=await req.json(); } catch { return text('bad json',400); }
+      const eventId=String(body.eventId||'global'), messageId=String(body.messageId||''), visitorId=String(body.visitorId||''), emoji=String(body.emoji||'');
+      if ((eventId !== 'global' && !/^[A-Za-z0-9_-]{1,100}$/.test(eventId)) || !/^[A-Za-z0-9_-]{1,80}$/.test(visitorId) || !/^.{1,8}$/u.test(emoji)) return text('bad request',400);
+      const key=`messages:${eventId}`, messages=(await this.state.storage.get(key))||[], message=messages.find(m=>m.id===messageId);
+      if (!message) return text('message not found',404);
+      message.reactions=message.reactions||{}; const voters=Array.isArray(message.reactions[emoji])?message.reactions[emoji]:[];
+      message.reactions[emoji]=voters.includes(visitorId)?voters.filter(x=>x!==visitorId):[...voters,visitorId].slice(-500);
+      await this.state.storage.put(key,messages); return json({ok:true,reactions:message.reactions});
+    }
+    if (path === '/push-subscription') {
+      let body; try { body=await req.json(); } catch { return text('bad json',400); }
+      const endpoint=String(body.endpoint||''); if (!/^https:\/\//i.test(endpoint) || endpoint.length>2048) return text('bad endpoint',400);
+      const subs=(await this.state.storage.get('push-subscriptions'))||[];
+      if (req.method==='POST') { const clean={endpoint,expirationTime:body.expirationTime||null}; const next=[...subs.filter(x=>x.endpoint!==endpoint),clean].slice(-2000); await this.state.storage.put('push-subscriptions',next); return json({ok:true}); }
+      if (req.method==='DELETE') { await this.state.storage.put('push-subscriptions',subs.filter(x=>x.endpoint!==endpoint)); return json({ok:true}); }
+      return text('method not allowed',405,{Allow:'POST, DELETE'});
+    }
+    if (path === '/push-subscriptions' && req.method==='GET') return json((await this.state.storage.get('push-subscriptions'))||[]);
+    if (path === '/latest-message' && req.method==='GET') {
+      const messages=(await this.state.storage.get('messages:global'))||[];
+      return json(messages[messages.length-1]||{});
+    }
     if (path === '/db') {
       const current = (await this.state.storage.get('db')) || { events: [], members: [], membersUpdated: 0, drinkLineup: [], drinkLineupUpdated: 0 };
       if (req.method === 'PUT') {
-        let incoming;
-        try { incoming = await req.json(); }
-        catch { return new Response('bad', { status: 400 }); }
-        if (!incoming || !Array.isArray(incoming.events)) return new Response('bad', { status: 400 });
-        mergeInto(current, incoming);
-        current.updated = Date.now();
-        await this.state.storage.put('db', current);
-      }
-      return Response.json(current);
+        let incoming; try { incoming = await req.json(); } catch { return text('bad json', 400); }
+        if (!incoming || !Array.isArray(incoming.events)) return text('bad payload', 400);
+        mergeInto(current, incoming); current.updated = Date.now(); await this.state.storage.put('db', current);
+      } else if (req.method !== 'GET') return text('method not allowed', 405, { Allow: 'GET, PUT' });
+      return json(current);
     }
-
-    const match = path.match(/^\/flyer\/([A-Za-z0-9]+)$/);
-    if (match) {
-      const key = 'fl:' + match[1];
+    const galleryMatch = path.match(/^\/gallery\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)$/);
+    if (galleryMatch) {
+      const [, eventId, imageId] = galleryMatch, db = (await this.state.storage.get('db')) || { events: [] };
+      const event = (db.events || []).find(item => String(item.id) === eventId && !item.deleted);
+      if (!event) return text('event not found', 404);
+      const key = `gallery:${eventId}:${imageId}`;
       if (req.method === 'PUT') {
-        const buffer = await req.arrayBuffer();
-        if (!buffer.byteLength || buffer.byteLength > 1500000) return new Response('too large', { status: 413 });
-        await this.state.storage.put(key, buffer);
-        return Response.json({ ok: true });
+        const buffer = await req.arrayBuffer(); if (!buffer.byteLength || buffer.byteLength > 1500000) return text('too large', 413);
+        const type = req.headers.get('Content-Type') || ''; if (!['image/jpeg', 'image/png', 'image/webp'].includes(type.split(';')[0])) return text('unsupported media', 415);
+        await this.state.storage.put(key, buffer); return json({ ok: true });
       }
-      const buffer = await this.state.storage.get(key);
-      if (!buffer) return new Response('not found', { status: 404 });
-      return new Response(buffer, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' } });
+      if (req.method === 'DELETE') { await this.state.storage.delete(key); return json({ ok: true }); }
+      if (req.method === 'GET') {
+        const buffer = await this.state.storage.get(key); if (!buffer) return text('not found', 404);
+        return new Response(buffer, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff' } });
+      }
+      return text('method not allowed', 405, { Allow: 'GET, PUT, DELETE' });
     }
-    return new Response('not found', { status: 404 });
+    const flyerMatch = path.match(/^\/flyer\/([A-Za-z0-9_-]+)$/);
+    if (flyerMatch) {
+      const key = 'fl:' + flyerMatch[1];
+      if (req.method === 'PUT') {
+        const buffer = await req.arrayBuffer(); if (!buffer.byteLength || buffer.byteLength > 1500000) return text('too large', 413);
+        const type = req.headers.get('Content-Type') || ''; if (!['image/jpeg', 'image/png', 'image/webp'].includes(type.split(';')[0])) return text('unsupported media', 415);
+        await this.state.storage.put(key, buffer); return json({ ok: true });
+      }
+      if (req.method !== 'GET') return text('method not allowed', 405, { Allow: 'GET, PUT' });
+      const buffer = await this.state.storage.get(key); if (!buffer) return text('not found', 404);
+      return new Response(buffer, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' } });
+    }
+    return text('not found', 404);
   }
+}
+
+function sanitizeAnnouncementHtml(input) {
+  let html=String(input||'').slice(0,10000);
+  html=html.replace(/<(script|style|iframe|object|svg|math)[^>]*>[\s\S]*?<\/\1\s*>/gi,'');
+  html=html.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,'');
+  html=html.replace(/javascript\s*:/gi,'');
+  const allowed=new Set(['B','STRONG','I','EM','U','S','DEL','BR','P','DIV','UL','OL','LI','BLOCKQUOTE','A']);
+  html=html.replace(/<\/?([a-z0-9]+)([^>]*)>/gi,(tag,name,attrs)=>{
+    const n=name.toUpperCase(); if(!allowed.has(n))return '';
+    if(tag.startsWith('</'))return `</${n}>`;
+    if(n==='A'){const m=attrs.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);const href=(m?.[1]||m?.[2]||m?.[3]||'').trim();if(/^https:\/\//i.test(href))return `<A href="${href.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" target="_blank" rel="noopener noreferrer">`;return '<A>';}
+    return `<${n}>`;
+  });
+  return html;
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === '/api/db' || url.pathname.startsWith('/api/flyer/')) {
-      const stub = env.STORE.get(env.STORE.idFromName('main'));
-      const inner = new Request('https://do' + url.pathname.replace('/api', ''), request);
-      const response = await stub.fetch(inner);
-      if (url.pathname === '/api/db') {
-        return new Response(response.body, {
-          status: response.status,
-          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
-        });
-      }
-      return response;
+    let response;
+    if (url.pathname === '/api/auth/session' && request.method === 'GET') {
+      if (!configured(env)) response = json({ authenticated: false, configured: false, message: 'Admin secrets are not configured.' }, 503);
+      else { const authenticated = await validSession(request, env); response = json({ authenticated }, authenticated ? 200 : 401); }
+      return secureResponse(response, url);
     }
-    return env.ASSETS.fetch(request);
+    if (url.pathname === '/api/auth/login' && request.method === 'POST') {
+      if (!configured(env)) return secureResponse(json({ error: '管理者認証の秘密情報が未設定です。Cloudflare Worker Secretsを設定してください。' }, 503), url);
+      if (!sameOrigin(request)) return secureResponse(json({ error: 'origin rejected' }, 403), url);
+      if (!(request.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) return secureResponse(json({ error: 'json required' }, 415), url);
+      const length = Number(request.headers.get('Content-Length') || 0); if (length > 2048) return secureResponse(json({ error: 'too large' }, 413), url);
+      let body; try { body = await request.json(); } catch { return secureResponse(json({ error: 'invalid request' }, 400), url); }
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const allowed = await rateLimit(env, `login:${ip}`, 5, 15 * 60 * 1000);
+      if (!allowed.ok) return secureResponse(json({ error: '試行回数が上限に達しました。しばらく待ってから再試行してください。' }, 429, { 'Retry-After': String(allowed.retryAfter || 900) }), url);
+      if (!constantTimeEqual(String(body.password || ''), env.ADMIN_PASSWORD)) return secureResponse(json({ error: 'パスワードが正しくありません。' }, 401), url);
+      await rateLimit(env, `login:${ip}`, 5, 15 * 60 * 1000, true);
+      const token = await makeSession(env.SESSION_SECRET);
+      return secureResponse(json({ ok: true }, 200, { 'Set-Cookie': `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_SECONDS}` }), url);
+    }
+    if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
+      if (!sameOrigin(request)) return secureResponse(json({ error: 'origin rejected' }, 403), url);
+      return secureResponse(json({ ok: true }, 200, { 'Set-Cookie': `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0` }), url);
+    }
+    if (url.pathname.startsWith('/api/auth/')) return secureResponse(text('not found', 404), url);
+
+    if (url.pathname === '/api/public/db') {
+      if (request.method !== 'GET') response = text('method not allowed', 405, { Allow: 'GET' });
+      else {
+        const stub = env.STORE.get(env.STORE.idFromName('main'));
+        response = await stub.fetch(new Request('https://do/public-db', { method: 'GET' }));
+      }
+      return secureResponse(response, url);
+    }
+    if (url.pathname === '/api/public/rsvp') {
+      if (!['GET','POST','DELETE'].includes(request.method)) return secureResponse(text('method not allowed',405,{Allow:'GET, POST, DELETE'}),url);
+      if (!configured(env)) return secureResponse(json({error:'visitor identity service unavailable'},503),url);
+      if (request.method !== 'GET') {
+        if (!sameOrigin(request)) return secureResponse(json({error:'origin rejected'},403),url);
+        const ip=request.headers.get('CF-Connecting-IP')||'unknown', allowed=await rateLimit(env,`rsvp:${ip}`,25,10*60*1000);
+        if(!allowed.ok)return secureResponse(json({error:'操作が多すぎます。しばらく待ってください。'},429,{'Retry-After':String(allowed.retryAfter||600)}),url);
+      }
+      const identity=await ensureVisitorCookie(request,env);
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      const innerUrl=new URL('https://do/public-rsvp'); innerUrl.search=url.search;
+      const headers=new Headers(request.headers); headers.set('X-Visitor-Id',identity.id);
+      const forwardedBody=['GET','HEAD'].includes(request.method)?undefined:await request.arrayBuffer();
+      response=await stub.fetch(new Request(innerUrl,{method:request.method,headers,body:forwardedBody}));
+      const outHeaders=new Headers(response.headers); if(identity.cookie)outHeaders.append('Set-Cookie',identity.cookie);
+      return secureResponse(new Response(response.body,{status:response.status,headers:outHeaders}),url);
+    }
+    if (url.pathname === '/api/public/push-key' && request.method==='GET') return secureResponse(json({publicKey:env.VAPID_PUBLIC_KEY||''}),url);
+    if (url.pathname === '/api/public/push-subscription') {
+      if(!['POST','DELETE'].includes(request.method))return secureResponse(text('method not allowed',405),url);
+      if(!sameOrigin(request))return secureResponse(json({error:'origin rejected'},403),url);
+      const pushIp=request.headers.get('CF-Connecting-IP')||'unknown'; const pushLimit=await rateLimit(env,`push-sub:${pushIp}`,10,10*60*1000); if(!pushLimit.ok)return secureResponse(json({error:'通知登録の操作が多すぎます。'},429),url);
+      if(await exceedsBodyLimit(request,12000))return secureResponse(json({error:'payload too large'},413),url);
+      let subBody; try{subBody=await request.clone().json()}catch{return secureResponse(text('bad json',400),url)}
+      if(request.method==='POST'){let host='';try{host=new URL(subBody.endpoint).hostname.toLowerCase()}catch{} if(!(host==='fcm.googleapis.com'||host.endsWith('.push.services.mozilla.com')||host==='web.push.apple.com'||host.endsWith('.notify.windows.com')))return secureResponse(json({error:'unsupported push endpoint'},400),url);}
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      const forwardedBody=await request.arrayBuffer();
+      response=await stub.fetch(new Request('https://do/push-subscription',{method:request.method,headers:request.headers,body:forwardedBody}));
+      return secureResponse(response,url);
+    }
+    if (url.pathname === '/api/public/messages' && request.method==='GET') {
+      // お知らせはイベント単位ではなく来場者アプリ全体で共有する。
+      const channel='global';
+      const identity=await ensureVisitorCookie(request,env);
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      const raw=await stub.fetch('https://do/messages?eventId='+channel);
+      if(!raw.ok)return secureResponse(raw,url);
+      const rows=await raw.json(); const safe=rows.map(m=>({...m,reactions:Object.fromEntries(Object.entries(m.reactions||{}).map(([emoji,ids])=>[emoji,Array.isArray(ids)?ids.length:0])),myReactions:Object.entries(m.reactions||{}).filter(([emoji,ids])=>Array.isArray(ids)&&ids.includes(identity.id)).map(([emoji])=>emoji)}));
+      const headers=new Headers({'Content-Type':'application/json'}); if(identity.cookie)headers.append('Set-Cookie',identity.cookie);
+      return secureResponse(new Response(JSON.stringify(safe),{headers}),url);
+    }
+    if (url.pathname === '/api/public/messages/latest' && request.method==='GET') {
+      const stub=env.STORE.get(env.STORE.idFromName('main')); response=await stub.fetch('https://do/latest-message'); return secureResponse(response,url);
+    }
+    if (url.pathname === '/api/public/messages/reaction' && request.method==='POST') {
+      if(!sameOrigin(request))return secureResponse(json({error:'origin rejected'},403),url);
+      const identity=await ensureVisitorCookie(request,env);
+      const ip=request.headers.get('CF-Connecting-IP')||'unknown', allowed=await rateLimit(env,`reaction:${ip}`,60,10*60*1000);
+      if(!allowed.ok)return secureResponse(json({error:'リアクションが多すぎます。'},429),url);
+      let body;try{body=await request.json()}catch{return secureResponse(text('bad json',400),url)}
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      response=await stub.fetch('https://do/message-reaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,visitorId:identity.id})});
+      const reactionHeaders=new Headers(response.headers); if(identity.cookie)reactionHeaders.append('Set-Cookie',identity.cookie);
+      return secureResponse(new Response(response.body,{status:response.status,headers:reactionHeaders}),url);
+    }
+    if (url.pathname === '/api/admin/messages' && request.method==='POST') {
+      if(!(await requireAdmin(request,env)))return secureResponse(json({error:'authentication required'},401),url);
+      if(!sameOrigin(request))return secureResponse(json({error:'origin rejected'},403),url);
+      if(await exceedsBodyLimit(request,12000))return secureResponse(json({error:'payload too large'},413),url);
+      let body;try{body=await request.json()}catch{return secureResponse(text('bad json',400),url)}
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      const cleanHtml=sanitizeAnnouncementHtml(String(body.html||''));
+      const inner=await stub.fetch('https://do/messages?eventId=global',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:body.text,html:cleanHtml})});
+      if(!inner.ok)return secureResponse(inner,url);
+      let push={sent:0,configured:false}; if(body.notify!==false)push=await sendPushNotifications(env,'tonight!｜TMPからのお知らせ',String(body.text||'').slice(0,120));
+      const payload=await inner.json(); return secureResponse(json({...payload,push}),url);
+    }
+    if (url.pathname.startsWith('/api/admin/messages/') && request.method==='PUT') {
+      if(!(await requireAdmin(request,env)))return secureResponse(json({error:'authentication required'},401),url);
+      if(!sameOrigin(request))return secureResponse(json({error:'origin rejected'},403),url);
+      if(await exceedsBodyLimit(request,16000))return secureResponse(json({error:'payload too large'},413),url);
+      let body;try{body=await request.json()}catch{return secureResponse(text('bad json',400),url)}
+      const id=decodeURIComponent(url.pathname.split('/').pop()); if(!/^[A-Za-z0-9_-]{10,80}$/.test(id))return secureResponse(text('bad id',400),url);
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      const inner=await stub.fetch('https://do/messages/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:body.text,html:sanitizeAnnouncementHtml(String(body.html||''))})});
+      return secureResponse(inner,url);
+    }
+    if (url.pathname === '/api/db') {
+      if (!(await requireAdmin(request, env))) return secureResponse(json({ error: 'authentication required' }, 401), url);
+      if (request.method === 'PUT') {
+        if (!sameOrigin(request)) return secureResponse(json({ error: 'origin rejected' }, 403), url);
+        if (!(request.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) return secureResponse(json({ error: 'json required' }, 415), url);
+        if (await exceedsBodyLimit(request, 8_000_000)) return secureResponse(json({ error: 'payload too large' }, 413), url);
+      } else if (request.method !== 'GET') return secureResponse(text('method not allowed', 405, { Allow: 'GET, PUT' }), url);
+      const stub = env.STORE.get(env.STORE.idFromName('main'));
+      response = await stub.fetch(new Request('https://do/db', request));
+      return secureResponse(response, url);
+    }
+    const isFlyer = url.pathname.startsWith('/api/flyer/'), isGallery = url.pathname.startsWith('/api/gallery/');
+    if (isFlyer || isGallery) {
+      const write = request.method !== 'GET';
+      if (write) {
+        if (await exceedsBodyLimit(request, 1_600_000)) return secureResponse(json({ error: 'file too large' }, 413), url);
+        if (!(await requireAdmin(request, env))) return secureResponse(json({ error: 'authentication required' }, 401), url);
+        if (!sameOrigin(request)) return secureResponse(json({ error: 'origin rejected' }, 403), url);
+      }
+      if (isFlyer && !['GET', 'PUT'].includes(request.method)) return secureResponse(text('method not allowed', 405, { Allow: 'GET, PUT' }), url);
+      if (isGallery && !['GET', 'PUT', 'DELETE'].includes(request.method)) return secureResponse(text('method not allowed', 405, { Allow: 'GET, PUT, DELETE' }), url);
+      const stub = env.STORE.get(env.STORE.idFromName('main'));
+      response = await stub.fetch(new Request('https://do' + url.pathname.replace('/api', ''), request));
+      return secureResponse(response, url);
+    }
+    response = await env.ASSETS.fetch(request);
+    return secureResponse(response, url);
   }
 };

@@ -297,8 +297,10 @@ function renderReceptionTabs() {
 
 function getPageTitle(renderFunc) {
   const titles = new Map([
-    [renderEventList, "tonight!"], [renderGuide, "使い方"], [renderEventNew, "新しい回を作成"],
+    [renderEventList, "tonight!管理用"], [renderGuide, "使い方"], [renderEventNew, "新しい回を作成"],
+    [renderMemberProfileEdit, "出演者プロフィール編集"],
     [renderEventPage, "イベントホーム"], [renderEventEdit, "イベント情報"], [renderMembers, "メンバー名簿"],
+    [renderGalleryManagement, "フォトギャラリー管理"],
     [renderSetup, "会計準備"], [renderHome, "受付ホーム"],
     [renderReceptionInput, "受付"], [renderDiscountScreen, "割引設定"],
     [renderPaymentScreen, "お支払い"], [renderChecklist, "受付確認"],
@@ -2516,6 +2518,16 @@ function todayStr() {
 function defaultBarProducts() {
   return [{ id: uid(), name: "ドリンク", price: 500 }];
 }
+// 共有ドリンクラインナップの更新番号は、端末間の同一ミリ秒更新や時計差で
+// 古いデータに負けないよう、必ず既知の最大値より大きくする。
+function touchDrinkLineup() {
+  db.drinkLineupUpdated = Math.max(Date.now(), Number(db.drinkLineupUpdated || 0) + 1);
+  db.updated = Math.max(Date.now(), Number(db.updated || 0) + 1);
+}
+function normalizeMemberFilter(value) {
+  return String(value || "").normalize("NFKC").toLocaleLowerCase("ja")
+    .replace(/[\s　・]/g, "");
+}
 function createBar() {
   return { started: false, startBreakdown: {}, endBreakdown: {}, tally: 0, tickets: 0, ticketCollected: "", receptionTicketRemaining: "", ticketChecks: {}, remain: "", checks: {}, products: defaultBarProducts(), sales: [], resetAt: 0, voidedSales: [], deletedSales: [] };
 }
@@ -2645,11 +2657,12 @@ function mergeInto(t, s) {
     o.bar.voidedSales = mergedBarTransactions.voidedSales;
     o.bar.deletedSales = mergedBarTransactions.deletedSales;
     if ((eu.tt || 0) > (o.u.tt || 0)) { o.tt = structuredClone(e.tt); o.u.tt = eu.tt; }
+    if ((eu.gallery || 0) > (o.u.gallery || 0)) { o.gallery = structuredClone(Array.isArray(e.gallery) ? e.gallery : []); o.u.gallery = eu.gallery; }
   }
   return t;
 }
 function dbSig() {
-  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
+  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt", "gallery"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
 }
 function setSync(t) { const e = document.getElementById("sync"); if (e) e.textContent = t; }
 function saveLocalDb() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {} }
@@ -2755,6 +2768,23 @@ function resizeImage(file, max = 900) {
     img.src = url;
   });
 }
+async function resizeGalleryImage(file, max = 1600) {
+  return new Promise((resolve, reject) => {
+    const image = new Image(), objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const scale = Math.min(1, max / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(objectUrl);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("image conversion failed")), "image/jpeg", 0.84);
+    };
+    image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("image load failed")); };
+    image.src = objectUrl;
+  });
+}
+
 async function uploadFlyer(ev, file) {
   try {
     const blob = await resizeImage(file);
@@ -2819,8 +2849,8 @@ function renderEventList() {
   evs.forEach(e => { (months[e.date.slice(0, 7)] = months[e.date.slice(0, 7)] || []).push(e); });
 
   let html = `<div class="event-list-toolbar">
-    <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="list-heading">パーティを始めよう。</div></div></div>
-    <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
+    <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="list-heading">パーティ開始！</div></div></div>
+    <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-secondary" id="globalMessagesBtn">お知らせ・スレッド</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
   </div>`;
   if (!evs.length) html += `<div class="card sub-text">まだ回がありません。「新しい回」から作成してください。</div>`;
 
@@ -2849,6 +2879,7 @@ function renderEventList() {
   screen.innerHTML = html;
   document.getElementById("newEventBtn").onclick = () => navigate(renderEventNew);
   document.getElementById("guideBtn").onclick = () => navigate(renderGuide);
+  document.getElementById("globalMessagesBtn").onclick = () => navigate(renderGlobalMessages);
   screen.querySelectorAll("[data-open]").forEach(el => el.onclick = () => openEvent(el.dataset.open));
 }
 
@@ -2991,6 +3022,93 @@ function downloadCurrentEventCsv() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function buildCurrentEventResultText() {
+  if (!ctx?.ev) return "";
+  const ev = ctx.ev;
+  const eventState = state || ev.state || createInitialState();
+  const bar = ensureBar(ctx.bar || ev.bar || createBar());
+  const pricing = getPricing();
+  const general = Number(eventState.totals?.general || 0);
+  const tmp = Number(eventState.totals?.tmp || 0);
+  const people = general + tmp;
+  const history = Array.isArray(eventState.receptionHistory) ? eventState.receptionHistory : [];
+  const gross = history.reduce((sum, r) => sum + Number(r.grossEntrance ?? ((Number(r.general || 0) + Number(r.tmp || 0)) * (pricing.entryFee + pricing.drinkFee))), 0);
+  const discounts = history.reduce((sum, r) => sum + Number(r.totalDiscount || 0), 0);
+  const actualReceptionRevenue = Math.max(0, gross - discounts);
+  const firstDrinkRevenue = people * pricing.drinkFee;
+  // Entry-fee variance after separating first-drink revenue; discounts/adjustments appear here.
+  const variance = actualReceptionRevenue - firstDrinkRevenue - people * pricing.entryFee;
+  const profit = people ? general * pricing.entryFee + tmp * pricing.entryFee + variance - pricing.boxFee : 0;
+  const activeSales = (bar.sales || []).filter(sale => Number(sale.timestamp || 0) > Number(bar.resetAt || 0));
+  const cashByPrice = new Map();
+  activeSales.filter(sale => sale.paymentMethod !== "ticket").forEach(sale => {
+    (sale.items || []).forEach(item => {
+      const qty = Math.max(0, Number(item.qty || 0));
+      const price = Number(item.price || 0);
+      if (!qty) return;
+      const current = cashByPrice.get(price) || { qty: 0, revenue: 0 };
+      current.qty += qty;
+      current.revenue += price * qty;
+      cashByPrice.set(price, current);
+    });
+  });
+  const dateMatch = String(ev.date || "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  const dateLabel = dateMatch ? `${Number(dateMatch[2])}/${Number(dateMatch[3])}` : (ev.date || "開催日未設定");
+  const yen = value => `¥${formatMoney(Math.abs(Number(value || 0)))}`;
+  const signedYen = value => `${Number(value) < 0 ? "-" : "+"}${yen(value)}`;
+  const lines = [
+    dateLabel,
+    `来場者　${people}人`,
+    `（一般${general}人 TMP${tmp}人）`,
+    "",
+    "【TMPの収益】",
+    `一般　${yen(pricing.entryFee)} × ${general} = ${signedYen(general * pricing.entryFee)}`,
+    `TMP　${yen(pricing.entryFee)} × ${tmp} = ${signedYen(tmp * pricing.entryFee)}`,
+    `誤差　${variance < 0 ? "-" : ""}${yen(variance)}`,
+    `箱代　-${yen(pricing.boxFee)}`,
+    `利益　${signedYen(profit)}`,
+    "",
+    "【aNTENAへ渡したお金】",
+    `箱代　${yen(pricing.boxFee)}`,
+    `ファーストドリンク　${yen(pricing.drinkFee)} × ${people}人 = ${yen(firstDrinkRevenue)}`
+  ];
+  if (cashByPrice.size) {
+    [...cashByPrice.entries()].sort((a,b) => a[0] - b[0]).forEach(([price, item]) => {
+      lines.push(`キャッシュドリンク　${yen(price)} × ${item.qty}杯 = ${yen(item.revenue)}`);
+    });
+  } else {
+    lines.push("キャッシュドリンク　販売なし");
+  }
+  return lines.join("\n");
+}
+
+async function copyCurrentEventText() {
+  const text = buildCurrentEventResultText();
+  if (!text) return;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const field = document.createElement("textarea");
+      field.value = text;
+      field.setAttribute("readonly", "");
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      field.style.pointerEvents = "none";
+      document.body.appendChild(field);
+      field.select();
+      field.setSelectionRange(0, field.value.length);
+      const copied = document.execCommand("copy");
+      field.remove();
+      if (!copied) throw new Error("clipboard copy failed");
+    }
+    alert("イベント結果をコピーしました。テキストを貼り付けて使用できます。");
+  } catch (error) {
+    console.error("イベント結果のコピーに失敗しました", error);
+    alert("コピーできませんでした。ブラウザのクリップボード利用設定をご確認ください。");
+  }
+}
+
 function renderEventPage() {
   const ev = ctx.ev, arc = ctx.mode === "archive";
   const s = evStats(state, ctx.bar, getPricing()), url = flyerUrl(ev);
@@ -3005,7 +3123,7 @@ function renderEventPage() {
       <div class="row"><span>受付利益</span><strong>¥${formatMoney(s.profit)}</strong></div>
       <div class="row"><span>ドリンク販売数</span><strong>${sales.totalUnits || (ctx.bar.tally || 0)}杯</strong></div>
       <div class="row"><span>ドリンク現金売上</span><strong>¥${formatMoney(sales.cashRevenue)}</strong></div>
-      <button class="btn btn-secondary full" id="exportEventCsv">この回のデータをCSV出力</button>
+      <div class="event-export-actions"><button class="btn btn-secondary" id="exportEventCsv">CSV出力</button><button class="btn btn-secondary" id="exportEventText">結果をコピー</button></div>
     </div>
     
     <div class="event-action-grid">
@@ -3013,6 +3131,7 @@ function renderEventPage() {
       <button class="btn btn-primary" id="goBar"><span>バーカウンター</span><small>商品販売・ドリンク精算</small></button>
       <button class="btn btn-secondary" id="goTt"><span>タイムテーブル</span><small>出演スケジュール</small></button>
       <button class="btn btn-secondary" id="goShifts"><span>シフト</span><small>スタッフ配置・勤務時間</small></button>
+      <button class="btn btn-secondary" id="goGallery"><span>フォトギャラリー管理</span><small>写真の追加・削除・並べ替え</small></button>
     </div>
 
     <div class="card"><div class="card-title">参加予定メンバー</div><div class="sub-text">${(ev.participants||[]).length}名登録</div><div class="participant-home-list">${(ev.participants||[]).map(id=>{const m=(db.members||[]).find(x=>x.id===id);const done=(state.receptionHistory||[]).some(r=>(r.guests||[]).some(g=>g.type==="tmp"&&(g.memberId===id||(!g.memberId&&g.name===m?.name))));return `<span>${esc(m?memberDisplayName(m):"名簿から削除済み")} <b class="${done?"checked":"pending"}">${done?"受付済み":"未受付"}</b></span>`}).join("")||`<span class="sub-text">参加予定はまだ登録されていません。</span>`}</div></div>
@@ -3027,8 +3146,10 @@ function renderEventPage() {
   document.getElementById("goShifts").onclick = () => navigate(renderShifts);
   document.getElementById("goMembers").onclick = () => navigate(renderMembers);
   document.getElementById("exportEventCsv").onclick = downloadCurrentEventCsv;
+  document.getElementById("exportEventText").onclick = copyCurrentEventText;
   document.getElementById("editEv").onclick = () => navigate(renderEventEdit);
   document.getElementById("editPricing").onclick = () => navigate(renderEventPricing);
+  document.getElementById("goGallery").onclick = () => navigate(renderGalleryManagement);
   const sv = document.getElementById("saveEv");
   if (sv) sv.onclick = () => { if (confirm("変更を保存しますか？")) { commitCtx(); renderEventPage(); updateBackButton(); } };
   document.getElementById("arcEv").onclick = () => {
@@ -3047,6 +3168,86 @@ function renderEventPage() {
     ev.deleted = true; ev.u.meta = Date.now(); ctx = null; persistDb();
     pageHistory = []; navigate(renderEventList);
   };
+}
+
+
+async function renderGlobalMessages() {
+  const editor = (html='') => `<div class="tmp-composer"><div class="tmp-composer-toolbar">${[['bold','B'],['italic','I'],['underline','U'],['strikeThrough','S'],['insertUnorderedList','• List'],['insertOrderedList','1. List']].map(([cmd,label])=>`<button type="button" data-format="${cmd}" title="${cmd}">${label}</button>`).join('')}<button type="button" data-format="createLink">リンク</button></div><div id="announcementEditor" class="tmp-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="TMPからのお知らせを入力してください">${html}</div></div>`;
+  screen.innerHTML=`<div class="card"><div class="card-title">TMPからのお知らせ</div><p class="sub-text">投稿は来場者アプリ全体に表示されます。通知を許可したユーザーにはプッシュ通知も送信できます。</p>${editor()}<label class="check-row"><input id="announcementNotify" type="checkbox" checked> プッシュ通知も送信する</label><button class="btn btn-primary" id="publishAnnouncement">投稿する</button></div><div class="card"><div class="card-title">投稿済みスレッド</div><div id="adminMessageList">読み込み中…</div></div><button class="btn btn-secondary" id="messagesBack">イベント一覧へ戻る</button>`;
+  const wireEditor=()=>{document.querySelectorAll('[data-format]').forEach(btn=>btn.onclick=()=>{const cmd=btn.dataset.format;if(cmd==='createLink'){const url=prompt('リンク先URL（https://...）');if(url&&/^https:\/\//i.test(url))document.execCommand(cmd,false,url);}else document.execCommand(cmd,false,null);document.getElementById('announcementEditor').focus();});};
+  wireEditor();
+  const load=async()=>{const host=document.getElementById('adminMessageList');try{const r=await fetch('/api/public/messages',{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error();const rows=await r.json();host.innerHTML=rows.length?rows.slice().reverse().map(m=>`<article class="thread-message"><div class="thread-message-meta"><span class="tmp-author"><img src="TMPlogo.png" alt=""><strong>TMP</strong></span><time>${new Date(m.createdAt).toLocaleString('ja-JP')}</time></div><div class="thread-message-body">${m.html||esc(m.text).replace(/\n/g,'<br>')}</div><small>リアクション ${Object.values(m.reactions||{}).reduce((n,v)=>n+Number(v||0),0)}件</small><button class="btn btn-secondary btn-small" data-edit-message="${esc(m.id)}">編集</button></article>`).join(''):'<p class="sub-text">投稿はまだありません。</p>';host.querySelectorAll('[data-edit-message]').forEach(btn=>btn.onclick=()=>editMessage(rows.find(m=>m.id===btn.dataset.editMessage)));}catch{host.textContent='投稿を読み込めませんでした。';}};
+  const editMessage=async m=>{if(!m)return;const host=document.getElementById('adminMessageList');const article=host.querySelector(`[data-edit-message="${CSS.escape(m.id)}"]`)?.closest('.thread-message');if(!article)return;article.innerHTML=`<div class="thread-message-meta"><span class="tmp-author"><img src="TMPlogo.png" alt=""><strong>TMP</strong></span><time>投稿を編集</time></div>${editor(m.html||esc(m.text).replace(/\n/g,'<br>'))}<div class="btn-row"><button class="btn btn-primary" id="saveMessageEdit">変更を保存</button><button class="btn btn-secondary" id="cancelMessageEdit">キャンセル</button></div>`;article.querySelectorAll('[data-format]').forEach(btn=>btn.onclick=()=>{const cmd=btn.dataset.format;if(cmd==='createLink'){const url=prompt('リンク先URL（https://...）');if(url&&/^https:\/\//i.test(url))document.execCommand(cmd,false,url);}else document.execCommand(cmd,false,null);article.querySelector('.tmp-rich-editor').focus();});article.querySelector('#cancelMessageEdit').onclick=load;article.querySelector('#saveMessageEdit').onclick=async()=>{const ed=article.querySelector('.tmp-rich-editor'),html=ed.innerHTML,text=ed.innerText.trim();if(!text){alert('投稿内容を入力してください。');return;}try{const r=await fetch(`/api/admin/messages/${encodeURIComponent(m.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({html,text})});const d=await r.json();if(!r.ok)throw new Error(d.error||'編集に失敗しました');await load();}catch(e){alert(e.message);}};};
+  document.getElementById('publishAnnouncement').onclick=async()=>{const ed=document.getElementById('announcementEditor'),html=ed.innerHTML,text=ed.innerText.trim();if(!text){alert('投稿内容を入力してください。');return;}const btn=document.getElementById('publishAnnouncement');btn.disabled=true;try{const r=await fetch('/api/admin/messages',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({text,html,notify:document.getElementById('announcementNotify').checked})});const data=await r.json();if(!r.ok)throw new Error(data.error||'投稿に失敗しました');ed.innerHTML='';alert(data.push?.configured?`投稿しました。通知送信数：${data.push.sent}`:'投稿しました。プッシュ通知のVAPID設定は未完了です。');await load();}catch(e){alert(e.message||'投稿に失敗しました。');}finally{btn.disabled=false;}};
+  document.getElementById('messagesBack').onclick=()=>navigate(renderEventList); await load();
+}
+
+function renderGalleryManagement() {
+  const ev = ctx?.ev;
+  if (!ev) { navigate(renderEventList); return; }
+  const gallery = Array.isArray(ev.gallery) ? ev.gallery : (ev.gallery = []);
+  screen.innerHTML = `
+    <div class="gallery-management-page">
+      <div class="gallery-management-heading">
+        <div><h2>フォトギャラリー管理</h2><p>${esc(ev.name)} ・ ${esc(ev.date)}</p></div>
+        <span class="gallery-count">${gallery.length} / 60 枚</span>
+      </div>
+      <div class="card gallery-upload-panel">
+        <div class="card-title">写真を追加</div>
+        <p class="sub-text">写真を追加すると来場者アプリの「フォト」に公開されます。複数枚をまとめて選択できます。画像はJPEG形式に変換して保存します。</p>
+        <label class="btn btn-primary full gallery-upload-label" for="eventGalleryFiles">＋ 写真を選択してアップロード</label>
+        <input id="eventGalleryFiles" type="file" accept="image/*" multiple hidden>
+        <p class="sub-text gallery-admin-status" id="galleryAdminStatus" aria-live="polite">最大60枚まで登録できます。</p>
+      </div>
+      <section class="gallery-management-list">
+        <div class="gallery-list-heading"><h3>公開中の写真</h3><span>${gallery.length} 枚</span></div>
+        <div class="gallery-admin-grid" id="eventGalleryGrid">
+          ${gallery.map((src,i)=>`<div class="gallery-admin-item"><img src="${esc(src)}" alt="ギャラリー写真 ${i+1}" loading="lazy"><div class="gallery-admin-actions"><span>${i+1}</span><button type="button" data-gallery-up="${i}" aria-label="上へ" ${i===0?'disabled':''}>↑</button><button type="button" data-gallery-down="${i}" aria-label="下へ" ${i===gallery.length-1?'disabled':''}>↓</button><button type="button" class="danger" data-gallery-delete="${i}">削除</button></div></div>`).join("") || `<div class="gallery-empty-state"><strong>写真はまだ登録されていません</strong><p>上のボタンからイベント写真を追加してください。</p></div>`}
+        </div>
+      </section>
+      <button class="btn btn-secondary full gallery-back-button" id="galleryBackHome">イベントホームに戻る</button>
+    </div>`;
+
+  const input = document.getElementById("eventGalleryFiles");
+  input.onchange = async () => {
+    const files = [...(input.files || [])].filter(file => file.type.startsWith("image/"));
+    if (!files.length) return;
+    const status = document.getElementById("galleryAdminStatus");
+    let uploaded = 0;
+    for (const file of files) {
+      if ((ev.gallery || []).length >= 60) { alert("写真は最大60枚までです。"); break; }
+      if (status) status.textContent = `${file.name} をアップロード中…`;
+      const id = uid();
+      try {
+        const blob = await resizeGalleryImage(file);
+        const response = await fetch(`/api/gallery/${encodeURIComponent(ev.id)}/${encodeURIComponent(id)}`, {method:"PUT",headers:{"Content-Type":"image/jpeg"},body:blob});
+        if (!response.ok) throw new Error(`upload failed: ${response.status}`);
+        ev.gallery = [...(ev.gallery || []), `/api/gallery/${encodeURIComponent(ev.id)}/${encodeURIComponent(id)}`];
+        ev.u = ev.u || {}; ev.u.gallery = Date.now(); persistDb(); uploaded++;
+      } catch (error) {
+        console.error(error); alert(`${file.name} のアップロードに失敗しました。`);
+      }
+    }
+    if (status) status.textContent = `${uploaded}枚の写真を追加しました。`;
+    renderGalleryManagement();
+  };
+
+  screen.querySelectorAll("[data-gallery-delete]").forEach(btn => btn.onclick = async () => {
+    const index = Number(btn.dataset.galleryDelete), src = (ev.gallery || [])[index];
+    if (!src || !confirm("この写真をギャラリーから削除しますか？")) return;
+    if (src.startsWith('/api/gallery/')) {
+      const response = await fetch(src, {method:"DELETE"});
+      if (!response.ok && response.status !== 404) { alert("写真を削除できませんでした。"); return; }
+    }
+    ev.gallery.splice(index,1); ev.u = ev.u || {}; ev.u.gallery = Date.now(); persistDb(); renderGalleryManagement();
+  });
+  screen.querySelectorAll("[data-gallery-up],[data-gallery-down]").forEach(btn => btn.onclick = () => {
+    const from = Number(btn.dataset.galleryUp ?? btn.dataset.galleryDown), to = from + (btn.hasAttribute("data-gallery-up") ? -1 : 1);
+    if (!Array.isArray(ev.gallery) || to < 0 || to >= ev.gallery.length) return;
+    [ev.gallery[from],ev.gallery[to]] = [ev.gallery[to],ev.gallery[from]];
+    ev.u = ev.u || {}; ev.u.gallery = Date.now(); persistDb(); renderGalleryManagement();
+  });
+  document.getElementById("galleryBackHome").onclick = () => navigate(renderEventPage);
 }
 
 
@@ -3097,9 +3298,91 @@ function memberStats(memberId) {
   }
   return {attendance,dj,lastDate:lastDate||"—"};
 }
+let editingMemberId = null;
+function renderMemberProfileEdit() {
+  const member = (db.members || []).find(x => x.id === editingMemberId);
+  if (!member) { alert("メンバーが見つかりませんでした。"); back(); return; }
+  const photo = String(member.photo || "");
+  screen.innerHTML = `
+    <div class="member-profile-editor">
+      <div class="member-profile-editor-heading">
+        <div class="section-label">MEMBER PROFILE</div>
+        <h2>出演者プロフィール</h2>
+        <p class="sub-text">来場者用アプリに表示するプロフィールを編集します。</p>
+      </div>
+      <form id="memberProfileForm" class="card member-profile-form">
+        <section class="profile-form-section">
+          <h3>基本情報</h3>
+          <div class="profile-form-grid">
+            <label class="form-row"><span>本名・氏名 <b class="required-mark">必須</b></span><input id="profileName" required maxlength="80" value="${esc(member.name || "")}" placeholder="名前"></label>
+            <label class="form-row"><span>学年</span><input id="profileGrade" maxlength="30" value="${esc(member.grade || "")}" placeholder="例：3年"></label>
+            <label class="form-row profile-form-wide"><span>ニックネーム／DJネーム</span><input id="profileNickname" maxlength="80" value="${esc(member.nickname || "")}" placeholder="来場者に表示する名前"></label>
+          </div>
+        </section>
+        <section class="profile-form-section">
+          <h3>プロフィール写真</h3>
+          <label class="form-row"><span>写真URL</span><input id="profilePhoto" type="url" value="${esc(photo)}" placeholder="https://example.com/photo.jpg"></label>
+          <div class="profile-photo-preview-wrap"><img id="profilePhotoPreview" class="profile-photo-preview ${photo ? "" : "is-empty"}" src="${esc(photo)}" alt="プロフィール写真プレビュー" ${photo ? "" : "hidden"}><div id="profilePhotoEmpty" class="profile-photo-empty" ${photo ? "hidden" : ""}>写真URLを入力するとプレビューが表示されます</div></div>
+          <p class="sub-text">インターネット上からアクセスできる画像URLを指定してください。</p>
+        </section>
+        <section class="profile-form-section">
+          <h3>SNS・音楽</h3>
+          <div class="profile-form-grid">
+            <label class="form-row profile-form-wide"><span>Instagram</span><input id="profileInstagram" value="${esc(member.instagram || "")}" placeholder="URL または @ユーザー名"></label>
+            <label class="form-row profile-form-wide"><span>Favorite（好きな音楽・アーティスト）</span><textarea id="profileFavorite" rows="3" placeholder="例：House、Hip-Hop、KID FRESINO、STUTS">${esc(member.favorite || [member.genre, member.favoriteArtists].filter(Boolean).join("、"))}</textarea></label>
+            <label class="form-row profile-form-wide"><span>SpotifyプレイリストURL</span><input id="profileSpotify" type="url" value="${esc(member.spotifyPlaylist || "")}" placeholder="https://open.spotify.com/playlist/..."></label>
+          </div>
+        </section>
+        <section class="profile-form-section">
+          <h3>自己紹介</h3>
+          <label class="form-row"><span>プロフィール文</span><textarea id="profileBio" rows="5" maxlength="1000" placeholder="音楽や活動について紹介してください">${esc(member.bio || member.profile || "")}</textarea></label>
+        </section>
+        <div class="profile-form-actions"><button type="button" class="btn btn-secondary" id="cancelMemberProfile">キャンセル</button><button type="submit" class="btn btn-primary">変更を保存</button></div>
+      </form>
+    </div>`;
+  const photoInput = document.getElementById("profilePhoto");
+  const preview = document.getElementById("profilePhotoPreview");
+  const empty = document.getElementById("profilePhotoEmpty");
+  const updatePhotoPreview = () => {
+    const url = photoInput.value.trim();
+    if (!url) { preview.hidden = true; empty.hidden = false; return; }
+    preview.onload = () => { preview.hidden = false; empty.hidden = true; };
+    preview.onerror = () => { preview.hidden = true; empty.hidden = false; empty.textContent = "画像を読み込めません。URLを確認してください。"; };
+    preview.src = url;
+  };
+  photoInput.addEventListener("input", updatePhotoPreview);
+  if (photo) updatePhotoPreview();
+  document.getElementById("cancelMemberProfile").onclick = () => { editingMemberId = null; back(); };
+  document.getElementById("memberProfileForm").onsubmit = event => {
+    event.preventDefault();
+    const name = document.getElementById("profileName").value.trim();
+    if (!name) { alert("本名・氏名を入力してください。"); return; }
+    const photoUrl = photoInput.value.trim();
+    const instagram = document.getElementById("profileInstagram").value.trim();
+    const spotify = document.getElementById("profileSpotify").value.trim();
+    for (const [label, value] of [["プロフィール写真", photoUrl], ["Spotifyプレイリスト", spotify]]) {
+      if (value && !/^https:\/\//i.test(value)) { alert(`${label}は https:// から始まるURLを入力してください。`); return; }
+    }
+    member.name = name;
+    member.grade = document.getElementById("profileGrade").value.trim();
+    member.nickname = document.getElementById("profileNickname").value.trim();
+    member.photo = photoUrl;
+    member.instagram = instagram;
+    member.favorite = document.getElementById("profileFavorite").value.trim();
+    // 旧データとの互換性を保つため、既存の個別項目も空にせず保持する。
+    member.spotifyPlaylist = spotify;
+    member.bio = document.getElementById("profileBio").value.trim();
+    db.membersUpdated = Date.now();
+    persistDb();
+    editingMemberId = null;
+    alert("プロフィールを保存しました。");
+    back();
+  };
+}
+
 function renderMembers() {
   const gradeNumber = value => {
-    const match = String(value || "").match(/\\d+/);
+    const match = String(value || "").match(/\d+/);
     return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
   };
   const compareGrade = (a,b) => {
@@ -3120,8 +3403,8 @@ function renderMembers() {
     });
   const planned=Array.isArray(ctx.ev.participants)?ctx.ev.participants:[];
   const receptionNames=new Set((state.receptionHistory||[]).flatMap(r=>(r.guests||[]).filter(g=>g.type==="tmp").flatMap(g=>[g.memberId||"",`name:${g.name||""}`])));
-  screen.innerHTML=`<div class="card"><div class="card-title">参加予定メンバー</div><p class="sub-text">参加予定に登録したメンバーの受付状況を確認できます。チェックボックス・名前・受付状況は横並びで表示されます。</p><div class="member-filter-toolbar"><input type="search" id="participantNameSearch" placeholder="名前の一部で検索" aria-label="参加予定メンバーを名前で検索"><select id="participantGradeFilter" aria-label="参加予定メンバーを学年で絞り込み"><option value="">すべての学年</option>${gradeOptions.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("")}</select></div><div class="member-check-grid">${members.map(m=>{const grade=String(m.grade||"").trim()||"学年未登録";const searchText=[m.name,m.nickname,memberDisplayName(m)].filter(Boolean).join(" ").toLocaleLowerCase("ja");return `<label class="member-check" data-participant-grade="${esc(grade)}" data-participant-search="${esc(searchText)}"><input type="checkbox" data-participant="${esc(m.id)}" ${planned.includes(m.id)?"checked":""}><span>${esc(memberDisplayName(m))}${m.nickname?` <small>(${esc(m.name)})</small>`:""} <small>${esc(grade)}</small></span><b class="${(receptionNames.has(m.id)||receptionNames.has(`name:${m.name}`))?"checked":"pending"}">${(receptionNames.has(m.id)||receptionNames.has(`name:${m.name}`))?"受付済み":"未受付"}</b></label>`}).join("")||`<div class="sub-text">先に名簿へメンバーを登録してください。</div>`}</div><button class="btn btn-primary full" id="saveParticipants">参加予定を保存</button></div>
-  <div class="card"><div class="card-title">メンバー名簿</div><div class="member-import"><label>CSV／Excelを読み込む<input type="file" id="memberFile" accept=".csv,.xlsx,.xls"></label><small>表に他の項目が含まれていても、「名前（氏名）」「学年」「ニックネーム（DJネーム）」の列を取り込みます。</small></div><div class="inline-form"><input id="memberName" placeholder="本名・氏名"><input id="memberGrade" placeholder="学年（例：3年）"><input id="memberNickname" placeholder="ニックネーム／DJネーム（任意）"><button class="btn btn-primary full" id="addMember">メンバーを追加</button></div><div class="member-bulk-toolbar"><label><input type="checkbox" id="selectAllMembers"> 全員選択</label><button type="button" class="btn btn-danger" id="deleteSelectedMembers" disabled>選択したメンバーを一括削除</button><small id="selectedMemberCount">0名選択中</small></div><div class="member-filter-toolbar"><input type="search" id="memberNameSearch" placeholder="名前の一部で検索" aria-label="名前の一部で検索"><select id="memberGradeFilter" aria-label="学年で絞り込み"><option value="">すべての学年</option>${gradeOptions.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("")}</select></div><div id="memberList">${members.map(m=>{const st=memberStats(m.id);const grade=String(m.grade||"").trim()||"学年未登録";const searchText=[m.name,m.nickname,memberDisplayName(m)].filter(Boolean).join(" ").toLocaleLowerCase("ja");return `<div class="member-record" data-member-grade="${esc(grade)}" data-member-search="${esc(searchText)}"><input class="member-row-select" type="checkbox" data-select-member="${esc(m.id)}" aria-label="${esc(memberDisplayName(m))}を選択"><div class="member-record-main"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname?`<small>本名：${esc(m.name)}</small>`:""}<small>${esc(grade)} ・ 参加 ${st.attendance}回 ・ DJ ${st.dj}回 ・ 最終出演 ${esc(st.lastDate)}</small></div><button class="btn btn-secondary" data-edit-member="${esc(m.id)}">編集</button><button class="x" data-delete-member="${esc(m.id)}">×</button></div>`}).join("")||`<p class="sub-text">名簿はまだ空です。</p>`}</div></div>`;
+  screen.innerHTML=`<div class="card"><div class="card-title">参加予定メンバー</div><p class="sub-text">参加予定に登録したメンバーの受付状況を確認できます。チェックボックス・名前・受付状況は横並びで表示されます。</p><div class="member-filter-toolbar"><input type="search" id="participantNameSearch" placeholder="名前の一部で検索" aria-label="参加予定メンバーを名前で検索"><select id="participantGradeFilter" aria-label="参加予定メンバーを学年で絞り込み"><option value="">すべての学年</option>${gradeOptions.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("")}</select></div><div class="member-check-grid">${members.map(m=>{const grade=String(m.grade||"").trim()||"学年未登録";const searchText=normalizeMemberFilter([m.name,m.nickname,memberDisplayName(m)].filter(Boolean).join(" "));return `<label class="member-check" data-participant-grade="${esc(grade)}" data-participant-search="${esc(searchText)}"><input type="checkbox" data-participant="${esc(m.id)}" ${planned.includes(m.id)?"checked":""}><span>${esc(memberDisplayName(m))}${m.nickname?` <small>(${esc(m.name)})</small>`:""} <small>${esc(grade)}</small></span><b class="${(receptionNames.has(m.id)||receptionNames.has(`name:${m.name}`))?"checked":"pending"}">${(receptionNames.has(m.id)||receptionNames.has(`name:${m.name}`))?"受付済み":"未受付"}</b></label>`}).join("")||`<div class="sub-text">先に名簿へメンバーを登録してください。</div>`}</div><button class="btn btn-primary full" id="saveParticipants">参加予定を保存</button></div>
+  <div class="card"><div class="card-title">メンバー名簿</div><p class="sub-text">出演者プロフィールは各メンバーの「編集」から登録できます。写真URL・Instagram・好きなジャンル／アーティスト・Spotifyプレイリスト・自己紹介が来場者用アプリに表示されます。</p><div class="member-import"><label>CSV／Excelを読み込む<input type="file" id="memberFile" accept=".csv,.xlsx,.xls"></label><small>表に他の項目が含まれていても、「名前（氏名）」「学年」「ニックネーム（DJネーム）」の列を取り込みます。</small></div><div class="inline-form"><input id="memberName" placeholder="本名・氏名"><input id="memberGrade" placeholder="学年（例：3年）"><input id="memberNickname" placeholder="ニックネーム／DJネーム（任意）"><button class="btn btn-primary full" id="addMember">メンバーを追加</button></div><div class="member-bulk-toolbar"><label><input type="checkbox" id="selectAllMembers"> 全員選択</label><button type="button" class="btn btn-danger" id="deleteSelectedMembers" disabled>選択したメンバーを一括削除</button><small id="selectedMemberCount">0名選択中</small></div><div class="member-filter-toolbar"><input type="search" id="memberNameSearch" placeholder="名前の一部で検索" aria-label="名前の一部で検索"><select id="memberGradeFilter" aria-label="学年で絞り込み"><option value="">すべての学年</option>${gradeOptions.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("")}</select></div><div id="memberList">${members.map(m=>{const st=memberStats(m.id);const grade=String(m.grade||"").trim()||"学年未登録";const searchText=normalizeMemberFilter([m.name,m.nickname,memberDisplayName(m)].filter(Boolean).join(" "));return `<div class="member-record tt-record" data-member-grade="${esc(grade)}" data-member-search="${esc(searchText)}"><div class="member-record-main"><input class="member-row-select" type="checkbox" data-select-member="${esc(m.id)}" aria-label="${esc(memberDisplayName(m))}を選択"><div class="member-record-info"><strong>${esc(memberDisplayName(m))}</strong>${m.nickname?`<small>本名：${esc(m.name)}</small>`:""}<small>${esc(grade)} ・ 参加 ${st.attendance}回 ・ DJ ${st.dj}回 ・ 最終出演 ${esc(st.lastDate)}</small></div></div><div class="tt-record-actions"><button type="button" class="btn btn-secondary tt-edit-btn" data-edit-member="${esc(m.id)}">編集</button><button type="button" class="x" data-delete-member="${esc(m.id)}" aria-label="削除">×</button></div></div>`}).join("")||`<p class="sub-text">名簿はまだ空です。</p>`}</div></div>`;
   const applyParticipantFilters=()=>{
     const query=(document.getElementById("participantNameSearch").value||"").trim().toLocaleLowerCase("ja");
     const grade=document.getElementById("participantGradeFilter").value;
@@ -3135,12 +3418,15 @@ function renderMembers() {
   document.getElementById("participantGradeFilter").addEventListener("change",applyParticipantFilters);
   document.getElementById("saveParticipants").onclick=()=>{ctx.ev.participants=[...screen.querySelectorAll('[data-participant]:checked')].map(x=>x.dataset.participant);ctx.ev.u.meta=Date.now();persistDb();alert("参加予定を保存しました");renderMembers();};
   const applyMemberFilters=()=>{
-    const query=(document.getElementById("memberNameSearch").value||"").trim().toLocaleLowerCase("ja");
+    const query=normalizeMemberFilter(document.getElementById("memberNameSearch").value);
     const grade=document.getElementById("memberGradeFilter").value;
     screen.querySelectorAll("#memberList .member-record").forEach(row=>{
-      const matchesName=!query || (row.dataset.memberSearch||"").includes(query);
+      const matchesName=!query || normalizeMemberFilter(row.dataset.memberSearch||"").includes(query);
       const matchesGrade=!grade || row.dataset.memberGrade===grade;
-      row.hidden=!(matchesName&&matchesGrade);
+      // .member-record は display:flex!important のため hidden 属性だけでは隠れない。
+      const visible = matchesName && matchesGrade;
+      row.hidden = !visible;
+      row.style.setProperty("display", visible ? "flex" : "none", "important");
     });
   };
   document.getElementById("memberNameSearch").addEventListener("input",applyMemberFilters);
@@ -3150,7 +3436,7 @@ function renderMembers() {
   document.getElementById("selectAllMembers").onchange=e=>{screen.querySelectorAll("[data-select-member]").forEach(box=>box.checked=e.target.checked);updateBulkSelection();};
   document.getElementById("deleteSelectedMembers").onclick=()=>{const ids=[...screen.querySelectorAll("[data-select-member]:checked")].map(x=>x.dataset.selectMember);if(!ids.length)return;const names=ids.map(id=>db.members.find(m=>m.id===id)?.name).filter(Boolean);if(!confirm(`${ids.length}名のメンバーを名簿から一括削除しますか？\n\n${names.slice(0,8).join("、")}${names.length>8?` ほか${names.length-8}名`:""}\n\n参加予定リストからも除外されます。過去の受付・売上・出演履歴は保持されます。`))return;const removed=new Set(ids);db.members=(db.members||[]).filter(m=>!removed.has(m.id));for(const ev of db.events||[]){if(Array.isArray(ev.participants)){const next=ev.participants.filter(id=>!removed.has(id));if(next.length!==ev.participants.length){ev.participants=next;ev.u=ev.u||{};ev.u.meta=Date.now();}}}db.membersUpdated=Date.now();persistDb();alert(`${ids.length}名を名簿から削除しました。過去の履歴は保持されています。`);renderMembers();};
   document.getElementById("addMember").onclick=()=>{const name=document.getElementById("memberName").value.trim(),grade=document.getElementById("memberGrade").value.trim(),nickname=document.getElementById("memberNickname").value.trim();if(!name){alert("名前を入力してください");return;}const found=(db.members||[]).find(m=>m.name.trim().toLowerCase()===name.toLowerCase());if(found){found.grade=grade;found.nickname=nickname;alert("登録済みメンバーの学年・ニックネームを更新しました。");}else{db.members.push({id:uid(),name,grade,nickname});}db.membersUpdated=Date.now();persistDb();renderMembers();};
-  screen.querySelectorAll("[data-edit-member]").forEach(btn=>btn.onclick=()=>{const m=db.members.find(x=>x.id===btn.dataset.editMember);if(!m)return;const name=prompt("本名・氏名",m.name);if(name===null)return;const grade=prompt("学年",m.grade||"");if(grade===null)return;const nickname=prompt("ニックネーム／DJネーム（空欄なら本名表示）",m.nickname||"");if(nickname===null)return;if(!name.trim()){alert("名前を入力してください");return;}m.name=name.trim();m.grade=grade.trim();m.nickname=nickname.trim();db.membersUpdated=Date.now();persistDb();renderMembers();});
+  screen.querySelectorAll("[data-edit-member]").forEach(btn=>btn.onclick=()=>{editingMemberId=btn.dataset.editMember;navigate(renderMemberProfileEdit);});
   screen.querySelectorAll("[data-delete-member]").forEach(btn=>btn.onclick=()=>{const m=db.members.find(x=>x.id===btn.dataset.deleteMember);if(!m||!confirm(`${m.name}を名簿から削除しますか？過去の履歴は保持されます。`))return;db.members=db.members.filter(x=>x.id!==m.id);db.membersUpdated=Date.now();persistDb();renderMembers();});
   document.getElementById("memberFile").onchange=async e=>{
     const file=e.target.files[0]; if(!file)return;
@@ -3274,6 +3560,9 @@ function renderEventEdit() {
     <div class="card-title">回の情報を編集</div>
     <div class="form-row"><label>イベント名</label><input id="evName" value="${esc(ev.name)}"></div>
     <div class="form-row"><label>開催日</label><input id="evDate" type="date" value="${esc(ev.date)}"></div>
+    <div class="form-row"><label>会場名</label><input id="evVenue" maxlength="120" value="${esc(ev.venue||"")}" placeholder="会場名を入力"></div>
+    <div class="form-row"><label>GoogleマップURL</label><input id="evMapUrl" type="url" maxlength="500" value="${esc(ev.mapUrl||"https://maps.app.goo.gl/7ncCUVbzojuKphd37")}" placeholder="https://maps.app.goo.gl/..."></div>
+    <div class="form-row"><label>イベント説明</label><textarea id="evDescription" maxlength="2000">${esc(ev.description||"")}</textarea></div>
     <div class="form-row"><label>フライヤーを変更</label><input id="evFlyer" type="file" accept="image/*"></div>
     <button class="btn btn-primary" id="saveMeta">保存</button></div>`;
   document.getElementById("saveMeta").onclick = async () => {
@@ -3281,7 +3570,10 @@ function renderEventEdit() {
     const date = document.getElementById("evDate").value;
     if (!name || !date) { alert("イベント名と開催日を入力してください"); return; }
     if (ctx.mode === "archive" && !confirm("変更を保存しますか？")) return;
-    ev.name = name; ev.date = date; ev.u.meta = Date.now();
+    ev.name = name; ev.date = date; ev.venue = document.getElementById("evVenue").value.trim();
+    const mapUrl = document.getElementById("evMapUrl").value.trim();
+    if (mapUrl && !/^https:\/\//i.test(mapUrl)) { alert("GoogleマップURLはhttps://から始まるURLを入力してください。"); return; }
+    ev.mapUrl = mapUrl; ev.description = document.getElementById("evDescription").value.trim(); ev.u.meta = Date.now();
     const f = document.getElementById("evFlyer").files[0];
     if (f) await uploadFlyer(ev, f);
     persistDb();
@@ -3753,7 +4045,7 @@ function renderBarHome() {
     if (!p || !name || !Number.isInteger(price) || price <= 0) { alert("商品名と1円以上の整数価格を入力してください"); return; }
     p.name = name; p.price = price;
     db.drinkLineup = (db.drinkLineup || []).map(x => x.id === id ? { id, name, price } : x);
-    db.drinkLineupUpdated = Date.now();
+    touchDrinkLineup();
     for (const event of db.events) if (event.bar) {
       const soldOut = Boolean(event.bar.products?.find(x => x.id === id)?.soldOut);
       event.bar.products = db.drinkLineup.map(x => ({ ...x, soldOut: x.id === id ? soldOut : Boolean(event.bar.products?.find(y => y.id === x.id)?.soldOut) }));
@@ -3771,7 +4063,7 @@ function renderBarHome() {
     if (!confirm("この商品を販売メニューから削除しますか？\n過去の販売履歴は残ります。")) return;
     const deletedId = btn.dataset.deleteProduct;
     db.drinkLineup = (db.drinkLineup || []).filter(x => x.id !== deletedId);
-    db.drinkLineupUpdated = Date.now();
+    touchDrinkLineup();
     for (const event of db.events) if (event.bar) event.bar.products = (event.bar.products || []).filter(x => x.id !== deletedId);
     b.products = b.products.filter(x => x.id !== deletedId);
     barCart = barCart.filter(x => x.productId !== deletedId);
@@ -3782,7 +4074,7 @@ function renderBarHome() {
     if (!name || !Number.isInteger(price) || price <= 0) { alert("商品名と1円以上の整数価格を入力してください"); return; }
     const product = { id: uid(), name, price };
     db.drinkLineup = [...(db.drinkLineup || []), product];
-    db.drinkLineupUpdated = Date.now();
+    touchDrinkLineup();
     for (const event of db.events) if (event.bar) event.bar.products = [...(event.bar.products || []), { ...product }];
     b.products = [...b.products, { ...product }];
     saveBar(); renderBarHome();
@@ -3979,30 +4271,24 @@ function nowHtml(tt, ev) {
   const eventStart = new Date(ev.date + "T00:00:00").getTime();
   const t = (Date.now() - eventStart) / 60000;
   const current = (list, shifted=false) => list.filter(item => {
-    const [a, b] = shifted ? actSlotRange(item) : slotRange(item);
-    return t >= a && t < b;
-  }).sort((a,b) => slotRange(a)[0] - slotRange(b)[0]);
-  const next = (list, shifted=false) => list.filter(item => (shifted ? actSlotRange(item) : slotRange(item))[0] > t)
-    .sort((a,b) => (shifted ? actSlotRange(a) : slotRange(a))[0] - (shifted ? actSlotRange(b) : slotRange(b))[0])[0];
+    const [start, end] = shifted ? actSlotRange(item) : slotRange(item);
+    return t >= start && t < end;
+  }).sort((x,y) => (shifted ? actSlotRange(x)[0] : slotRange(x)[0]) - (shifted ? actSlotRange(y)[0] : slotRange(y)[0]));
   const actNow = current(tt.acts || [], true);
-  const actNext = next(tt.acts || [], true);
   const shiftNow = current(tt.shifts || []);
-  const shiftNext = next(tt.shifts || []);
-  const eventState = t < 0 ? "開催前" : (t > 30 * 60 ? "開催終了" : "LIVE");
-  const actLabel = item => `${item.type === "その他" ? (item.customType || "その他") : (item.type || "DJ")}：${recordMemberDisplay(item)}`;
-  const showTime = item => scheduleRangeLabel(item,true);
-  let html = `<div class="schedule-status"><span class="live-orb"></span><span>${eventState}</span><small>${esc(ev.date)}</small></div>`;
-  html += `<div class="schedule-overview-grid">`;
-  html += `<div class="schedule-section"><div class="now-label">出番</div><div class="schedule-columns">`;
-  html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${actNow.length ? actNow.map(item => `<div class="schedule-item"><strong class="now-main">${esc(actLabel(item))}</strong><span class="sub-text">${esc(showTime(item))}</span></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
-  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${actNext ? `<div class="schedule-item"><strong class="now-main">${esc(actLabel(actNext))}</strong><span class="sub-text">${esc(showTime(actNext))}</span></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
-  html += `</div></div>`;
-  html += `<div class="schedule-section"><div class="now-label">シフト</div><div class="schedule-columns">`;
-  html += `<div class="schedule-column"><span class="schedule-tag current">NOW</span><div class="schedule-column-content">${shiftNow.length ? shiftNow.map(item => `<div class="schedule-item"><strong>${esc(item.role)}：${esc(recordMemberDisplay(item))}</strong><small>${esc(scheduleRangeLabel(item))}</small></div>`).join("") : `<span class="sub-text">該当なし</span>`}</div></div>`;
-  html += `<div class="schedule-column"><span class="schedule-tag next">NEXT</span><div class="schedule-column-content">${shiftNext ? `<div class="schedule-item"><strong>${esc(shiftNext.role)}：${esc(recordMemberDisplay(shiftNext))}</strong><small>${esc(scheduleRangeLabel(shiftNext))}</small></div>` : `<span class="sub-text">該当なし</span>`}</div></div>`;
-  html += `</div></div>`;
-  html += `</div>`;
-  return html;
+  const actName = item => `${item.type === "その他" ? (item.customType || "その他") : (item.type || "DJ")}：${recordMemberDisplay(item)}`;
+  const shiftName = item => `${item.role || "シフト"}：${recordMemberDisplay(item)}`;
+  const renderEntries = (items, shifted) => items.map(item =>
+    `<span class="admin-pulse-entry"><strong>${esc(shifted ? actName(item) : shiftName(item))}</strong><small>${esc(scheduleRangeLabel(item, shifted))}</small></span>`
+  ).join("");
+  const actHtml = renderEntries(actNow, true);
+  const shiftHtml = renderEntries(shiftNow, false);
+  const currentHtml = `${actHtml}${actHtml && shiftHtml ? '<span class="admin-pulse-divider" aria-hidden="true"></span>' : ''}${shiftHtml}`;
+  const status = t < 0 ? "開催前" : (t > 30*60 ? "開催終了" : "LIVE");
+  return `<div class="admin-header-pulse">
+    <span class="admin-pulse-status"><i class="live-orb"></i>${status}</span>
+    ${currentHtml || `<span class="admin-pulse-empty">現在の出演・シフトなし</span>`}
+  </div>`;
 }
 function updateNow(options = {}) {
   if (!ctx || !ctx.ev) return;
@@ -4281,4 +4567,64 @@ function initApp() {
   setInterval(() => { if (!document.hidden) syncPull(); }, 10000);
   setInterval(updateNow, 20000);   // 「いまの出番」を自動更新
 }
-initApp();
+
+function renderAdminLogin(message = "") {
+  screen.innerHTML = `<section class="admin-login-wrap"><form class="admin-login-card" id="adminLoginForm">
+    <div class="admin-login-mark">tonight!</div><h2>管理者ログイン</h2>
+    <p>管理画面を利用するにはパスワードを入力してください。</p>
+    <label for="adminPassword">管理者パスワード</label>
+    <input id="adminPassword" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="パスワード">
+    <div class="admin-login-error" id="adminLoginError" role="alert">${message}</div>
+    <button class="admin-login-submit" type="submit">ログイン</button>
+  </form></section>`;
+  const form = document.getElementById("adminLoginForm");
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = form.querySelector("button[type=submit]");
+    const error = document.getElementById("adminLoginError");
+    button.disabled = true; button.textContent = "確認中…"; error.textContent = "";
+    try {
+      const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: document.getElementById("adminPassword").value }) });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "ログインできませんでした。");
+      location.reload();
+    } catch (errorValue) {
+      error.textContent = errorValue.message || "通信に失敗しました。";
+      button.disabled = false; button.textContent = "ログイン";
+      document.getElementById("adminPassword").focus();
+    }
+  });
+}
+
+async function startSecureAdminApp() {
+  const logoutButton = document.getElementById("adminLogoutBtn");
+  try {
+    const response = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
+    if (response.ok) {
+      logoutButton.hidden = false;
+      const visitorLink = document.getElementById("visitorAppLink"); if (visitorLink) visitorLink.hidden = false;
+      logoutButton.addEventListener("click", async () => {
+        logoutButton.disabled = true;
+        try { await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }); } finally { location.reload(); }
+      });
+      initApp();
+      const sessionWatch = setInterval(async () => {
+        try {
+          const check = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
+          if (check.status === 401) { clearInterval(sessionWatch); renderAdminLogin("ログインの有効期限が切れました。もう一度ログインしてください。"); }
+        } catch {}
+      }, 5 * 60 * 1000);
+      return;
+    }
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 503 || payload.configured === false) {
+      renderAdminLogin("管理者認証がまだ設定されていません。SECURITY-SETUP.txt の手順で Worker Secrets を設定してください。");
+      return;
+    }
+    renderAdminLogin();
+  } catch {
+    renderAdminLogin("認証サーバーに接続できません。通信環境を確認してください。");
+  }
+}
+startSecureAdminApp();

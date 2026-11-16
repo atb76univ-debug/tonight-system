@@ -3560,3 +3560,528 @@ select:disabled { cursor: not-allowed; opacity: .65; }
 @media (prefers-reduced-motion: reduce) {
   .bar-cart-dock-next { transition: none; }
 }
+
+/* ===== 出演者プロフィール専用編集ページ ===== */
+.member-profile-editor{max-width:860px;margin:0 auto;padding-bottom:32px}
+.member-profile-editor-heading{margin:8px 2px 18px}
+.member-profile-editor-heading h2{font-size:26px;letter-spacing:-.03em;margin:4px 0 6px}
+.member-profile-form{padding:clamp(16px,3vw,28px)}
+.profile-form-section{padding:4px 0 22px;margin-bottom:20px;border-bottom:1px solid var(--border)}
+.profile-form-section:last-of-type{border-bottom:0;margin-bottom:0}
+.profile-form-section h3{font-size:17px;font-weight:800;margin-bottom:16px}
+.profile-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+.profile-form-wide{grid-column:1/-1}
+.profile-form-section .form-row{min-width:0}
+.profile-form-section .form-row>span{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:750;color:var(--sub)}
+.profile-form-section input,.profile-form-section textarea{width:100%;min-width:0;padding:13px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--text);font:inherit;font-size:15px;line-height:1.5}
+.profile-form-section textarea{resize:vertical}
+.profile-form-section input:focus,.profile-form-section textarea:focus{outline:2px solid color-mix(in srgb,var(--primary) 22%,transparent);border-color:var(--primary)}
+.required-mark{font-size:10px;color:#fff;background:#d94848;border-radius:5px;padding:2px 6px}
+.profile-photo-preview-wrap{display:flex;align-items:center;justify-content:flex-start;min-height:120px;margin:8px 0 10px}
+.profile-photo-preview{width:120px;height:120px;object-fit:cover;border-radius:16px;background:#f0f0f0;border:1px solid var(--border)}
+.profile-photo-empty{display:grid;place-items:center;width:min(100%,320px);min-height:100px;padding:16px;text-align:center;color:var(--sub);font-size:13px;background:#fafafa;border:1px dashed var(--border);border-radius:14px}
+.profile-form-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:20px}
+.profile-form-actions .btn{width:auto;min-width:140px}
+@media(max-width:600px){.member-profile-editor-heading h2{font-size:22px}.profile-form-grid{grid-template-columns:1fr}.profile-form-wide{grid-column:auto}.profile-form-actions{position:sticky;bottom:0;margin:0 -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-top:1px solid var(--border);z-index:5}.profile-form-actions .btn{flex:1;min-width:0}.member-profile-form{padding:16px}}
+
+
+/* v47: compact floating NOW / NEXT pill in the admin header */
+.topbar{position:sticky;overflow:visible}
+.event-pulse{
+  position:absolute!important;top:calc(100% + 9px)!important;left:50%!important;
+  right:auto!important;transform:translateX(-50%);
+  z-index:120!important;width:max-content;max-width:min(92vw,760px);
+  padding:0!important;margin:0!important;background:transparent!important;
+  border:0!important;box-shadow:none!important;backdrop-filter:none!important;
+}
+.event-pulse.hidden{display:none!important}
+.event-pulse-top{display:none!important}
+#globalNowBox{width:100%}
+.admin-header-pulse{
+  display:flex;align-items:center;justify-content:center;gap:11px;
+  width:max-content;max-width:100%;padding:10px 17px;border-radius:999px;
+  color:#252525;background:rgba(255,255,255,.96);
+  border:1px solid rgba(20,20,20,.07);
+  box-shadow:0 7px 24px rgba(0,0,0,.12),0 0 0 5px rgba(255,255,255,.35);
+  animation:admin-pulse-float 3.8s ease-in-out infinite;
+}
+.admin-pulse-status{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:850;color:#737373;white-space:nowrap}
+.admin-pulse-status .live-orb{width:8px;height:8px;display:inline-block;border-radius:50%;background:#35d17c;box-shadow:0 0 0 4px #35d17c22}
+.admin-pulse-group{display:flex;align-items:center;gap:10px;min-width:0}
+.admin-pulse-entry{display:flex;align-items:baseline;gap:5px;min-width:0;white-space:nowrap}
+.admin-pulse-entry small{font-size:9px;font-weight:850;color:#777}
+.admin-pulse-entry strong{font-size:11px;font-weight:850;color:#171717;max-width:170px;overflow:hidden;text-overflow:ellipsis}
+.admin-pulse-divider{width:1px;height:18px;background:#e5e5e5;flex:0 0 auto}
+.admin-pulse-empty,.admin-pulse-coming{font-size:10px;color:#888;font-weight:750;white-space:nowrap}
+@keyframes admin-pulse-float{0%,100%{transform:translateY(0);box-shadow:0 7px 24px rgba(0,0,0,.12),0 0 0 5px rgba(255,255,255,.32)}50%{transform:translateY(-2px);box-shadow:0 10px 27px rgba(0,0,0,.15),0 0 0 7px rgba(255,255,255,.4)}}
+@media(max-width:600px){
+ .event-pulse{top:calc(100% + 7px)!important;max-width:calc(100vw - 20px)}
+ .admin-header-pulse{gap:7px;padding:8px 12px}
+ .admin-pulse-entry{gap:3px}
+ .admin-pulse-entry small{font-size:8px}
+ .admin-pulse-entry strong{font-size:10px;max-width:105px}
+ .admin-pulse-status{font-size:9px}
+}
+
+/* v12: keep admin NOW / NEXT pill inside the top header */
+.topbar{display:flex;align-items:center;flex-wrap:nowrap;overflow:visible;gap:10px}
+.event-pulse{
+  position:relative!important;top:auto!important;left:auto!important;right:auto!important;
+  transform:none!important;z-index:2!important;
+  width:auto!important;max-width:min(58vw,680px)!important;
+  flex:0 1 auto!important;margin:0 0 0 auto!important;
+  padding:0!important;background:transparent!important;border:0!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+.event-pulse.hidden{display:none!important}
+.event-pulse-top{display:none!important}
+#globalNowBox{width:100%;min-width:0}
+.admin-header-pulse{animation:none!important;transform:none!important;max-width:100%;padding:8px 13px;gap:8px}
+.admin-pulse-status .live-orb{animation:green-dot-pulse-admin 1.8s ease-in-out infinite}
+@keyframes green-dot-pulse-admin{
+  0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(53,209,124,.42)}
+  50%{opacity:.62;box-shadow:0 0 0 6px rgba(53,209,124,0)}
+}
+@media(max-width:760px){
+ .topbar{flex-wrap:wrap}
+ .event-pulse{order:10;flex:1 0 100%!important;max-width:100%!important;margin:2px 0 0!important}
+ .admin-header-pulse{width:100%;justify-content:center;flex-wrap:wrap;padding:7px 10px}
+ .admin-pulse-entry strong{max-width:125px}
+}
+
+/* v13: center the admin NOW / NEXT pill within the header */
+.topbar{position:sticky}
+.event-pulse{
+  position:absolute!important;
+  left:50%!important;
+  right:auto!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+  margin:0!important;
+  width:max-content!important;
+  max-width:min(58vw,680px)!important;
+  flex:initial!important;
+}
+@media(max-width:760px){
+  .topbar{position:sticky}
+  .event-pulse{
+    position:relative!important;
+    left:auto!important;right:auto!important;top:auto!important;
+    transform:none!important;
+    margin:4px auto 0!important;
+    width:100%!important;max-width:100%!important;
+    flex:1 0 100%!important;
+    order:10;
+  }
+}
+
+
+/* v24: keep NOW/NEXT focused on names; reveal schedule details on tap */
+.admin-pulse-entry{display:block;cursor:pointer;min-width:0;white-space:nowrap}
+.admin-pulse-entry summary{display:block;list-style:none;cursor:pointer;max-width:100%}
+.admin-pulse-entry summary::-webkit-details-marker{display:none}
+.admin-pulse-entry summary strong{display:block;font-size:11px;font-weight:850;color:#171717;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+.admin-pulse-entry>small{display:none;margin-top:3px;font-size:9px;font-weight:750;color:#777;white-space:normal}
+.admin-pulse-entry[open]>small{display:block}
+.admin-pulse-entry[open] summary strong{max-width:none;overflow:visible;white-space:normal}
+@media(max-width:600px){
+  .admin-pulse-entry summary strong{font-size:10px;max-width:125px}
+  .admin-pulse-entry>small{font-size:8px}
+}
+
+
+/* v25: persistent inline NOW/NEXT entries; divider only separates acts from shifts */
+.admin-pulse-entry{display:flex;flex-direction:column;align-items:flex-start;gap:2px;cursor:default;white-space:nowrap}
+.admin-pulse-entry strong{display:block;font-size:11px;font-weight:850;color:#171717;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.admin-pulse-entry small{display:block;margin:0;font-size:9px;font-weight:750;color:#777;white-space:nowrap}
+.admin-pulse-divider{width:1px;height:30px;background:#e5e5e5;flex:0 0 auto;align-self:center}
+@media(max-width:600px){
+  .admin-pulse-entry strong{font-size:10px;max-width:125px}
+  .admin-pulse-entry small{font-size:8px}
+}
+
+
+
+/* v32 restored: admin event photo gallery manager */
+.gallery-admin-card .sub-text{line-height:1.6;margin:0 0 12px}
+.gallery-upload-label{display:block;text-align:center;cursor:pointer;margin:12px 0}
+.gallery-admin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:10px;margin-top:14px}
+.gallery-admin-item{min-width:0;background:#f7f7f8;border:1px solid #e5e5e5;border-radius:12px;overflow:hidden}
+.gallery-admin-item img{display:block;width:100%;aspect-ratio:1;object-fit:cover}
+.gallery-admin-actions{display:flex;align-items:center;gap:5px;padding:7px}
+.gallery-admin-actions span{font-size:12px;color:#666;margin-right:auto}
+.gallery-admin-actions button{min-width:28px;min-height:28px;border:1px solid #ddd;border-radius:7px;background:#fff}
+.gallery-admin-actions button:disabled{opacity:.35}
+.gallery-admin-actions button.danger{color:#c33}
+.gallery-admin-status{margin-top:10px!important}
+
+/* Dedicated event photo gallery management page */
+.gallery-management-page{display:flex;flex-direction:column;gap:16px;max-width:1100px;margin:0 auto;padding-bottom:28px}
+.gallery-management-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:8px 2px}
+.gallery-management-heading h2{margin:0;font-size:clamp(22px,4vw,30px);letter-spacing:-.03em}
+.gallery-management-heading p{margin:6px 0 0;color:#777;font-size:13px}
+.gallery-count{flex:0 0 auto;padding:7px 11px;border-radius:999px;background:#f0f2f5;color:#555;font-size:12px;font-weight:800}
+.gallery-upload-panel{margin:0}
+.gallery-upload-panel .sub-text{line-height:1.65}
+.gallery-upload-label{display:block;text-align:center;cursor:pointer;margin:14px 0 8px}
+.gallery-admin-status{margin-top:10px!important;min-height:1.2em}
+.gallery-management-list{background:#fff;border:1px solid #e6e7eb;border-radius:16px;padding:16px;box-shadow:0 2px 10px rgba(20,30,50,.04)}
+.gallery-list-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.gallery-list-heading h3{margin:0;font-size:17px}
+.gallery-list-heading span{font-size:12px;color:#777;font-weight:700}
+.gallery-admin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:0}
+.gallery-admin-item{min-width:0;background:#f7f7f8;border:1px solid #e5e5e5;border-radius:12px;overflow:hidden}
+.gallery-admin-item img{display:block;width:100%;aspect-ratio:1;object-fit:cover;background:#eee}
+.gallery-admin-actions{display:flex;align-items:center;gap:5px;padding:7px}
+.gallery-admin-actions span{font-size:12px;color:#666;margin-right:auto}
+.gallery-admin-actions button{min-width:30px;min-height:30px;border:1px solid #ddd;border-radius:7px;background:#fff}
+.gallery-admin-actions button:disabled{opacity:.35}
+.gallery-admin-actions button.danger{color:#c33}
+.gallery-empty-state{grid-column:1/-1;text-align:center;padding:40px 16px;color:#444;background:#fafafa;border:1px dashed #d7d9de;border-radius:12px}
+.gallery-empty-state p{margin:8px 0 0;color:#888;font-size:13px}
+.gallery-back-button{max-width:360px;align-self:center}
+@media(max-width:600px){.gallery-management-heading{align-items:center}.gallery-management-list{padding:12px}.gallery-admin-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.gallery-admin-actions{gap:4px;padding:6px}.gallery-admin-actions button{min-width:28px;min-height:28px}}
+
+
+/* v38: unified typography — Noto Sans JP across the entire application */
+:root{--tonight-font-stack:"Noto Sans JP",sans-serif}
+html,body,body *,body *::before,body *::after,button,input,select,textarea,optgroup,option{
+  font-family:"Noto Sans JP",sans-serif!important;
+}
+
+/* v39 typography: Helvetica / Arial with Noto Sans JP fallback */
+:root{--tonight-font-stack:Helvetica,Arial,"Noto Sans JP",sans-serif}
+html,body,body *,body *::before,body *::after,
+button,input,select,textarea,optgroup,option{
+  font-family:var(--tonight-font-stack)!important;
+}
+
+/* v40: editorial, restrained visual system inspired by Apple's product pages */
+:root{
+  --bg:#f5f5f7;
+  --card:#ffffff;
+  --border:#e5e5e7;
+  --text:#1d1d1f;
+  --sub:#6e6e73;
+  --primary:#1d1d1f;
+  --success:#248a52;
+  --danger:#d93025;
+  --radius:20px;
+  --shadow:0 1px 2px rgba(0,0,0,.025),0 8px 28px rgba(0,0,0,.035);
+}
+html,body{background:var(--bg);color:var(--text);letter-spacing:-.012em}
+.topbar{background:rgba(255,255,255,.88);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid rgba(0,0,0,.06);box-shadow:none;padding:15px 20px}
+.topbar h1{font-size:21px;font-weight:700;letter-spacing:-.045em}
+#app{max-width:1040px;padding:26px 22px}
+.card{border:1px solid rgba(0,0,0,.045);border-radius:20px;box-shadow:var(--shadow);padding:22px;margin-bottom:18px}
+.card-title{font-size:19px;font-weight:700;letter-spacing:-.035em;margin-bottom:18px}
+.section-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#86868b}
+.sub-text{color:var(--sub);line-height:1.65}
+button,.btn{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,opacity .18s ease}
+.btn,.btn-primary{border-radius:999px;font-weight:650;box-shadow:none}
+.btn-primary{background:#0071e3;color:#fff}
+.btn-secondary{background:#f2f2f4;color:#1d1d1f;border:1px solid #e5e5e7}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(0,113,227,.35);outline-offset:2px}
+input,select,textarea{border-radius:12px}
+.event-card,.compact-event,.discount-card,.gallery-management-list{border-radius:20px;box-shadow:0 1px 2px rgba(0,0,0,.025),0 8px 28px rgba(0,0,0,.035)}
+.gallery-admin-item{border:1px solid #e5e5e7;border-radius:14px;background:#fff}
+.gallery-management-heading h2{font-size:clamp(28px,4vw,38px);font-weight:700;letter-spacing:-.055em}
+.gallery-count{background:#f0f0f2;color:#6e6e73;font-weight:650}
+@media(max-width:600px){#app{padding:18px 14px}.card{padding:18px;border-radius:17px}.topbar{padding:13px 15px}}
+
+
+/* v41: replace black primary actions with Apple's restrained blue accent */
+:root{--primary:#0071e3;--accent:#0071e3}
+.btn-primary,.primary-button,.button-primary,button.primary,button.is-primary,
+.cashier-confirm,.confirm-button,.submit-button{
+  background:#0071e3!important;border-color:#0071e3!important;color:#fff!important;
+}
+.btn-primary:hover,.primary-button:hover,.button-primary:hover,
+button.primary:hover,button.is-primary:hover,.cashier-confirm:hover:not(:disabled),
+.confirm-button:hover,.submit-button:hover{background:#0066cc!important;border-color:#0066cc!important}
+
+/* v43: keep the original hover lift; only prevent the blue from darkening on hover */
+.btn-primary:hover,.primary-button:hover,.button-primary:hover,
+button.primary:hover,button.is-primary:hover,.cashier-confirm:hover:not(:disabled),
+.confirm-button:hover,.submit-button:hover{
+  background:#0071e3!important;
+  border-color:#0071e3!important;
+  color:#fff!important;
+}
+
+/* v44: improve event-menu button inset and use Hiragino Japanese typography */
+.event-action-grid .btn{padding:18px 22px!important}
+:root{--tonight-font-stack:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}
+html,body,body *,body *::before,body *::after,button,input,select,textarea,optgroup,option{
+  font-family:var(--tonight-font-stack)!important;
+}
+
+
+/* v45: visibly increase the inset of the five event-home menu buttons */
+.event-action-grid > .btn {
+  box-sizing: border-box !important;
+  padding-left: 36px !important;
+  padding-right: 36px !important;
+}
+
+/* v46: Noto Sans JP for Japanese text; preserve v45 spacing and interactions */
+:root{--tonight-font-stack:Helvetica,Arial,"Noto Sans JP",sans-serif}
+html,body,body *,body *::before,body *::after,button,input,select,textarea,optgroup,option{font-family:var(--tonight-font-stack)!important}
+
+/* v48: HIG-inspired hierarchy, restrained materials, and consistent controls */
+:root{
+  --bg:#f5f5f7;--card:#fff;--border:#e5e5e7;--text:#1d1d1f;--sub:#6e6e73;
+  --primary:#0071e3;--accent:#0071e3;--radius:18px;
+  --shadow:0 1px 2px rgba(0,0,0,.025),0 6px 20px rgba(0,0,0,.035);
+}
+html,body{background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+.topbar{
+  background:rgba(250,250,252,.78)!important;
+  -webkit-backdrop-filter:saturate(180%) blur(24px);
+  backdrop-filter:saturate(180%) blur(24px);
+  border-bottom:1px solid rgba(60,60,67,.12)!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.55) inset!important;
+}
+/* Liquid Glass is reserved for the functional navigation layer, not content cards. */
+.topbar::after{content:"";position:absolute;inset:0;pointer-events:none;border-bottom:1px solid rgba(255,255,255,.45);opacity:.7}
+.card,.guide-step,.result-panel,.member-panel,.bar-panel{
+  background:rgba(255,255,255,.98);border-color:rgba(60,60,67,.075);box-shadow:var(--shadow)
+}
+.card-title{color:var(--text);letter-spacing:-.025em}
+.btn,.icon-btn,.event-home-btn,.product-tile,.qty-btn,.mini-danger{
+  min-height:44px;transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s ease,background-color .18s ease,border-color .18s ease;
+}
+.btn{border-radius:14px;box-shadow:none}
+.btn-primary,.btn-primary:hover,.primary-button:hover,.button-primary:hover,button.primary:hover,button.is-primary:hover,
+.cashier-confirm:hover:not(:disabled),.confirm-button:hover,.submit-button:hover{
+  background:#0071e3!important;border-color:#0071e3!important;color:#fff!important;
+}
+.btn-primary:hover,.icon-btn:hover,.event-home-btn:hover,.product-tile:hover{transform:translateY(-2px);box-shadow:0 5px 14px rgba(0,0,0,.09)}
+.btn:active,.icon-btn:active,.event-home-btn:active,.counter button:active,.discount-option button:active,.product-tile:active,.qty-btn:active,.mini-danger:active{transform:scale(.98)}
+input,select,textarea{border-radius:12px}
+@media(prefers-reduced-transparency:reduce){.topbar{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(250,250,252,.97)!important}}
+@media(prefers-reduced-motion:reduce){button,.btn{transition:none!important}}
+
+
+/* v50: copy result action and contained responsive member roster */
+.event-export-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px;width:100%;min-width:0}
+.event-export-actions .btn{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+#memberList{display:flex;flex-direction:column;width:100%;max-width:100%;min-width:0;overflow:hidden;box-sizing:border-box}
+#memberList .member-record{
+  display:grid!important;
+  grid-template-columns:20px minmax(0,1fr) 58px 34px;
+  align-items:center;gap:8px;
+  width:100%;max-width:100%;min-width:0;
+  box-sizing:border-box;padding:12px 8px;
+}
+#memberList .member-row-select{width:18px;max-width:18px;min-width:18px;margin:0;justify-self:center}
+#memberList .member-record-main{display:grid;gap:3px;flex:none;width:100%;min-width:0;max-width:100%;overflow:hidden}
+#memberList .member-record-main strong,#memberList .member-record-main small{display:block;min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+#memberList .member-record .btn{width:58px!important;min-width:0;max-width:58px;padding:7px 3px;box-sizing:border-box;justify-self:stretch;white-space:nowrap}
+#memberList .member-record .x{width:34px;min-width:34px;max-width:34px;padding:0;box-sizing:border-box;justify-self:stretch}
+@media(max-width:600px){
+  .event-export-actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .event-export-actions .btn{font-size:14px;padding:10px 6px}
+  #memberList .member-record{grid-template-columns:18px minmax(0,1fr) 48px 30px;gap:6px;padding:11px 5px}
+  #memberList .member-record .btn{width:48px!important;max-width:48px;min-height:38px;padding:6px 2px;font-size:12px}
+  #memberList .member-record .x{width:30px;min-width:30px;max-width:30px;height:34px}
+  #memberList .member-record-main strong{font-size:14px;line-height:1.35}
+  #memberList .member-record-main small{font-size:11px;line-height:1.45}
+}
+@media(max-width:360px){
+  #memberList .member-record{grid-template-columns:16px minmax(0,1fr) 42px 28px;gap:5px;padding-left:3px;padding-right:3px}
+  #memberList .member-row-select{width:16px;max-width:16px;min-width:16px}
+  #memberList .member-record .btn{width:42px!important;max-width:42px;font-size:11px}
+  #memberList .member-record .x{width:28px;min-width:28px;max-width:28px}
+}
+
+/* v51: member roster rows share the timetable record layout */
+#memberList .member-record {
+  display:flex !important;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  padding:13px 12px;
+  margin:8px 0;
+  border:1px solid #e5e8ef;
+  border-radius:14px;
+  background:#fff;
+  overflow:hidden;
+}
+#memberList .member-record-main {
+  display:flex;
+  flex:1 1 auto;
+  flex-direction:row;
+  align-items:center;
+  gap:12px;
+  width:auto;
+  min-width:0;
+  max-width:none;
+  overflow:hidden;
+}
+#memberList .member-record-info {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+#memberList .member-record-info strong {font-size:15px;line-height:1.4;overflow-wrap:anywhere}
+#memberList .member-record-info small {font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+#memberList .member-record .member-row-select {
+  display:block;
+  flex:0 0 18px;
+  width:18px !important;
+  min-width:18px !important;
+  max-width:18px !important;
+  height:18px;
+  min-height:18px;
+  margin:0;
+  padding:0 !important;
+}
+#memberList .member-record .tt-record-actions {
+  display:flex;
+  flex:0 0 auto;
+  align-items:center;
+  gap:7px;
+}
+#memberList .member-record .tt-edit-btn {min-width:72px;white-space:nowrap}
+#memberList .member-record .x {flex:0 0 42px;width:42px;min-width:42px;max-width:42px}
+@media(max-width:600px){
+  #memberList .member-record {gap:7px;padding:11px 9px}
+  #memberList .member-record-main {gap:8px}
+  #memberList .member-record-info strong {font-size:14px}
+  #memberList .member-record-info small {font-size:11px}
+  #memberList .member-record .tt-record-actions {gap:5px}
+  #memberList .member-record .tt-edit-btn {min-width:54px;padding:7px 10px !important;font-size:13px}
+  #memberList .member-record .x {flex-basis:36px;width:36px;min-width:36px;max-width:36px;height:38px}
+}
+@media(max-width:360px){
+  #memberList .member-record {padding:10px 7px;gap:5px}
+  #memberList .member-record-main {gap:6px}
+  #memberList .member-record .tt-edit-btn {min-width:48px;padding:6px 7px !important;font-size:12px}
+  #memberList .member-record .x {flex-basis:32px;width:32px;min-width:32px;max-width:32px}
+}
+
+/* v52: 名簿行の外観・操作ボタンをタイムテーブル行と完全に共通化 */
+#memberList .member-record {
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:12px !important;
+  width:auto !important;
+  max-width:none !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+  padding:13px 12px !important;
+  margin:8px 0 !important;
+  border:1px solid #e5e8ef !important;
+  border-radius:14px !important;
+  background:#fff !important;
+  overflow:hidden !important;
+  box-shadow:none !important;
+  transform:none !important;
+}
+#memberList .member-record-main {
+  display:flex !important;
+  flex:1 1 auto !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  gap:12px !important;
+  width:auto !important;
+  min-width:0 !important;
+  max-width:none !important;
+  overflow:hidden !important;
+}
+#memberList .member-record-info {
+  display:flex !important;
+  flex:1 1 auto !important;
+  flex-direction:column !important;
+  gap:4px !important;
+  min-width:0 !important;
+  overflow-wrap:anywhere !important;
+}
+#memberList .member-record-info strong,
+#memberList .member-record-info small {
+  display:block !important;
+  max-width:100% !important;
+  overflow-wrap:anywhere !important;
+  line-height:1.45 !important;
+}
+#memberList .member-record-info strong {font-size:15px !important}
+#memberList .member-record-info small {font-size:13px !important}
+#memberList .member-record .member-row-select {
+  display:block !important;
+  flex:0 0 18px !important;
+  width:18px !important;
+  min-width:18px !important;
+  max-width:18px !important;
+  height:18px !important;
+  min-height:18px !important;
+  margin:0 !important;
+  padding:0 !important;
+}
+#memberList .member-record .tt-record-actions {
+  display:flex !important;
+  flex:0 0 auto !important;
+  align-items:center !important;
+  gap:7px !important;
+  flex-shrink:0 !important;
+}
+/* 編集・×ボタンは .tt-edit-btn / button.x の共通スタイルをそのまま使用 */
+#memberList .member-record .tt-edit-btn,
+#memberList .member-record .x {
+  box-sizing:border-box !important;
+  flex-shrink:0 !important;
+}
+@media(max-width:420px){
+  #memberList .member-record {gap:7px !important;padding:11px 9px !important}
+  #memberList .member-record-main {gap:8px !important}
+  #memberList .member-record-info strong {font-size:14px !important}
+  #memberList .member-record-info small {font-size:11px !important}
+  #memberList .member-record .tt-record-actions {gap:5px !important}
+}
+
+
+/* v53: 名簿絞り込み時は強制 display:flex を上書きして非表示にする */
+#memberList .member-record[hidden] { display: none !important; }
+
+
+/* v54: secure admin login */
+.admin-logout-btn{border:1px solid #dedfe3;background:#fff;color:#333;border-radius:999px;padding:8px 12px;font-family:inherit;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;cursor:pointer}
+.admin-logout-btn[hidden]{display:none!important}
+.admin-login-wrap{min-height:calc(100vh - var(--topbar-h,64px));display:grid;place-items:center;padding:24px 16px}
+.admin-login-card{width:min(100%,420px);background:#fff;border:1px solid #e5e5e8;border-radius:24px;padding:30px;box-shadow:0 12px 40px rgba(0,0,0,.06)}
+.admin-login-mark{font-size:13px;font-weight:800;letter-spacing:.08em;color:#0071e3;margin-bottom:18px}
+.admin-login-card h2{font-size:24px;margin:0 0 8px}
+.admin-login-card p{font-size:14px;color:#666;line-height:1.6;margin:0 0 24px}
+.admin-login-card label{display:block;font-size:13px;font-weight:700;margin-bottom:8px}
+.admin-login-card input{width:100%;min-height:48px;border:1px solid #d8d8dd;border-radius:12px;padding:12px 14px;font:inherit;background:#fff}
+.admin-login-submit{width:100%;min-height:48px;margin-top:18px;border:0;border-radius:999px;background:#0071e3;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.admin-login-submit:disabled{opacity:.6;cursor:wait}
+.admin-login-error{min-height:20px;margin-top:10px;color:#c62828;font-size:13px;line-height:1.5}
+@media(max-width:600px){.admin-login-card{padding:24px 20px}.admin-logout-btn{padding:7px 9px;font-size:11px}}
+
+/* v55: visitor-app shortcut and announcement composer */
+.visitor-app-link{display:inline-flex;align-items:center;justify-content:center;padding:8px 13px;border:1px solid #dfe3eb;border-radius:999px;background:rgba(255,255,255,.8);color:#0071e3;text-decoration:none;font-size:12px;font-weight:750;white-space:nowrap}
+.thread-message{padding:14px 0;border-top:1px solid #e7e9ee}.thread-message:first-child{border-top:0}.thread-message-meta{display:flex;justify-content:space-between;gap:10px;color:#6b7280;font-size:12px}.thread-message-meta strong{color:#111}.thread-message p{margin:9px 0 12px;line-height:1.7;overflow-wrap:anywhere}.check-row{display:flex;align-items:center;gap:8px;margin:12px 0;color:#555;font-size:13px}
+/* v56: global announcements from the admin event-selection home */
+.event-list-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.event-list-actions #globalMessagesBtn{white-space:nowrap}.thread-message{padding:14px 0;border-top:1px solid var(--border,#e5e7eb)}.thread-message:first-child{border-top:0}.thread-message-meta{display:flex;justify-content:space-between;gap:10px;color:var(--sub,#666);font-size:12px}.thread-message p{margin:8px 0;line-height:1.7;overflow-wrap:anywhere}
+@media(max-width:600px){.event-list-actions{width:100%;justify-content:flex-end}.event-list-actions .btn{padding:10px 11px;font-size:12px}}
+
+/* TMP announcement composer and author identity */
+.tmp-composer{border:1px solid #d9dce3;border-radius:14px;overflow:hidden;background:#fff;margin:12px 0}
+.tmp-composer-toolbar{display:flex;flex-wrap:wrap;gap:6px;padding:9px;border-bottom:1px solid #e6e8ed;background:#f7f8fa}
+.tmp-composer-toolbar button{min-width:34px;padding:7px 10px;border:1px solid #dfe2e8;border-radius:8px;background:#fff;color:#252932;font-weight:700}
+.tmp-rich-editor{min-height:150px;padding:14px;outline:none;line-height:1.7;overflow-wrap:anywhere}
+.tmp-rich-editor:empty:before{content:attr(data-placeholder);color:#9297a1;pointer-events:none}
+.tmp-rich-editor ul,.tmp-rich-editor ol{padding-left:24px}
+.tmp-author{display:inline-flex;align-items:center;gap:8px;color:#222}
+.tmp-author img{width:30px;height:30px;object-fit:contain;border-radius:50%;background:#fff;border:1px solid #e4e5e8;padding:2px}
+.thread-message-body{margin:9px 0 12px;line-height:1.75;overflow-wrap:anywhere}
+.thread-message-body p{margin:0 0 8px}.thread-message-body ul,.thread-message-body ol{padding-left:24px;margin:7px 0}.thread-message-body blockquote{margin:8px 0;padding:7px 12px;border-left:3px solid #aeb5c2;color:#606875;background:#f7f8fa}.thread-message-body a{color:#0071e3;text-decoration:underline}
