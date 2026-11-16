@@ -460,25 +460,9 @@
       checkReminders();
     } else alert('通知が許可されませんでした。ブラウザの設定から通知を許可できます。');
   }
-  function checkReminders(){
-    if(localStorage.getItem(NOTICE_KEY)!=='1'||!('Notification' in window)||Notification.permission!=='granted')return;
-    const sent=(()=>{try{return JSON.parse(localStorage.getItem(NOTICE_KEY+'_sent')||'{}')}catch{return {}}})();
-    const now=Date.now();
-    for(const ev of activeEvents()){if(localDate(new Date(now))===ev.date&&!sent[ev.id]){new Notification('tonight!｜本日開催！',{body:`${ev.name} · ${dateLabel(ev.date)}`});sent[ev.id]=true;}}
-    localStorage.setItem(NOTICE_KEY+'_sent',JSON.stringify(sent));
-  }
-  function checkNowPlayingNotice(){
-    if(localStorage.getItem(NOTICE_KEY)!=='1'||!('Notification' in window)||Notification.permission!=='granted')return;
-    const ev=selected();if(!ev)return;
-    const current=statusFor(ev).current?.a||null;
-    const key=`${NOTICE_KEY}_current_${ev.id}`;
-    const previous=localStorage.getItem(key);
-    const currentId=current?String(current.id):'';
-    if(previous!==null&&currentId&&previous!==currentId){
-      new Notification('tonight!｜NOW PLAYING',{body:`${actNames(ev,current)} がプレイ中です。`});
-    }
-    localStorage.setItem(key,currentId);
-  }
+  // 開催日・出演開始のお知らせはWorkerの定期処理がTMPからのお知らせとして投稿します。
+  function checkReminders(){}
+  function checkNowPlayingNotice(){}
   async function copyUrl(url){try{await navigator.clipboard.writeText(url);alert('リンクをコピーしました！');}catch{prompt('このリンクをコピーしてください',url);}}
   async function loadData(silent=false){
     try{

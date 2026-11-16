@@ -91,3 +91,11 @@ Set these using `npx wrangler secret put VAPID_PUBLIC_KEY`, `npx wrangler secret
 - RSVP writes explicitly use same-origin credentials and update the existing record for that visitor/event instead of creating a second record.
 - Added notification settings in the visitor notification panel. Push subscriptions can be removed from the server and browser; in-app event/performance notifications can also be turned off.
 - Notification dialogs are centered on screen.
+
+
+## v65 — 予約投稿と自動お知らせ
+- 管理画面の「TMPからのお知らせ」で投稿日時を指定すると予約投稿できます。空欄の場合は即時投稿です。
+- 予約時刻になるとCloudflare Cron Trigger（毎分）が投稿を公開し、プッシュ通知を送信します。
+- イベント開催日とタイムテーブルの各出演開始時刻に、TMPからのお知らせへ自動投稿します。通知購読端末には同時にプッシュ通知します。
+- 自動投稿はイベントID・日付・出演IDをキーに重複防止します。タイムテーブルの時刻補正（offsetMinutes）も反映します。
+- Cron Triggerを有効にするため、既存プロジェクトの `wrangler.jsonc` もこのZIPの設定に置き換えてデプロイしてください。

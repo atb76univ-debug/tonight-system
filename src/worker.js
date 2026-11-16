@@ -299,14 +299,39 @@ export class Store {
       }
       return text('method not allowed', 405, { Allow: 'GET, POST, DELETE' });
     }
+    if (path === '/messages-admin' && req.method === 'GET') {
+      const messages = (await this.state.storage.get('messages:global')) || [];
+      return json(messages);
+    }
+    if (path === '/publish-due-messages' && req.method === 'POST') {
+      const messages = (await this.state.storage.get('messages:global')) || [], now = Date.now(), due = [];
+      for (const message of messages) if (message.status === 'scheduled' && Number(message.scheduledAt || 0) <= now) {
+        message.status = 'published'; message.publishedAt = now; due.push(structuredClone(message));
+      }
+      if (due.length) await this.state.storage.put('messages:global', messages);
+      return json(due);
+    }
+    if (path === '/system-message' && req.method === 'POST') {
+      let body; try { body = await req.json(); } catch { return text('bad json',400); }
+      const key = String(body.key || '').slice(0,180); if (!key) return text('key required',400);
+      const sent = (await this.state.storage.get('system-message-keys')) || {};
+      if (sent[key]) return json({created:false, message:sent[key]});
+      const messages = (await this.state.storage.get('messages:global')) || [];
+      const message = { id: crypto.randomUUID(), text:String(body.text||'').slice(0,2000), html:'', createdAt:Date.now(), publishedAt:Date.now(), status:'published', notify:true, source:'system', reactions:{} };
+      if (!message.text) return text('message required',400);
+      messages.push(message); await this.state.storage.put('messages:global',messages.slice(-500));
+      sent[key] = message.id; await this.state.storage.put('system-message-keys',sent);
+      return json({created:true,message});
+    }
     if (path === '/messages') {
       const url = new URL(req.url), eventId = String(url.searchParams.get('eventId') || 'global');
       if (eventId !== 'global' && !/^[A-Za-z0-9_-]{1,100}$/.test(eventId)) return text('bad event',400);
       const key = `messages:${eventId}`, messages = (await this.state.storage.get(key)) || [];
-      if (req.method === 'GET') return json(messages);
+      if (req.method === 'GET') return json(messages.filter(m => m.status !== 'scheduled' && (!m.scheduledAt || Number(m.scheduledAt) <= Date.now())));
       if (req.method === 'POST') {
         let body; try { body=await req.json(); } catch { return text('bad json',400); }
-        const message = { id: crypto.randomUUID(), text:String(body.text||'').trim().slice(0,2000), html:String(body.html||'').slice(0,10000), createdAt:Date.now(), reactions:{} };
+        const scheduledAt = Number(body.scheduledAt || 0);
+        const message = { id: crypto.randomUUID(), text:String(body.text||'').trim().slice(0,2000), html:String(body.html||'').slice(0,10000), createdAt:Date.now(), scheduledAt: scheduledAt > Date.now() ? scheduledAt : null, status: scheduledAt > Date.now() ? 'scheduled' : 'published', notify: body.notify !== false, reactions:{}, source: body.source || 'admin' };
         if (!message.text) return text('message required',400);
         messages.push(message); await this.state.storage.put(key,messages.slice(-300)); return json({ok:true,message});
       }
@@ -319,6 +344,7 @@ export class Store {
       let body; try { body=await req.json(); } catch { return text('bad json',400); }
       const message=messages[index];
       message.html=String(body.html||'').slice(0,10000); message.text=String(body.text||'').trim().slice(0,2000); message.updatedAt=Date.now();
+      if (body.scheduledAt !== undefined) { const at=Number(body.scheduledAt||0); message.scheduledAt=at>Date.now()?at:null; message.status=at>Date.now()?'scheduled':'published'; }
       if(!message.text && !message.html)return text('message required',400);
       await this.state.storage.put(key,messages); return json({ok:true,message});
     }
@@ -405,7 +431,44 @@ function sanitizeAnnouncementHtml(input) {
   return html;
 }
 
+async function publishDueAnnouncements(env) {
+  const stub = env.STORE.get(env.STORE.idFromName('main'));
+  const dueRes = await stub.fetch('https://do/publish-due-messages', { method:'POST' });
+  const due = dueRes.ok ? await dueRes.json() : [];
+  for (const message of due) if (message.notify !== false) await sendPushNotifications(env, 'tonight!｜TMPからのお知らせ', String(message.text || '').slice(0,120));
+
+  // Event-day and timetable-start notices are generated as ordinary TMP announcement posts.
+  const dbRes = await stub.fetch('https://do/db');
+  if (!dbRes.ok) return;
+  const db = await dbRes.json(), now = Date.now();
+  const jstTime = (date, time='00:00') => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')) || !/^\d{1,2}:\d{2}$/.test(String(time||''))) return NaN;
+    return Date.parse(`${date}T${String(time).padStart(5,'0')}:00+09:00`);
+  };
+  for (const ev of (db.events||[])) {
+    if (!ev || ev.deleted || ev.archived) continue;
+    const eventAt = jstTime(ev.date, '00:00');
+    if (Number.isFinite(eventAt) && now >= eventAt && now < eventAt + 60*60*1000) {
+      const key=`event-day:${ev.id}:${ev.date}`;
+      const r=await stub.fetch('https://do/system-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,text:`本日開催！「${String(ev.name||'tonight!')}」は本日開催です。会場・タイムテーブルをチェックしてください。`})});
+      if (r.ok) { const d=await r.json(); if(d.created) await sendPushNotifications(env,'tonight!｜本日開催！',d.message.text.slice(0,120)); }
+    }
+    const tt=ev.tt||{};
+    for (const act of (tt.acts||[])) {
+      const date=act.startDate||ev.date, rawAt=jstTime(date,act.start||''), at=rawAt + Number(tt.offsetMinutes||0)*60000;
+      if (!Number.isFinite(at) || now < at || now >= at+60*1000) continue;
+      const key=`act-start:${ev.id}:${act.id||`${date}-${act.start}`}`;
+      const memberNames=(Array.isArray(act.memberIds)?act.memberIds:[]).map(id=>(db.members||[]).find(m=>String(m.id)===String(id))).filter(Boolean).map(m=>m.nickname||m.name).filter(Boolean);
+      const performer=memberNames.join('、')||act.name||'出演者';
+      const label=act.type==='その他'?(act.customType||'その他'):(act.type||'DJ');
+      const r=await stub.fetch('https://do/system-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,text:`まもなく出演開始！「${ev.name}」の${label}、${performer}の出演が始まります。タイムテーブルをチェック！`})});
+      if (r.ok) { const d=await r.json(); if(d.created) await sendPushNotifications(env,'tonight!｜出演開始',d.message.text.slice(0,120)); }
+    }
+  }
+}
+
 export default {
+  async scheduled(controller, env, ctx) { ctx.waitUntil(publishDueAnnouncements(env)); },
   async fetch(request, env) {
     const url = new URL(request.url);
     let response;
@@ -497,6 +560,11 @@ export default {
       const reactionHeaders=new Headers(response.headers); if(identity.cookie)reactionHeaders.append('Set-Cookie',identity.cookie);
       return secureResponse(new Response(response.body,{status:response.status,headers:reactionHeaders}),url);
     }
+    if (url.pathname === '/api/admin/messages' && request.method==='GET') {
+      if(!(await requireAdmin(request,env)))return secureResponse(json({error:'authentication required'},401),url);
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      const inner=await stub.fetch('https://do/messages-admin'); return secureResponse(inner,url);
+    }
     if (url.pathname === '/api/admin/messages' && request.method==='POST') {
       if(!(await requireAdmin(request,env)))return secureResponse(json({error:'authentication required'},401),url);
       if(!sameOrigin(request))return secureResponse(json({error:'origin rejected'},403),url);
@@ -504,10 +572,13 @@ export default {
       let body;try{body=await request.json()}catch{return secureResponse(text('bad json',400),url)}
       const stub=env.STORE.get(env.STORE.idFromName('main'));
       const cleanHtml=sanitizeAnnouncementHtml(String(body.html||''));
-      const inner=await stub.fetch('https://do/messages?eventId=global',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:body.text,html:cleanHtml})});
+      const scheduledAt=Number(body.scheduledAt||0);
+      if(scheduledAt && (!Number.isFinite(scheduledAt)||scheduledAt<Date.now()-60000||scheduledAt>Date.now()+366*24*60*60*1000)) return secureResponse(json({error:'予約日時は現在から1年以内の未来を指定してください。'},400),url);
+      const inner=await stub.fetch('https://do/messages?eventId=global',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:body.text,html:cleanHtml,scheduledAt,notify:body.notify!==false})});
       if(!inner.ok)return secureResponse(inner,url);
-      let push={sent:0,configured:false}; if(body.notify!==false)push=await sendPushNotifications(env,'tonight!｜TMPからのお知らせ',String(body.text||'').slice(0,120));
-      const payload=await inner.json(); return secureResponse(json({...payload,push}),url);
+      const payload=await inner.json(); let push={sent:0,configured:true,subscribers:0};
+      if(payload.message?.status==='published' && body.notify!==false) push=await sendPushNotifications(env,'tonight!｜TMPからのお知らせ',String(body.text||'').slice(0,120));
+      return secureResponse(json({...payload,push}),url);
     }
     if (url.pathname.startsWith('/api/admin/messages/') && ['PUT','DELETE'].includes(request.method)) {
       if(!(await requireAdmin(request,env)))return secureResponse(json({error:'authentication required'},401),url);
@@ -517,7 +588,7 @@ export default {
       if(request.method==='DELETE'){const inner=await stub.fetch('https://do/messages/'+id,{method:'DELETE'});return secureResponse(inner,url);}
       if(await exceedsBodyLimit(request,16000))return secureResponse(json({error:'payload too large'},413),url);
       let body;try{body=await request.json()}catch{return secureResponse(text('bad json',400),url)}
-      const inner=await stub.fetch('https://do/messages/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:body.text,html:sanitizeAnnouncementHtml(String(body.html||''))})});
+      const inner=await stub.fetch('https://do/messages/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:body.text,html:sanitizeAnnouncementHtml(String(body.html||'')),scheduledAt:body.scheduledAt})});
       return secureResponse(inner,url);
     }
     if (url.pathname === '/api/db') {
