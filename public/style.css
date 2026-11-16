@@ -4468,3 +4468,89 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   #app .offset-controls strong{flex:1 1 100%!important;order:-1!important}
   #app .sales-summary-grid{grid-template-columns:1fr!important}
 }
+
+
+/* v75: return the bar setup and timetable controls to the plain cashier UI language */
+#app .offset-controls{
+  justify-content:center!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin:14px auto 10px!important;
+  width:100%!important;
+}
+#app .offset-controls button{
+  width:auto!important;min-width:78px!important;max-width:none!important;
+  min-height:42px!important;height:42px!important;
+  padding:0 14px!important;border-radius:10px!important;
+  font-size:14px!important;font-weight:700!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+#app .offset-controls strong{
+  min-width:72px!important;min-height:42px!important;height:42px!important;
+  padding:0 10px!important;border:0!important;border-radius:0!important;
+  background:transparent!important;box-shadow:none!important;
+  font-size:18px!important;font-weight:800!important;
+}
+#app .offset-controls button#resetOffset{margin-left:4px!important}
+#app .product-admin-list{
+  display:grid!important;gap:0!important;
+  border-top:1px solid #e5e5ea!important;
+}
+#app .product-admin-row{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 104px minmax(190px,230px)!important;
+  gap:10px!important;align-items:center!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  padding:10px 0!important;margin:0!important;
+  border:0!important;border-bottom:1px solid #e5e5ea!important;
+  border-radius:0!important;background:transparent!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+#app .product-admin-row>input{
+  display:block!important;width:100%!important;min-width:0!important;
+  height:42px!important;min-height:42px!important;
+  padding:0 12px!important;border:1px solid #d2d2d7!important;
+  border-radius:9px!important;background:#fff!important;
+  box-shadow:none!important;font-size:14px!important;
+}
+#app .product-admin-actions{
+  display:flex!important;align-items:center!important;justify-content:flex-end!important;
+  gap:6px!important;min-width:0!important;
+}
+#app .product-admin-actions>button{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  width:auto!important;min-width:56px!important;max-width:none!important;
+  height:38px!important;min-height:38px!important;padding:0 10px!important;
+  border-radius:9px!important;box-shadow:none!important;
+  font-size:12px!important;white-space:nowrap!important;
+}
+#app .product-admin-actions>.mini-danger{
+  border:1px solid #e5caca!important;border-radius:9px!important;
+  background:#fff!important;color:#b42318!important;
+}
+#app .sales-summary-grid{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:10px!important;width:100%!important;min-width:0!important;
+}
+#app .sales-summary-grid>div{
+  min-width:0!important;padding:14px!important;
+  border:0!important;border-radius:12px!important;
+  background:#f5f5f7!important;box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app .sales-summary-grid strong{overflow-wrap:anywhere!important}
+@media(max-width:760px){
+  #app .product-admin-row{
+    grid-template-columns:minmax(0,1fr) 88px!important;
+    gap:7px!important;padding:9px 0!important;
+  }
+  #app .product-admin-actions{grid-column:1/-1!important;justify-content:flex-start!important}
+  #app .product-admin-actions>button{flex:1 1 0!important}
+  #app .offset-controls{gap:6px!important}
+  #app .offset-controls button{min-width:66px!important;padding:0 9px!important}
+}
+@media(max-width:420px){
+  #app .sales-summary-grid{grid-template-columns:1fr!important}
+  #app .offset-controls{gap:5px!important}
+  #app .offset-controls button{min-width:0!important;flex:1 1 28%!important;padding:0 6px!important}
+}
