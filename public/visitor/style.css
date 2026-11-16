@@ -666,3 +666,9 @@ html,body{background:var(--bg);color:var(--text);-webkit-font-smoothing:antialia
 .reaction-btn:active{transform:scale(.96)}
 .global-board-preview .thread-message{padding:16px 2px}
 .global-board-preview .thread-message-body{font-size:15px}
+
+/* v62: notification center uses a centered dialog, matching desktop and mobile */
+.modal:has(.notification-panel){align-items:center;padding:16px;overflow-y:auto}
+.modal:has(.notification-panel) .modal-box{width:min(100%,700px);max-height:min(82vh,820px);border-radius:24px;margin:auto}
+.modal:has(.notification-panel) .notification-panel{max-height:calc(min(82vh,820px) - 42px);overflow:auto}
+@media(max-width:600px){.modal:has(.notification-panel){padding:12px}.modal:has(.notification-panel) .modal-box{width:100%;max-height:84vh;border-radius:22px;padding:18px}}
