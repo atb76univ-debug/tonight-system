@@ -4492,30 +4492,42 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 
 
 
-/* ドリンクカード内の配置のみ変更：カード自体のサイズ・グリッドは既存設定を維持 */
+
+
+/* 商品カード：元のカード寸法・グリッドを維持し、文字は縦並び／アイコンは右 */
 .product-tile-card .product-tile{
   display:grid!important;
-  grid-template-columns:minmax(0,1fr) 68px;
-  grid-template-rows:auto auto;
-  grid-template-areas:"name icon" "price icon";
-  align-content:center;
-  align-items:center;
-  justify-items:start;
-  column-gap:6px;
-  row-gap:4px;
+  grid-template-columns:minmax(0,1fr) 68px!important;
+  grid-template-rows:1fr!important;
+  grid-template-areas:"copy icon"!important;
+  align-items:center!important;
+  justify-items:stretch!important;
+  column-gap:6px!important;
   text-align:left!important;
 }
-.product-tile-card .product-tile .product-tile-name{
-  grid-area:name;
+.product-tile-card .product-tile-copy{
+  grid-area:copy!important;
+  min-width:0;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  gap:5px!important;
+}
+.product-tile-card .product-tile-name{
   width:100%;
   text-align:left!important;
+  line-height:1.25;
 }
-.product-tile-card .product-tile strong{
-  grid-area:price;
-  justify-self:start;
+.product-tile-card .product-tile-copy strong{
+  display:block;
+  margin:0;
+  font-size:18px!important;
+  line-height:1.15;
+  text-align:left!important;
 }
 .product-tile-card .sales-drink-icon{
-  grid-area:icon;
+  grid-area:icon!important;
   width:68px!important;
   height:68px!important;
   margin:0!important;
@@ -4524,36 +4536,99 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 }
 .recipe-product-tile{
   display:grid!important;
-  grid-template-columns:minmax(0,1fr) 68px;
-  grid-template-areas:"name icon" "price icon";
-  align-content:center;
-  align-items:center;
-  justify-items:start;
-  column-gap:6px;
-  row-gap:4px;
+  grid-template-columns:minmax(0,1fr) 68px!important;
+  grid-template-rows:1fr!important;
+  grid-template-areas:"copy icon"!important;
+  align-items:center!important;
+  justify-items:stretch!important;
+  column-gap:6px!important;
   text-align:left!important;
 }
 .recipe-product-tile .recipe-product-copy{
-  display:contents;
+  grid-area:copy!important;
+  min-width:0;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  gap:5px!important;
 }
 .recipe-product-tile .recipe-product-copy strong{
-  grid-area:name;
   width:100%;
   text-align:left!important;
+  line-height:1.25;
 }
 .recipe-product-tile .recipe-product-copy b{
-  grid-area:price;
-  justify-self:start;
+  display:block;
+  font-size:18px!important;
+  line-height:1.15;
+  font-weight:800;
 }
 .recipe-product-tile .recipe-tile-art{
-  grid-area:icon;
+  grid-area:icon!important;
   width:68px!important;
   height:68px!important;
+  margin:0!important;
   background:transparent!important;
   border-radius:0!important;
 }
 .recipe-product-tile .drink-cutout-icon{
+  display:block;
   width:100%;
   height:100%;
   object-fit:contain;
+}
+
+/* 選択中の数量コントロール：Liquid Glass風の半透明フロストパネル */
+.product-selection-qty{
+  gap:16px!important;
+  padding:10px 14px!important;
+  border:1px solid rgba(255,255,255,.78)!important;
+  border-radius:18px!important;
+  background:rgba(245,247,251,.72)!important;
+  box-shadow:0 8px 24px rgba(28,38,58,.12),inset 0 1px 0 rgba(255,255,255,.95)!important;
+  backdrop-filter:blur(18px) saturate(175%)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(175%)!important;
+}
+.product-selection-qty .qty-btn{
+  width:40px!important;
+  height:40px!important;
+  min-width:40px!important;
+  display:grid!important;
+  place-items:center!important;
+  padding:0!important;
+  border:1px solid rgba(255,255,255,.92)!important;
+  border-radius:50%!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(235,239,246,.76))!important;
+  color:#20242b!important;
+  font-size:24px!important;
+  font-weight:500!important;
+  line-height:1!important;
+  box-shadow:0 3px 10px rgba(25,35,55,.12),inset 0 1px 0 #fff!important;
+  backdrop-filter:blur(12px) saturate(160%)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(160%)!important;
+}
+.product-selection-qty .qty-btn:hover{
+  background:rgba(255,255,255,.98)!important;
+  box-shadow:0 5px 14px rgba(25,35,55,.16),inset 0 1px 0 #fff!important;
+}
+.product-selection-qty .qty-btn:active{
+  transform:scale(.92)!important;
+}
+.product-selection-qty strong{
+  min-width:28px!important;
+  font-size:21px!important;
+  font-weight:750!important;
+  color:#20242b!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.8);
+}
+@media(max-width:560px){
+  .product-tile-card .sales-drink-icon,.recipe-product-tile .recipe-tile-art{
+    width:62px!important;height:62px!important;
+  }
+  .product-tile-card .product-tile,.recipe-product-tile{
+    grid-template-columns:minmax(0,1fr) 62px!important;
+  }
+  .product-selection-qty{gap:12px!important;padding:8px 10px!important}
+  .product-selection-qty .qty-btn{width:36px!important;height:36px!important;min-width:36px!important}
 }
