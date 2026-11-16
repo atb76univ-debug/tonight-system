@@ -77,6 +77,9 @@ function mergeInto(target, source) {
   if (Number(source.drinkLineupUpdated || 0) > Number(target.drinkLineupUpdated || 0)) {
     target.drinkLineup = structuredClone(Array.isArray(source.drinkLineup) ? source.drinkLineup : []); target.drinkLineupUpdated = Number(source.drinkLineupUpdated || 0);
   }
+  if (Number(source.drinkRecipesUpdated || 0) > Number(target.drinkRecipesUpdated || 0)) {
+    target.drinkRecipes = structuredClone(Array.isArray(source.drinkRecipes) ? source.drinkRecipes : []); target.drinkRecipesUpdated = Number(source.drinkRecipesUpdated || 0);
+  }
   for (const incoming of (Array.isArray(source.events) ? source.events : [])) {
     if (!incoming?.id) continue;
     const existing = target.events.find(event => event.id === incoming.id);
@@ -423,7 +426,7 @@ export class Store {
     if (path === '/drink-lineup' && req.method === 'PUT') {
       let body; try { body = await req.json(); } catch { return text('bad json', 400); }
       if (!Array.isArray(body.drinkLineup) || body.drinkLineup.length > 100) return text('bad lineup', 400);
-      const current = (await this.state.storage.get('db')) || { events: [], members: [], membersUpdated: 0, drinkLineup: [], drinkLineupUpdated: 0 };
+      const current = (await this.state.storage.get('db')) || { events: [], members: [], membersUpdated: 0, drinkLineup: [], drinkLineupUpdated: 0, drinkRecipes: [], drinkRecipesUpdated: 0 };
       const clean = body.drinkLineup.map((item, index) => ({
         id: String(item?.id || `drink-${index}`).slice(0, 100),
         name: String(item?.name || '').trim().slice(0, 80),
@@ -436,7 +439,7 @@ export class Store {
       return json({ drinkLineup: current.drinkLineup, drinkLineupUpdated: current.drinkLineupUpdated });
     }
     if (path === '/db') {
-      const current = (await this.state.storage.get('db')) || { events: [], members: [], membersUpdated: 0, drinkLineup: [], drinkLineupUpdated: 0 };
+      const current = (await this.state.storage.get('db')) || { events: [], members: [], membersUpdated: 0, drinkLineup: [], drinkLineupUpdated: 0, drinkRecipes: [], drinkRecipesUpdated: 0 };
       if (req.method === 'PUT') {
         let incoming; try { incoming = await req.json(); } catch { return text('bad json', 400); }
         if (!incoming || !Array.isArray(incoming.events)) return text('bad payload', 400);

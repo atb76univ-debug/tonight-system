@@ -26,6 +26,7 @@ const pageTitleEl = document.getElementById("pageTitle");
 
 let pageHistory = [];
 let barPage = "sales";
+let selectedRecipeName = "";
 
 let state = createInitialState();
 let currentRender = null;
@@ -2575,6 +2576,7 @@ function loadDb() {
     const r = localStorage.getItem(DB_KEY);
     if (r) {
       const d = JSON.parse(r); d.events = d.events || []; d.members = Array.isArray(d.members) ? d.members : [];
+      d.drinkRecipes = Array.isArray(d.drinkRecipes) ? d.drinkRecipes : []; d.drinkRecipesUpdated = Number(d.drinkRecipesUpdated || 0);
       for (const e of d.events) {
         e.state = e.state || createInitialState();
         e.pricing = normalizePricing(e.pricing);
@@ -2589,7 +2591,7 @@ function loadDb() {
       return d;
     }
   } catch {}
-  const d = { events: [], members: [], membersUpdated: 0, drinkLineup: null, drinkLineupUpdated: 0, updated: 0 };
+  const d = { events: [], members: [], membersUpdated: 0, drinkLineup: null, drinkLineupUpdated: 0, drinkRecipes: [], drinkRecipesUpdated: 0, updated: 0 };
   // これまでの端末内データ（1回分）を最初の回として引き継ぐ
   const old = loadState();
   if (old.initialized || old.receptionHistory.length) {
@@ -2633,6 +2635,11 @@ function mergeInto(t, s) {
     t.drinkLineup = structuredClone(s.drinkLineup || []);
     t.drinkLineupUpdated = s.drinkLineupUpdated;
   }
+  if ((s.drinkRecipesUpdated || 0) > (t.drinkRecipesUpdated || 0)) {
+    t.drinkRecipes = structuredClone(Array.isArray(s.drinkRecipes) ? s.drinkRecipes : []);
+    t.drinkRecipesUpdated = Number(s.drinkRecipesUpdated || 0);
+  }
+  if (!Array.isArray(t.drinkRecipes)) t.drinkRecipes = [];
   if (!Array.isArray(t.drinkLineup)) {
     const first = t.events.find(e => Array.isArray(e.bar?.products) && e.bar.products.length);
     t.drinkLineup = first ? first.bar.products.map(p => ({id:p.id || uid(),name:p.name,price:Number(p.price||0)})) : defaultBarProducts().map(p => ({id:p.id,name:p.name,price:p.price}));
@@ -2674,7 +2681,7 @@ function mergeInto(t, s) {
   return t;
 }
 function dbSig() {
-  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt", "gallery"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
+  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||recipes=" + (db.drinkRecipesUpdated || 0) + ":" + (db.drinkRecipes || []).map(r => `${r.productName}:${r.ingredients||""}:${r.steps||""}`).join("|") + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt", "gallery"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
 }
 function setSync(t) { const e = document.getElementById("sync"); if (e) e.textContent = t; }
 function saveLocalDb() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {} }
@@ -3764,6 +3771,67 @@ function getIssuedDrinkTicketCount(eventState) {
   }, 0);
 }
 
+function normalizeRecipeName(value) {
+  return String(value || "").normalize("NFKC").toLocaleLowerCase("ja").replace(/[\s　・]/g, "");
+}
+function recipeGlassIllustration(name, compact = false) {
+  const n = String(name || "");
+  const isBeer = /ビール|シャンディ|コークビア/.test(n);
+  const isHighball = /ハイボール|ウイスキー|ジンジャーハイ|コークハイ/.test(n);
+  const isSour = /サワー|レモン/.test(n);
+  const liquid = isBeer ? "#e8ad36" : isHighball ? "#d7a34c" : isSour ? "#e9d65d" : /カシス|レゲエ/.test(n) ? "#9b477a" : /モスコミュール|ジンジャー/.test(n) ? "#c98a43" : "#b9d9d2";
+  const garnish = isSour ? '<path d="M63 25a13 13 0 1 0 26 0a13 13 0 1 0-26 0" fill="#f3dc54" stroke="#d0ae28" stroke-width="2"/><path d="M76 12v26M63 25h26" stroke="#fff5bd" stroke-width="2"/>' : isBeer ? '<path d="M59 22c-2-9 8-14 15-8 5-10 19-4 17 6 9 3 6 14-2 14H67c-8 0-12-7-8-12" fill="#fff" opacity=".92"/>' : '<path d="M79 13l15 10-15 10-15-10z" fill="#9bcf8a" stroke="#6da66b" stroke-width="2"/>';
+  return `<svg viewBox="0 0 150 150" role="img" aria-label="${esc(n)}のドリンクイラスト" class="recipe-glass-svg ${compact ? "is-compact" : ""}"><defs><linearGradient id="glassshine" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".8"/><stop offset=".45" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient></defs><ellipse cx="75" cy="128" rx="38" ry="7" fill="#7d8da5" opacity=".13"/><path d="M44 37h62l-7 77c-.5 7-6 11-13 11H64c-7 0-12-4-13-11z" fill="${liquid}" opacity=".9"/><path d="M44 37h62l-7 77c-.5 7-6 11-13 11H64c-7 0-12-4-13-11z" fill="url(#glassshine)" stroke="#a8b8c9" stroke-width="3" stroke-linejoin="round"/><path d="M49 43h52" stroke="#fff" stroke-width="3" opacity=".9"/>${garnish}<path d="M56 51l6 57" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".42"/><path d="M102 48l-6 62" stroke="#fff" stroke-width="2" opacity=".32"/></svg>`;
+}
+function showDrinkRecipe(productName) {
+  selectedRecipeName = productName;
+  const recipe = (db.drinkRecipes || []).find(r => normalizeRecipeName(r.productName) === normalizeRecipeName(productName));
+  const ingredients = String(recipe?.ingredients || "").split(/\r?\n|[；;]/).map(x => x.trim()).filter(Boolean);
+  const steps = String(recipe?.steps || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const overlay = document.createElement("div");
+  overlay.className = "recipe-glass-overlay";
+  overlay.id = "drinkRecipeOverlay";
+  overlay.innerHTML = `<section class="recipe-glass-dialog" role="dialog" aria-modal="true" aria-labelledby="recipeDialogTitle"><button type="button" class="recipe-glass-close" aria-label="閉じる">×</button><div class="recipe-dialog-art">${recipeGlassIllustration(productName)}</div><div class="recipe-dialog-content"><span class="recipe-eyebrow">TONIGHT! RECIPE</span><h2 id="recipeDialogTitle">${esc(productName)}</h2>${recipe ? `<div class="recipe-detail-block"><h3>材料</h3>${ingredients.length ? `<ul>${ingredients.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>材料の記載はありません。</p>`}</div><div class="recipe-detail-block"><h3>作り方</h3>${steps.length ? `<ol>${steps.map(x => `<li>${esc(x.replace(/^\d+[.)．、]\s*/, ""))}</li>`).join("")}</ol>` : `<p>作り方の記載はありません。</p>`}</div>${recipe.note ? `<p class="recipe-note">${esc(recipe.note)}</p>` : ""}` : `<div class="recipe-empty-state"><strong>作り方はまだ登録されていません</strong><p>ExcelまたはCSVから、この商品の材料と作り方を取り込んでください。</p></div>`}</div></section>`;
+  const onEscape = e => { if (e.key === "Escape" && document.getElementById("drinkRecipeOverlay")) close(); };
+  const close = () => { overlay.remove(); selectedRecipeName = ""; document.removeEventListener("keydown", onEscape); };
+  overlay.addEventListener("click", e => { if (e.target === overlay || e.target.closest(".recipe-glass-close")) close(); });
+  document.addEventListener("keydown", onEscape);
+  document.body.appendChild(overlay);
+}
+async function importDrinkRecipes(file) {
+  if (!file) return;
+  try {
+    let rows = [];
+    if (/\.csv$/i.test(file.name)) rows = parseMemberCSVRows(await file.text());
+    else {
+      if (!window.XLSX) throw new Error("Excel読み込みライブラリを読み込めません。CSV形式で保存して取り込んでください。");
+      const workbook = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array", cellDates: false });
+      rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "", raw: false });
+    }
+    const norm = value => String(value ?? "").normalize("NFKC").toLowerCase().replace(/[\s　_*・:：()（）「」【】\[\]\-]/g, "");
+    let headerIndex = -1, cols = { name: -1, ingredients: -1, steps: -1, note: -1 };
+    for (let i = 0; i < Math.min(rows.length, 30); i++) {
+      const h = (rows[i] || []).map(norm);
+      const find = names => h.findIndex(x => names.some(n => x === norm(n) || x.includes(norm(n))));
+      const candidate = { name: find(["商品名", "ドリンク名", "メニュー名", "名前", "name"]), ingredients: find(["材料", "ingredients"]), steps: find(["作り方", "手順", "レシピ", "steps", "method"]), note: find(["備考", "メモ", "note"]) };
+      if (candidate.name >= 0 && (candidate.ingredients >= 0 || candidate.steps >= 0)) { headerIndex = i; cols = candidate; break; }
+    }
+    if (headerIndex < 0) throw new Error("見出し行を特定できません。『商品名』『材料』『作り方』の列を用意してください。");
+    let added = 0, updated = 0, skipped = 0;
+    for (const row of rows.slice(headerIndex + 1)) {
+      const productName = String(row[cols.name] ?? "").trim();
+      if (!productName) { skipped++; continue; }
+      const value = { productName, ingredients: cols.ingredients >= 0 ? String(row[cols.ingredients] ?? "").trim() : "", steps: cols.steps >= 0 ? String(row[cols.steps] ?? "").trim() : "", note: cols.note >= 0 ? String(row[cols.note] ?? "").trim() : "" };
+      const existing = (db.drinkRecipes || []).find(r => normalizeRecipeName(r.productName) === normalizeRecipeName(productName));
+      if (existing) { Object.assign(existing, value); updated++; } else { db.drinkRecipes = [...(db.drinkRecipes || []), value]; added++; }
+    }
+    if (!added && !updated) throw new Error("取り込める作り方がありませんでした。商品名と材料／作り方を確認してください。");
+    db.drinkRecipesUpdated = Date.now(); persistDb();
+    alert(`作り方の取り込みが完了しました。\n新規：${added}件／更新：${updated}件${skipped ? `／空欄スキップ：${skipped}行` : ""}`);
+    renderBarHome();
+  } catch (error) { console.error("[作り方インポート失敗]", error); alert(`読み込みに失敗しました：${error.message}`); }
+}
+
 function renderBarHome() {
   const $ = id => document.getElementById(id);
   const ev = ctx.ev, b = ensureBar(ctx.bar);
@@ -3849,6 +3917,7 @@ function renderBarHome() {
   screen.innerHTML = `
   <div class="bar-page-nav">
     <button class="bar-page-tab ${barPage === "sales" ? "active" : ""}" data-bar-page="sales">販売</button>
+    <button class="bar-page-tab ${barPage === "recipes" ? "active" : ""}" data-bar-page="recipes">作り方</button>
     <button class="bar-page-tab ${barPage === "products" ? "active" : ""}" data-bar-page="products">商品管理</button>
     <button class="bar-page-tab ${barPage === "history" ? "active" : ""}" data-bar-page="history">販売履歴・集計</button>
     <button class="bar-page-tab ${barPage === "cash" ? "active" : ""}" data-bar-page="cash">金庫・精算</button>
@@ -3903,6 +3972,21 @@ function renderBarHome() {
     </div>
   </div>
 
+  <div class="card recipe-library-card" data-bar-section="recipes">
+    <div class="sales-heading"><div><div class="card-title">ドリンクの作り方</div><p class="sub-text">商品名をタップすると、材料と作り方を確認できます。</p></div><span class="sales-live"><i></i> RECIPE BOOK</span></div>
+    <div class="recipe-import-panel">
+      <div class="recipe-import-copy"><strong>作り方を一括登録</strong><small>Excel（.xlsx）またはCSV（.csv）から取り込めます。</small></div>
+      <label class="btn btn-secondary recipe-import-button" for="drinkRecipeFile">ファイルを選択</label>
+      <input type="file" id="drinkRecipeFile" accept=".csv,.xlsx,.xls" hidden>
+      <small class="recipe-format-hint">列名：商品名／材料／作り方（手順）　※イラストは商品に合わせて自動表示します。</small>
+    </div>
+    <div class="recipe-product-grid">
+      ${b.products.map(p => {
+        const recipe = (db.drinkRecipes || []).find(r => normalizeRecipeName(r.productName) === normalizeRecipeName(p.name));
+        return `<button type="button" class="recipe-product-tile" data-open-recipe="${esc(p.name)}"><span class="recipe-tile-art">${recipeGlassIllustration(p.name, true)}</span><strong>${esc(p.name)}</strong><small>${recipe ? "作り方を見る" : "作り方未登録"}</small></button>`;
+      }).join("") || `<div class="sub-text">販売メニューに商品がありません。</div>`}
+    </div>
+  </div>
   <div class="card" data-bar-section="history">
     <div class="card-title">販売集計</div>
     <div class="sales-summary-grid report-summary">
@@ -3929,16 +4013,10 @@ function renderBarHome() {
           </div>
         </div>`).join("")}
       </div>
-      
       <div class="add-product-form">
         <input id="newProductName" placeholder="商品名（例：ビール）" aria-label="追加する商品名">
         <input id="newProductPrice" type="number" min="1" step="1" value="500" aria-label="販売価格">
         <button class="btn btn-primary" id="addBarProduct">商品を追加</button>
-      </div>
-      <br>
-      <div class="member-import">
-        <label>CSV／Excelを読み込む<input type="file" id="drinkMenuFile" accept=".csv,.xlsx,.xls"></label>
-        <small>「商品名（ドリンク名）」と「価格」の列を読み込みます。同じ商品名が登録済みの場合は価格を更新し、新しい商品は追加します。</small>
       </div>
     </div>
   </div>
@@ -4014,6 +4092,10 @@ function renderBarHome() {
 
   screen.querySelectorAll("[data-bar-page]").forEach(btn => btn.onclick = () => { barPage = btn.dataset.barPage; barCheckoutPage = false; renderBarHome(); });
   screen.querySelectorAll("[data-bar-section]").forEach(el => { el.hidden = el.dataset.barSection !== barPage; });
+  screen.querySelectorAll("[data-open-recipe]").forEach(btn => btn.onclick = () => showDrinkRecipe(btn.dataset.openRecipe));
+  const recipeFileInput = $("drinkRecipeFile");
+  if (recipeFileInput) recipeFileInput.onchange = async e => { await importDrinkRecipes(e.target.files?.[0]); e.target.value = ""; };
+  if (selectedRecipeName && barPage === "recipes") showDrinkRecipe(selectedRecipeName);
   updateBackButton();
   const cartTotal = () => barCart.reduce((sum, x) => sum + x.price * x.qty, 0);
   const cartUnits = () => barCart.reduce((sum, x) => sum + x.qty, 0);
@@ -4225,99 +4307,6 @@ function renderBarHome() {
     try { await syncDrinkLineup(); saveBar(); renderBarHome(); }
     catch (error) { setSync("同期エラー"); alert(error.message || "クラウド同期に失敗しました。"); }
   });
-  const drinkMenuFile = $("drinkMenuFile");
-  if (drinkMenuFile) drinkMenuFile.onchange = async e => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      let table = [];
-      if (/\.csv$/i.test(file.name)) {
-        table = parseMemberCSVRows(await file.text());
-      } else {
-        if (!window.XLSX) throw new Error("Excel読み込みライブラリを読み込めません。CSV形式で保存して取り込んでください。");
-        const data = new Uint8Array(await file.arrayBuffer());
-        const wb = XLSX.read(data, { type: "array", cellDates: false });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
-      }
-
-      const normHeader = value => String(value ?? "").replace(/^\uFEFF/, "").normalize("NFKC").toLowerCase().replace(/[\s　_*・:：()（）「」【】\[\]\-]/g, "");
-      const findColumn = (headers, type) => {
-        const values = headers.map(normHeader);
-        const exact = type === "name"
-          ? ["商品名", "ドリンク名", "品名", "商品", "メニュー名", "name", "product", "drink", "item"]
-          : ["価格", "販売価格", "単価", "金額", "price", "amount"];
-        let index = values.findIndex(value => exact.some(alias => normHeader(alias) === value));
-        if (index >= 0) return index;
-        return type === "name"
-          ? values.findIndex(value => value.includes("商品名") || value.includes("ドリンク名") || value.includes("品名") || value === "name")
-          : values.findIndex(value => value.includes("価格") || value.includes("単価") || value === "price" || value === "amount");
-      };
-
-      let headerIndex = -1, nameCol = -1, priceCol = -1;
-      for (let r = 0; r < Math.min(table.length, 30); r++) {
-        const headers = table[r] || [];
-        const n = findColumn(headers, "name"), p = findColumn(headers, "price");
-        if (n >= 0 && p >= 0) { headerIndex = r; nameCol = n; priceCol = p; break; }
-      }
-      if (headerIndex < 0) {
-        const preview = (table[0] || []).map(value => String(value ?? "").trim()).filter(Boolean).join(" / ");
-        throw new Error(`見出し行を特定できませんでした。商品名と価格の列見出しを確認してください。1行目：${preview || "空行"}`);
-      }
-
-      const clean = value => String(value ?? "").replace(/^\uFEFF/, "").trim();
-      const normalizeName = value => normHeader(value).replace(/[\s　]/g, "");
-      let added = 0, updated = 0, skipped = 0;
-      const imported = [];
-      const lineup = Array.isArray(db.drinkLineup) ? db.drinkLineup : [];
-      for (const row of table.slice(headerIndex + 1)) {
-        const name = clean(row[nameCol]);
-        const rawPrice = clean(row[priceCol]).replace(/[￥¥,\s]/g, "").replace(/円$/, "");
-        const price = Number(rawPrice);
-        if (!name || !rawPrice || !Number.isInteger(price) || price <= 0) { skipped++; continue; }
-        const existing = lineup.find(item => normalizeName(item.name) === normalizeName(name));
-        if (existing) {
-          if (existing.name !== name || Number(existing.price) !== price) updated++;
-          existing.name = name;
-          existing.price = price;
-        } else {
-          lineup.push({ id: uid(), name, price });
-          added++;
-        }
-        imported.push({ name, price });
-      }
-      if (!imported.length) throw new Error("取り込める商品がありませんでした。商品名と1円以上の整数価格を確認してください。");
-
-      db.drinkLineup = lineup;
-      touchDrinkLineup();
-      for (const event of db.events || []) {
-        if (!event.bar) continue;
-        const oldProducts = event.bar.products || [];
-        event.bar.products = lineup.map(item => {
-          const previous = oldProducts.find(product => product.id === item.id);
-          return { ...item, soldOut: Boolean(previous?.soldOut) };
-        });
-      }
-      b.products = lineup.map(item => {
-        const previous = b.products.find(product => product.id === item.id);
-        return { ...item, soldOut: Boolean(previous?.soldOut) };
-      });
-      try {
-        await syncDrinkLineup();
-        saveBar();
-        alert(`ドリンクメニューの取り込みが完了しました\n商品名列：${table[headerIndex][nameCol]}\n価格列：${table[headerIndex][priceCol]}\n新規追加：${added}件／更新：${updated}件${skipped ? `／スキップ：${skipped}行` : ""}`);
-        renderBarHome();
-      } catch (error) {
-        setSync("同期エラー");
-        alert(error.message || "クラウド同期に失敗しました。");
-      }
-    } catch (error) {
-      console.error("[ドリンクメニューインポート失敗]", error);
-      alert(`読み込みに失敗しました：${error.message}`);
-    }
-    e.target.value = "";
-  };
-
   $("addBarProduct").onclick = async () => {
     const name = $("newProductName").value.trim(), price = Number($("newProductPrice").value);
     if (!name || !Number.isInteger(price) || price <= 0) { alert("商品名と1円以上の整数価格を入力してください"); return; }
