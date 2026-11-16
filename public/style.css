@@ -4418,7 +4418,7 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 .product-tile-card .product-tile.sold-out{background:#fff0f0!important}
 .product-tile-card .product-selection-qty{border-radius:16px}
 
-/* v75: 進行時間の調整 — 中央揃え・等幅グリッド、ボタンと現在値を明確に区別 */
+/* v75: 進行時間の調整 — 中央揃え・等幅グリッド、白地＋青縁取りのボタン */
 .offset-controls{
   display:grid!important;
   grid-template-columns:repeat(5,minmax(0,1fr));
@@ -4428,7 +4428,7 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   max-width:520px;
   margin:18px auto 16px!important;
 }
-/* ボタン: 枠線・影・塗りで「押せる」と分かる見た目 */
+/* ボタン: 白地・青い縁取り・青文字 */
 .offset-controls .btn{
   width:100%!important;
   min-height:52px;
@@ -4436,23 +4436,19 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   display:flex;align-items:center;justify-content:center;
   font-size:15px!important;font-weight:700;
   font-variant-numeric:tabular-nums;
-  color:#1d1d1f!important;
+  color:#0071e3!important;
   background:#fff!important;
-  border:1.5px solid #c7c7cc!important;
+  border:2px solid #0071e3!important;
   border-radius:14px!important;
-  box-shadow:0 2px 0 rgba(0,0,0,.08),0 3px 8px rgba(0,0,0,.06)!important;
+  box-shadow:none!important;
   cursor:pointer;
 }
-.offset-controls .btn:hover{background:#f5f5f7!important;border-color:#8e8e93!important}
+.offset-controls .btn:hover{background:#eef5fd!important}
 .offset-controls .btn:active{
-  transform:translateY(1px) scale(.97);
-  box-shadow:0 0 0 rgba(0,0,0,0)!important;background:#ececf0!important;
+  transform:scale(.97);
+  background:#dcebfb!important;
 }
-/* 巻き(−)と押し(＋)を色味で区別 */
-.offset-controls .btn[data-offset^="-"]{color:#0759a5!important;border-color:#9cc3ee!important}
-.offset-controls .btn[data-offset="1"],
-.offset-controls .btn[data-offset="5"]{color:#b4540a!important;border-color:#f0c08e!important}
-/* 現在値: ボタンではなく「表示」だと分かる、枠なしの大きな数字 */
+/* 現在値: 枠なしの大きな数字（ボタンではない） */
 .offset-controls strong{
   min-width:0!important;
   display:flex;align-items:center;justify-content:center;
@@ -4463,14 +4459,11 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   border:0;box-shadow:none;
   font-variant-numeric:tabular-nums;white-space:nowrap;
 }
-/* リセットは下段中央に独立 */
+/* リセットは下段中央（同じ白＋青縁取り、少し小さめ） */
 .offset-controls #resetOffset{
   grid-column:2 / 5;
   min-height:44px;
   font-size:14px!important;
-  color:#6e6e73!important;
-  border-style:dashed!important;
-  box-shadow:none!important;
 }
 @media(max-width:480px){
   .offset-controls{gap:7px}
