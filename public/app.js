@@ -2845,27 +2845,60 @@ function evStats(st, bar, pricing = getPricing()) {
 /* ---------- 回の一覧（月ごとの概要） ---------- */
 async function configureAdminShiftNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-    alert('このブラウザはプッシュ通知に対応していません。'); return;
+    throw new Error('このブラウザはプッシュ通知に対応していません。');
   }
+  const keyRes=await fetch('/api/admin/push-key',{cache:'no-store',credentials:'same-origin'});
+  if(!keyRes.ok) throw new Error(keyRes.status===401?'管理者としてログインし直してください。':'VAPID公開鍵を取得できませんでした。');
+  const keyData=await keyRes.json();
+  if(!keyData.publicKey) throw new Error('VAPID_PUBLIC_KEYが設定されていません。');
+  let permission=Notification.permission;
+  if(permission==='default') permission=await Notification.requestPermission();
+  if(permission!=='granted') throw new Error('通知が許可されませんでした。ブラウザのサイト設定から通知を許可してください。');
+  const registration=await navigator.serviceWorker.ready;
+  let subscription=await registration.pushManager.getSubscription();
+  if(!subscription){
+    const encoded=keyData.publicKey.replace(/-/g,'+').replace(/_/g,'/');
+    const applicationServerKey=Uint8Array.from(atob(encoded+'='.repeat((4-encoded.length%4)%4)),c=>c.charCodeAt(0));
+    subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});
+  }
+  const save=await fetch('/api/admin/push-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription),credentials:'same-origin'});
+  if(!save.ok) throw new Error('管理者用通知の登録に失敗しました。');
+  return true;
+}
+
+async function showAdminShiftNotificationPrompt() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  const existing=document.getElementById('adminShiftPushPrompt');
+  if(existing) existing.remove();
+  let subscribed=false;
   try {
-    const keyRes=await fetch('/api/admin/push-key',{cache:'no-store',credentials:'same-origin'});
-    if(!keyRes.ok) throw new Error(keyRes.status===401?'管理者としてログインし直してください。':'VAPID公開鍵を取得できませんでした。');
-    const keyData=await keyRes.json();
-    if(!keyData.publicKey) throw new Error('VAPID_PUBLIC_KEYが設定されていません。');
-    let permission=Notification.permission;
-    if(permission==='default') permission=await Notification.requestPermission();
-    if(permission!=='granted') throw new Error('ブラウザの通知許可が必要です。');
-    const registration=await navigator.serviceWorker.ready;
-    let subscription=await registration.pushManager.getSubscription();
-    if(!subscription){
-      const encoded=keyData.publicKey.replace(/-/g,'+').replace(/_/g,'/');
-      const applicationServerKey=Uint8Array.from(atob(encoded+'='.repeat((4-encoded.length%4)%4)),c=>c.charCodeAt(0));
-      subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});
+    if(Notification.permission==='granted'){
+      const registration=await navigator.serviceWorker.ready;
+      const subscription=await registration.pushManager.getSubscription();
+      if(subscription){
+        const keyRes=await fetch('/api/admin/push-key',{cache:'no-store',credentials:'same-origin'});
+        if(keyRes.ok){
+          const save=await fetch('/api/admin/push-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription),credentials:'same-origin'});
+          subscribed=save.ok;
+        }
+      }
     }
-    const save=await fetch('/api/admin/push-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription),credentials:'same-origin'});
-    if(!save.ok) throw new Error('管理者用通知の登録に失敗しました。');
-    alert('管理者用のシフト開始通知を有効にしました。この端末にシフト通知が届きます。');
-  }catch(error){alert(error.message||'通知設定に失敗しました。');}
+  } catch(error){ console.warn('管理者通知の状態確認に失敗しました',error); }
+  if(subscribed) return;
+  if(sessionStorage.getItem('adminShiftPushPromptLater')==='1') return;
+  const denied=Notification.permission==='denied';
+  const card=document.createElement('section');
+  card.id='adminShiftPushPrompt';
+  card.className='admin-shift-push-prompt';
+  card.innerHTML=`<div class="admin-shift-push-copy"><div class="admin-shift-push-eyebrow">NOTIFICATIONS</div><strong>${denied?'ブラウザの通知がオフになっています':'シフト開始通知を受け取りますか？'}</strong><p>${denied?'このサイトの通知をブラウザ設定で許可すると、管理用アプリにシフト開始のお知らせが届きます。':'シフトの開始時刻に、管理用アプリからこの端末へお知らせします。'}</p></div><div class="admin-shift-push-actions">${denied?'<span class="admin-shift-push-denied">ブラウザのサイト設定から通知を許可してください</span>':'<button type="button" class="btn btn-primary" id="enableAdminShiftPush">通知をオンにする</button>'}<button type="button" class="btn btn-secondary" id="laterAdminShiftPush">あとで</button></div>`;
+  const toolbar=screen.querySelector('.event-list-toolbar');
+  if(toolbar) toolbar.insertAdjacentElement('afterend',card);
+  document.getElementById('laterAdminShiftPush')?.addEventListener('click',()=>{sessionStorage.setItem('adminShiftPushPromptLater','1');card.remove();});
+  document.getElementById('enableAdminShiftPush')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;button.disabled=true;button.textContent='設定中…';
+    try{await configureAdminShiftNotifications();card.innerHTML='<div class="admin-shift-push-copy"><strong>シフト開始通知を有効にしました</strong><p>この端末で管理用アプリのシフト通知を受け取れます。</p></div>';sessionStorage.removeItem('adminShiftPushPromptLater');}
+    catch(error){const p=card.querySelector('p');if(p)p.textContent=error.message||'通知設定に失敗しました。';button.disabled=false;button.textContent='もう一度試す';}
+  });
 }
 
 function renderEventList() {
@@ -2875,7 +2908,7 @@ function renderEventList() {
 
   let html = `<div class="event-list-toolbar">
     <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="list-heading">パーティ開始！</div></div></div>
-    <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-secondary" id="adminShiftNoticeBtn">シフト通知を設定</button><button class="btn btn-secondary" id="globalMessagesBtn">お知らせ・スレッド</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
+    <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-secondary" id="globalMessagesBtn">お知らせ・スレッド</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
   </div>`;
   if (!evs.length) html += `<div class="card sub-text">まだ回がありません。「新しい回」から作成してください。</div>`;
 
@@ -2903,10 +2936,11 @@ function renderEventList() {
     html += `</div></section>`;
   });
   screen.innerHTML = html;
+  showAdminShiftNotificationPrompt();
   document.getElementById("newEventBtn").onclick = () => navigate(renderEventNew);
   document.getElementById("guideBtn").onclick = () => navigate(renderGuide);
   document.getElementById("globalMessagesBtn").onclick = () => navigate(renderGlobalMessages);
-  document.getElementById("adminShiftNoticeBtn").onclick = configureAdminShiftNotifications;
+
   screen.querySelectorAll(".event-card-flyer").forEach(img => img.addEventListener("error", () => {
     const card = img.closest(".event-card");
     img.remove();
