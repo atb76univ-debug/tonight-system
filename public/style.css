@@ -4143,3 +4143,154 @@ input,select,textarea{border-radius:12px}
   #eventPulse{padding:8px 10px!important}
   #eventPulse .admin-header-pulse{width:max-content;max-width:100%;flex-wrap:wrap}
 }
+
+
+/* =========================================================
+   tonight! v63 — Admin Light Liquid Glass visual system
+   Visual skin only: preserves existing layout and behavior.
+   ========================================================= */
+:root{
+  --bg:#f5f5f7;
+  --card:rgba(255,255,255,.84);
+  --border:rgba(60,60,67,.12);
+  --text:#1d1d1f;
+  --sub:#6e6e73;
+  --primary:#0071e3;
+  --success:#30a46c;
+  --danger:#e5484d;
+  --radius:20px;
+  --shadow:0 8px 26px rgba(31,42,68,.065),0 1px 2px rgba(31,42,68,.035),inset 0 1px 0 rgba(255,255,255,.9);
+  --glass-bg:rgba(255,255,255,.68);
+  --glass-edge:rgba(255,255,255,.88);
+}
+html,body{
+  background:
+    radial-gradient(ellipse at 7% 0%,rgba(177,211,255,.18),transparent 34rem),
+    radial-gradient(ellipse at 96% 18%,rgba(218,204,255,.15),transparent 30rem),
+    var(--bg);
+  color:var(--text);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Hiragino Sans",sans-serif}
+.topbar{
+  background:rgba(250,250,252,.72)!important;
+  border-bottom:1px solid rgba(255,255,255,.88);
+  box-shadow:0 1px 0 rgba(255,255,255,.85) inset,0 5px 24px rgba(31,42,68,.045)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(165%);
+  backdrop-filter:blur(24px) saturate(165%);
+}
+.topbar h1{letter-spacing:-.025em}
+#app{isolation:isolate}
+.card,.admin-login-card,.event-card,.history-card,.gallery-admin-card,
+.member-record,.product-tile-card,.product-admin-row,.schedule-shift-row,
+.shift-timeline-item,.report-summary,.cart-panel,.bar-cart-dock,
+.bar-latest-order,.bar-order-complete,.success-screen{
+  border:1px solid rgba(255,255,255,.88)!important;
+  background:rgba(255,255,255,.82)!important;
+  box-shadow:var(--shadow)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(145%);
+  backdrop-filter:blur(18px) saturate(145%);
+}
+.card{border-radius:var(--radius)}
+.card-title{letter-spacing:-.02em}
+.stat,.stat-card,.discount-counts div,.counter-row,.cash-denomination,
+.cash-entry-row,.sale-history-row,.member-chip,.member-pick-row,
+.product-tile,.schedule-tag,.guide-step,.gallery-admin-item{
+  background:rgba(255,255,255,.68)!important;
+  border-color:rgba(60,60,67,.09)!important;
+}
+input,select,textarea{
+  color:var(--text);
+  background:rgba(255,255,255,.82)!important;
+  border:1px solid rgba(60,60,67,.16)!important;
+  border-radius:13px!important;
+  box-shadow:inset 0 1px 2px rgba(31,42,68,.025);
+  transition:border-color .18s,box-shadow .18s,background .18s;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none!important;
+  border-color:rgba(0,113,227,.52)!important;
+  box-shadow:0 0 0 4px rgba(0,113,227,.11)!important;
+  background:#fff!important;
+}
+button,.btn,.icon-btn,.pulse-control,.tab,.bar-page-tab,.reception-page-tab,
+.schedule-switch-btn,.event-home-btn,.visitor-app-link,.admin-logout-btn{
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .16s ease,box-shadow .18s ease,background .18s ease,border-color .18s ease,opacity .18s ease;
+}
+.btn,.btn-primary,.submit-button,.confirm-button,.cashier-confirm,
+.admin-login-submit,.member-add-btn,.gallery-upload-label{
+  border-radius:14px!important;
+  box-shadow:0 5px 14px rgba(0,113,227,.14),inset 0 1px 0 rgba(255,255,255,.2);
+}
+.btn-primary,.submit-button,.confirm-button,.cashier-confirm,.admin-login-submit{
+  background:linear-gradient(180deg,#1684ed,#0071e3)!important;
+  color:#fff!important;
+}
+.btn-secondary,.icon-btn,.pulse-control,.tab,.bar-page-tab,.reception-page-tab,
+.schedule-switch-btn,.event-home-btn,.visitor-app-link,.admin-logout-btn{
+  background:rgba(255,255,255,.72)!important;
+  border:1px solid rgba(255,255,255,.94)!important;
+  color:#303036;
+  box-shadow:0 3px 12px rgba(31,42,68,.055),inset 0 1px 0 rgba(255,255,255,.96);
+  -webkit-backdrop-filter:blur(18px) saturate(150%);
+  backdrop-filter:blur(18px) saturate(150%);
+}
+.btn-danger,.mini-danger{box-shadow:0 3px 10px rgba(229,72,77,.09)}
+button:active,.btn:active{transform:scale(.985)}
+button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:3px solid rgba(0,113,227,.24)!important;outline-offset:2px;
+}
+#eventPulse{
+  background:rgba(245,245,247,.72)!important;
+  border-bottom:1px solid rgba(255,255,255,.85)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(155%)!important;
+  backdrop-filter:blur(22px) saturate(155%)!important;
+}
+#eventPulse .admin-header-pulse{
+  background:rgba(255,255,255,.82)!important;
+  border:1px solid rgba(255,255,255,.94)!important;
+  border-radius:18px!important;
+  box-shadow:0 6px 20px rgba(31,42,68,.065),inset 0 1px 0 #fff!important;
+}
+.modal{
+  background:rgba(26,30,40,.24)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(130%);
+  backdrop-filter:blur(14px) saturate(130%);
+}
+.modal-box,.modal-content,.cashier-dialog{
+  background:rgba(250,250,252,.88)!important;
+  border:1px solid rgba(255,255,255,.94)!important;
+  border-radius:26px!important;
+  box-shadow:0 22px 70px rgba(20,25,40,.2),inset 0 1px 0 rgba(255,255,255,.96)!important;
+  -webkit-backdrop-filter:blur(28px) saturate(160%);
+  backdrop-filter:blur(28px) saturate(160%);
+}
+.admin-login-wrap{background:transparent}
+.admin-login-card{border-radius:28px!important;padding:32px!important}
+.admin-login-mark{color:#0071e3}
+.admin-login-submit{border-radius:14px!important}
+.tmp-composer{
+  background:rgba(255,255,255,.82)!important;
+  border:1px solid rgba(255,255,255,.94)!important;
+  border-radius:20px!important;
+  box-shadow:var(--shadow)!important;
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+}
+.tmp-composer-toolbar{background:rgba(245,245,247,.72)!important}
+.tmp-composer-toolbar button{border-radius:10px!important}
+.tmp-rich-editor{background:transparent}
+.thread-message{border-color:rgba(60,60,67,.1)!important}
+.badge,.event-card-status,.schedule-status{border-radius:999px}
+.success-icon{box-shadow:0 8px 22px rgba(48,164,108,.14)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .topbar,#eventPulse,.card,.admin-login-card,.modal-box,.tmp-composer{background:rgba(255,255,255,.97)!important}
+}
+@media(prefers-reduced-transparency:reduce){
+  .topbar,#eventPulse,.card,.admin-login-card,.modal-box,.tmp-composer{
+    -webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:rgba(255,255,255,.97)!important
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}

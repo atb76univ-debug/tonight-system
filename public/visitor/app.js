@@ -224,18 +224,102 @@
     localStorage.setItem(MESSAGE_READ_KEY,String(Date.now())); updateNotificationBadge();
     openModal(`<div class="notification-panel"><div class="notification-panel-head"><div><div class="eyebrow">TONIGHT! NOTIFICATIONS</div><h2>通知</h2><p>TMPからのお知らせ · ${globalMessages.length}件</p></div><button class="text-link" id="enablePushBtn" type="button">通知をオンにする</button></div><div id="notificationMessages">${renderGlobalMessageRows()}</div></div>`);
   }
-  async function enablePushNotifications(){
-    if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){alert('この環境ではプッシュ通知に対応していません。');return;}
-    const permission=await Notification.requestPermission(); if(permission!=='granted'){alert('通知が許可されませんでした。');return;}
+  const PUSH_PROMPT_SESSION_KEY = 'tonight_push_prompt_seen_v1';
+  function pushEnvironment(){
+    const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    return {supported, standalone};
+  }
+  async function getPushSubscription(){
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
     try{
-      const keyRes=await fetch('/api/public/push-key',{cache:'no-store'}), keyData=await keyRes.json();
-      if(!keyData.publicKey){alert('プッシュ通知のサーバー設定がまだ完了していません。TMPにお問い合わせください。');return;}
-      const registration=await navigator.serviceWorker.ready;
-      let subscription=await registration.pushManager.getSubscription();
-      if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:Uint8Array.from(atob(keyData.publicKey.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-keyData.publicKey.length%4)%4)),c=>c.charCodeAt(0))});
-      const res=await fetch('/api/public/push-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription)});
-      if(!res.ok)throw new Error(); alert('TMPからのお知らせ通知を受け取る設定が完了しました。');
-    }catch{alert('通知の設定に失敗しました。ホーム画面への追加・HTTPS接続・ブラウザの通知設定をご確認ください。');}
+      const registration = await navigator.serviceWorker.ready;
+      return await registration.pushManager.getSubscription();
+    }catch{return null;}
+  }
+  function openPushHelp(){
+    openModal(`<section class="push-prompt" role="dialog" aria-modal="true" aria-labelledby="pushPromptTitle">
+      <div class="push-prompt-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 7a11 11 0 0 0-11 11c0 12-5 13-5 17h32c0-4-5-5-5-17A11 11 0 0 0 24 7Z"/><path d="M19 40a5 5 0 0 0 10 0"/></svg></div>
+      <div class="eyebrow">TONIGHT! NOTIFICATIONS</div>
+      <h2 id="pushPromptTitle">通知を受け取りませんか？</h2>
+      <p>次回の開催情報やTMPからのお知らせを、プッシュ通知でお届けします。</p>
+      <div class="push-prompt-actions">
+        <button class="btn" id="pushPromptOpenSettings" type="button">通知を設定する</button>
+        <button class="push-prompt-later" type="button" data-close>あとで設定する</button>
+      </div>
+      <p class="push-prompt-footnote">通知は端末の設定からいつでも変更できます。</p>
+    </section>`);
+  }
+  function openPushDeniedHelp(){
+    openModal(`<section class="push-prompt" role="dialog" aria-modal="true" aria-labelledby="pushPromptTitle">
+      <div class="push-prompt-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 7a11 11 0 0 0-11 11c0 12-5 13-5 17h32c0-4-5-5-5-17A11 11 0 0 0 24 7Z"/><path d="M19 40a5 5 0 0 0 10 0"/></svg></div>
+      <div class="eyebrow">TONIGHT! NOTIFICATIONS</div>
+      <h2 id="pushPromptTitle">通知がオフになっています</h2>
+      <p>通知を受け取るには、端末の設定からtonight!の通知を許可してください。</p>
+      <div class="push-help-steps">
+        <strong>iPhoneの場合</strong>
+        <span>「設定」→「通知」→「tonight!」→「通知を許可」をオン</span>
+        <strong>Mac・その他のブラウザの場合</strong>
+        <span>ブラウザまたはサイトの設定から、tonight!の通知を許可してください。</span>
+      </div>
+      <div class="push-prompt-actions"><button class="btn" type="button" data-close>確認しました</button></div>
+    </section>`);
+  }
+  async function showPushSetupPrompt(){
+    const {supported,standalone} = pushEnvironment();
+    if(!supported || sessionStorage.getItem(PUSH_PROMPT_SESSION_KEY)==='1') return;
+    let subscription = await getPushSubscription();
+    if(Notification.permission==='granted' && subscription) return;
+    sessionStorage.setItem(PUSH_PROMPT_SESSION_KEY,'1');
+    if(Notification.permission==='denied'){openPushDeniedHelp();return;}
+    if(/iPhone|iPad|iPod/.test(navigator.userAgent) && !standalone){
+      openModal(`<section class="push-prompt" role="dialog" aria-modal="true" aria-labelledby="pushPromptTitle">
+        <div class="push-prompt-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 7a11 11 0 0 0-11 11c0 12-5 13-5 17h32c0-4-5-5-5-17A11 11 0 0 0 24 7Z"/><path d="M19 40a5 5 0 0 0 10 0"/></svg></div>
+        <div class="eyebrow">TONIGHT! NOTIFICATIONS</div>
+        <h2 id="pushPromptTitle">通知を受け取る準備をしましょう</h2>
+        <p>iPhoneでプッシュ通知を受け取るには、tonight!をホーム画面に追加してから通知を設定してください。</p>
+        <div class="push-help-steps"><strong>ホーム画面への追加方法</strong><span>Safariの共有ボタンをタップし、「ホーム画面に追加」を選択します。</span></div>
+        <div class="push-prompt-actions"><button class="btn" type="button" data-close>確認しました</button><button class="push-prompt-later" type="button" data-close>あとで設定する</button></div>
+      </section>`);
+      return;
+    }
+    openPushSetupPrompt();
+  }
+  async function subscribeForPush(){
+    const keyRes=await fetch('/api/public/push-key',{cache:'no-store'});
+    if(!keyRes.ok) throw new Error('push-key');
+    const keyData=await keyRes.json();
+    if(!keyData.publicKey) throw new Error('push-not-configured');
+    const registration=await navigator.serviceWorker.ready;
+    let subscription=await registration.pushManager.getSubscription();
+    if(!subscription){
+      const encoded=keyData.publicKey.replace(/-/g,'+').replace(/_/g,'/');
+      const applicationServerKey=Uint8Array.from(atob(encoded+'='.repeat((4-encoded.length%4)%4)),c=>c.charCodeAt(0));
+      subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});
+    }
+    const res=await fetch('/api/public/push-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription)});
+    if(!res.ok) throw new Error('push-subscription');
+    return subscription;
+  }
+  async function enablePushNotifications(){
+    const {supported}=pushEnvironment();
+    if(!supported){alert('この環境ではプッシュ通知に対応していません。');return;}
+    try{
+      let permission=Notification.permission;
+      if(permission==='default') permission=await Notification.requestPermission();
+      if(permission!=='granted'){
+        modalRoot.innerHTML='';
+        openPushDeniedHelp();
+        return;
+      }
+      await subscribeForPush();
+      sessionStorage.setItem(PUSH_PROMPT_SESSION_KEY,'1');
+      modalRoot.innerHTML='';
+      alert('TMPからのお知らせ通知を受け取る設定が完了しました。');
+    }catch(error){
+      if(error?.message==='push-not-configured') alert('プッシュ通知のサーバー設定がまだ完了していません。TMPにお問い合わせください。');
+      else alert('通知の設定に失敗しました。ホーム画面への追加・HTTPS接続・ブラウザの通知設定をご確認ください。');
+    }
   }
   const reactionPending=new Set();
   async function toggleReaction(messageId,emoji){
@@ -378,6 +462,8 @@
       if(selectedId&&!data.events.some(e=>e.id===selectedId)){selectedId=null;page='select';}
       if(!silent){
         render();
+        // 起動時の初回データ表示後にだけ通知案内を出す。
+        window.setTimeout(()=>showPushSetupPrompt(),450);
       }else{
         // Render only after the fresh response has arrived. Previously the 30s
         // timer redrew the schedule before this request completed, leaving old times visible.
@@ -419,7 +505,7 @@
     if(e.target.closest('#calendarAdd')){addToCalendar();return;}
     const rsvpChoice=e.target.closest('[data-rsvp-choice]');if(rsvpChoice){setRsvpStatus(rsvpChoice.dataset.rsvpChoice);return;}
     if(e.target.closest('#rsvpCancel')){cancelRsvp();return;}
-    if(e.target.closest('#enablePushBtn')){enablePushNotifications();return;}
+    if(e.target.closest('#enablePushBtn,#pushPromptOpenSettings')){enablePushNotifications();return;}
     if(e.target.closest('#notificationBtn,[data-open-notifications]')){openNotifications();return;}
     const reaction=e.target.closest('[data-reaction]');if(reaction){toggleReaction(reaction.dataset.message,reaction.dataset.reaction);return;}
     if(e.target.closest('#backBtn')){if(page==='detail'){setPage('home');return;}setPage('home');return;}
