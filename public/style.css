@@ -4662,12 +4662,155 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 }
 
 
-/* v79: remove only the extra outer backdrop behind drink-page content.
-   Keep the current inner cards, controls, spacing, and component styling intact. */
-#app:has(.bar-page-nav) .card[data-bar-section]{
-  background:transparent!important;
-  border-color:transparent!important;
-  box-shadow:none!important;
+/* v78: Restore the complete bar-counter page to its earlier, plain UI.
+   Scope is the entire bar page (sales, products, history, cash/settlement). */
+#app:has(.bar-page-nav) .card,
+#app:has(.bar-page-nav) .bar-panel{
+  background:#fff!important;
+  border:1px solid rgba(60,60,67,.08)!important;
+  border-radius:var(--radius)!important;
+  box-shadow:var(--shadow)!important;
   -webkit-backdrop-filter:none!important;
   backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .bar-page-nav{
+  background:transparent!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .bar-page-tab{
+  background:#f5f7fb!important;color:#59677c!important;
+  border:1px solid #d9e0eb!important;border-radius:11px!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .bar-page-tab.active{
+  background:#263b5b!important;color:#fff!important;border-color:#263b5b!important;
+  box-shadow:0 4px 12px rgba(38,59,91,.18)!important;
+}
+#app:has(.bar-page-nav) .sales-summary-grid,
+#app:has(.bar-page-nav) .sales-summary-grid.report-summary{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:8px!important;margin:2px 0 18px!important;
+  padding:0!important;background:transparent!important;border:0!important;
+  border-radius:0!important;box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .sales-summary-grid>div{
+  min-width:0!important;padding:11px 10px!important;
+  background:#f5f5f8!important;border:0!important;border-radius:12px!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .product-tile-card{
+  background:transparent!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;backdrop-filter:none!important;padding:0!important;
+}
+#app:has(.bar-page-nav) .product-tile{
+  background:#fff!important;border:1px solid #e8e8ee!important;
+  border-radius:13px!important;box-shadow:0 2px 6px rgba(0,0,0,.035)!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .cart-panel,
+#app:has(.bar-page-nav) .bar-checkout-cart{
+  background:#fafafa!important;border:1px solid #e8e8ee!important;
+  border-radius:14px!important;box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .bar-cart-dock{
+  background:rgba(255,255,255,.97)!important;border:1px solid #dce3ef!important;
+  border-radius:16px!important;box-shadow:0 8px 28px rgba(25,42,68,.16)!important;
+  -webkit-backdrop-filter:blur(12px)!important;backdrop-filter:blur(12px)!important;
+}
+#app:has(.bar-page-nav) .bar-latest-orders{
+  background:#f7faff!important;border:1px solid #dfe7f2!important;
+  border-radius:14px!important;box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .bar-latest-order,
+#app:has(.bar-page-nav) .sale-history-row,
+#app:has(.bar-page-nav) .deleted-history-row{
+  background:transparent!important;border-radius:0!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .product-admin-list{
+  display:grid!important;gap:0!important;background:transparent!important;
+  border:0!important;border-top:1px solid #e5e5ea!important;
+  border-radius:0!important;box-shadow:none!important;
+}
+#app:has(.bar-page-nav) .product-admin-row{
+  display:grid!important;grid-template-columns:minmax(0,1fr) 90px auto auto!important;
+  gap:6px!important;align-items:center!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  padding:10px 0!important;margin:0!important;
+  background:transparent!important;border:0!important;border-bottom:1px solid #e5e5ea!important;
+  border-radius:0!important;box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .product-admin-row>input,
+#app:has(.bar-page-nav) .add-product-form input{
+  min-width:0!important;width:100%!important;min-height:42px!important;
+  padding:10px 12px!important;background:#fff!important;
+  border:1px solid #d2d2d7!important;border-radius:9px!important;
+  box-shadow:none!important;
+}
+#app:has(.bar-page-nav) .product-admin-actions{display:contents!important}
+#app:has(.bar-page-nav) .product-admin-row .btn,
+#app:has(.bar-page-nav) .product-admin-row .mini-danger{
+  width:auto!important;min-height:38px!important;padding:9px 10px!important;
+  border-radius:9px!important;box-shadow:none!important;white-space:nowrap!important;
+}
+#app:has(.bar-page-nav) .add-product-form{
+  display:grid!important;grid-template-columns:minmax(0,1fr) 100px!important;
+  gap:8px!important;margin-top:14px!important;
+  padding:0!important;background:transparent!important;border:0!important;
+  border-radius:0!important;box-shadow:none!important;
+}
+#app:has(.bar-page-nav) .add-product-form .btn{grid-column:1/-1!important}
+#app:has(.bar-page-nav) .money-display,
+#app:has(.bar-page-nav) .cash-denomination,
+#app:has(.bar-page-nav) .cash-entry-row,
+#app:has(.bar-page-nav) .counter-row{
+  background:#f5f5f7!important;border:1px solid rgba(60,60,67,.07)!important;
+  border-radius:14px!important;box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .form-row,
+#app:has(.bar-page-nav) .cash-breakdown,
+#app:has(.bar-page-nav) .cash-count-list{
+  background:transparent!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) input,
+#app:has(.bar-page-nav) select,
+#app:has(.bar-page-nav) textarea{
+  background:#fff!important;box-shadow:none!important;
+  border-radius:12px!important;
+}
+#app:has(.bar-page-nav) .btn,
+#app:has(.bar-page-nav) .mini-danger,
+#app:has(.bar-page-nav) .qty-btn{
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) .report-summary{padding:0!important}
+@media(max-width:700px){
+  #app:has(.bar-page-nav) .product-admin-row{
+    grid-template-columns:minmax(0,1fr) 82px!important;gap:7px!important;
+  }
+  #app:has(.bar-page-nav) .product-admin-actions{
+    display:grid!important;grid-column:1/-1!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px!important;
+  }
+  #app:has(.bar-page-nav) .product-admin-actions>button{
+    width:100%!important;min-width:0!important;min-height:38px!important;
+    padding:7px 4px!important;font-size:11px!important;
+  }
+}
+@media(max-width:420px){
+  #app:has(.bar-page-nav) .sales-summary-grid{grid-template-columns:1fr!important}
+  #app:has(.bar-page-nav) .product-admin-row{grid-template-columns:minmax(0,1fr) 72px!important}
+}
+
+
+/* v80: Remove the extra fill behind drink-page sections without changing layout. */
+#app:has(.bar-page-nav) > .card[data-bar-section],
+#app:has(.bar-page-nav) .card[data-bar-section]{
+  background-color:transparent!important;
 }
