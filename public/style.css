@@ -4470,3 +4470,48 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   .offset-controls .btn{font-size:13px!important;min-height:48px;padding:0!important}
   .offset-controls strong{font-size:18px!important;min-height:48px}
 }
+
+
+/* v76: restore the restrained charcoal primary-button treatment.
+   Blue remains an accent for links and focus indicators, not large button fills. */
+:root{--primary:#1d1d1f!important;--accent:#1d1d1f!important}
+.btn-primary,.primary-button,.button-primary,button.primary,button.is-primary,
+.cashier-confirm,.confirm-button,.submit-button{
+  background:#1d1d1f!important;border-color:#1d1d1f!important;color:#fff!important;box-shadow:none!important;
+}
+.btn-primary:hover,.primary-button:hover,.button-primary:hover,button.primary:hover,
+button.is-primary:hover,.cashier-confirm:hover:not(:disabled),.confirm-button:hover,.submit-button:hover{
+  background:#333438!important;border-color:#333438!important;color:#fff!important;
+}
+.btn-primary:active,.primary-button:active,.button-primary:active,button.primary:active,button.is-primary:active{
+  background:#111!important;border-color:#111!important;
+}
+
+
+/* v77: restore the original clean Apple-blue buttons (no gradient or heavy glow). */
+:root{--primary:#0071e3!important;--accent:#0071e3!important}
+.btn-primary,.primary-button,.button-primary,button.primary,button.is-primary,
+.submit-button,.confirm-button,.cashier-confirm,.admin-login-submit,.member-add-btn{
+  background:#0071e3!important;
+  background-image:none!important;
+  border-color:#0071e3!important;
+  color:#fff!important;
+  box-shadow:none!important;
+  filter:none!important;
+}
+.btn-primary:hover,.primary-button:hover,.button-primary:hover,button.primary:hover,button.is-primary:hover,
+.submit-button:hover,.confirm-button:hover,.cashier-confirm:hover:not(:disabled),.admin-login-submit:hover,.member-add-btn:hover{
+  background:#0077ed!important;
+  background-image:none!important;
+  border-color:#0077ed!important;
+  box-shadow:0 2px 6px rgba(0,113,227,.14)!important;
+  transform:none!important;
+}
+.btn-primary:active,.primary-button:active,.button-primary:active,button.primary:active,button.is-primary:active,
+.submit-button:active,.confirm-button:active,.cashier-confirm:active:not(:disabled){
+  background:#0066cc!important;
+  background-image:none!important;
+  border-color:#0066cc!important;
+  box-shadow:none!important;
+  transform:scale(.99)!important;
+}
