@@ -295,10 +295,12 @@ export class Store {
       }
       return text('method not allowed',405,{Allow:'GET, POST'});
     }
-    if (path.startsWith('/messages/') && req.method === 'PUT') {
+    if (path.startsWith('/messages/') && (req.method === 'PUT' || req.method === 'DELETE')) {
+      const id=path.slice('/messages/'.length), key='messages:global', messages=(await this.state.storage.get(key))||[], index=messages.findIndex(m=>m.id===id);
+      if(index<0)return text('message not found',404);
+      if(req.method==='DELETE'){messages.splice(index,1);await this.state.storage.put(key,messages);return json({ok:true,deleted:true});}
       let body; try { body=await req.json(); } catch { return text('bad json',400); }
-      const id=path.slice('/messages/'.length), key='messages:global', messages=(await this.state.storage.get(key))||[], message=messages.find(m=>m.id===id);
-      if(!message)return text('message not found',404);
+      const message=messages[index];
       message.html=String(body.html||'').slice(0,10000); message.text=String(body.text||'').trim().slice(0,2000); message.updatedAt=Date.now();
       if(!message.text && !message.html)return text('message required',400);
       await this.state.storage.put(key,messages); return json({ok:true,message});
@@ -490,13 +492,14 @@ export default {
       let push={sent:0,configured:false}; if(body.notify!==false)push=await sendPushNotifications(env,'tonight!｜TMPからのお知らせ',String(body.text||'').slice(0,120));
       const payload=await inner.json(); return secureResponse(json({...payload,push}),url);
     }
-    if (url.pathname.startsWith('/api/admin/messages/') && request.method==='PUT') {
+    if (url.pathname.startsWith('/api/admin/messages/') && ['PUT','DELETE'].includes(request.method)) {
       if(!(await requireAdmin(request,env)))return secureResponse(json({error:'authentication required'},401),url);
       if(!sameOrigin(request))return secureResponse(json({error:'origin rejected'},403),url);
-      if(await exceedsBodyLimit(request,16000))return secureResponse(json({error:'payload too large'},413),url);
-      let body;try{body=await request.json()}catch{return secureResponse(text('bad json',400),url)}
       const id=decodeURIComponent(url.pathname.split('/').pop()); if(!/^[A-Za-z0-9_-]{10,80}$/.test(id))return secureResponse(text('bad id',400),url);
       const stub=env.STORE.get(env.STORE.idFromName('main'));
+      if(request.method==='DELETE'){const inner=await stub.fetch('https://do/messages/'+id,{method:'DELETE'});return secureResponse(inner,url);}
+      if(await exceedsBodyLimit(request,16000))return secureResponse(json({error:'payload too large'},413),url);
+      let body;try{body=await request.json()}catch{return secureResponse(text('bad json',400),url)}
       const inner=await stub.fetch('https://do/messages/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:body.text,html:sanitizeAnnouncementHtml(String(body.html||''))})});
       return secureResponse(inner,url);
     }

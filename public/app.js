@@ -3230,8 +3230,15 @@ async function renderGlobalMessages() {
     const host=document.getElementById('adminMessageList');
     try{
       const r=await fetch('/api/public/messages',{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error();const rows=await r.json();
-      host.innerHTML=rows.length?rows.slice().reverse().map(m=>`<article class="thread-message"><div class="thread-message-meta"><span class="tmp-author"><img src="TMPlogo.png" alt=""><strong>TMP</strong></span><time>${new Date(m.createdAt).toLocaleString('ja-JP')}</time></div><div class="thread-message-body">${m.html||esc(m.text).replace(/\n/g,'<br>')}</div><small>リアクション ${Object.values(m.reactions||{}).reduce((n,v)=>n+Number(v||0),0)}件</small><button class="btn btn-secondary btn-small" data-edit-message="${esc(m.id)}">編集</button></article>`).join(''):'<p class="sub-text">投稿はまだありません。</p>';
+      host.innerHTML=rows.length?rows.slice().reverse().map(m=>`<article class="thread-message"><div class="thread-message-meta"><span class="tmp-author"><img src="TMPlogo.png" alt=""><strong>TMP</strong></span><time>${new Date(m.createdAt).toLocaleString('ja-JP')}</time></div><div class="thread-message-body">${m.html||esc(m.text).replace(/\n/g,'<br>')}</div><small>リアクション ${Object.values(m.reactions||{}).reduce((n,v)=>n+Number(v||0),0)}件</small><div class="thread-admin-actions"><button class="btn btn-secondary btn-small" data-edit-message="${esc(m.id)}">編集</button><button class="btn btn-danger btn-small" data-delete-message="${esc(m.id)}">削除</button></div></article>`).join(''):'<p class="sub-text">投稿はまだありません。</p>';
       host.querySelectorAll('[data-edit-message]').forEach(btn=>btn.onclick=()=>editMessage(rows.find(m=>m.id===btn.dataset.editMessage)));
+      host.querySelectorAll('[data-delete-message]').forEach(btn=>btn.onclick=async()=>{
+        const message=rows.find(m=>m.id===btn.dataset.deleteMessage); if(!message)return;
+        if(!confirm('この投稿を削除しますか？\n削除した投稿は来場者アプリからも表示されなくなります。'))return;
+        btn.disabled=true;
+        try{const r=await fetch(`/api/admin/messages/${encodeURIComponent(message.id)}`,{method:'DELETE',credentials:'same-origin'});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'削除に失敗しました');await load();}
+        catch(e){alert(e.message||'削除に失敗しました。');btn.disabled=false;}
+      });
     }catch{host.textContent='投稿を読み込めませんでした。';}
   };
   const editMessage=async m=>{

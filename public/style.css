@@ -4103,3 +4103,12 @@ input,select,textarea{border-radius:12px}
 .tmp-rich-editor blockquote{margin:8px 0;padding:8px 13px;border-left:3px solid #0071e3;background:#f5f8fc;color:#51545a;border-radius:0 9px 9px 0}
 .tmp-composer-footer{display:flex;justify-content:space-between;gap:12px;padding:8px 14px;border-top:1px solid rgba(60,60,67,.1);color:#8e8e93;font-size:11px}
 @media(max-width:600px){.tmp-composer-toolbar{gap:6px;padding:9px}.tmp-composer-toolbar button{min-width:34px;height:34px}.tmp-composer-footer{font-size:10px}.tmp-rich-editor{min-height:160px}}
+
+
+/* v59: realtime status is a separate strip below the admin header */
+#eventPulse{position:sticky;top:var(--topbar-h,68px);z-index:80;width:100%;box-sizing:border-box;margin:0;border-radius:0 0 16px 16px;}
+.topbar{z-index:100;}
+.thread-admin-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.thread-admin-actions .btn{min-width:76px;}
+.thread-admin-actions .btn-danger{background:#fff5f5;border:1px solid #f0caca;color:#b42318;}
+@media(max-width:600px){.thread-admin-actions .btn{flex:1;}}
