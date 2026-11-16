@@ -2681,7 +2681,7 @@ function mergeInto(t, s) {
   return t;
 }
 function dbSig() {
-  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||recipes=" + (db.drinkRecipesUpdated || 0) + ":" + (db.drinkRecipes || []).map(r => `${r.productName}:${r.ingredients||""}:${r.steps||""}`).join("|") + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt", "gallery"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
+  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||recipes=" + (db.drinkRecipesUpdated || 0) + ":" + (db.drinkRecipes || []).map(r => `${r.productName}:${r.steps||""}`).join("|") + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt", "gallery"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
 }
 function setSync(t) { const e = document.getElementById("sync"); if (e) e.textContent = t; }
 function saveLocalDb() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {} }
@@ -3777,21 +3777,25 @@ function normalizeRecipeName(value) {
 function recipeGlassIllustration(name, compact = false) {
   const n = String(name || "");
   const isBeer = /ビール|シャンディ|コークビア/.test(n);
-  const isHighball = /ハイボール|ウイスキー|ジンジャーハイ|コークハイ/.test(n);
   const isSour = /サワー|レモン/.test(n);
-  const liquid = isBeer ? "#e8ad36" : isHighball ? "#d7a34c" : isSour ? "#e9d65d" : /カシス|レゲエ/.test(n) ? "#9b477a" : /モスコミュール|ジンジャー/.test(n) ? "#c98a43" : "#b9d9d2";
-  const garnish = isSour ? '<path d="M63 25a13 13 0 1 0 26 0a13 13 0 1 0-26 0" fill="#f3dc54" stroke="#d0ae28" stroke-width="2"/><path d="M76 12v26M63 25h26" stroke="#fff5bd" stroke-width="2"/>' : isBeer ? '<path d="M59 22c-2-9 8-14 15-8 5-10 19-4 17 6 9 3 6 14-2 14H67c-8 0-12-7-8-12" fill="#fff" opacity=".92"/>' : '<path d="M79 13l15 10-15 10-15-10z" fill="#9bcf8a" stroke="#6da66b" stroke-width="2"/>';
-  return `<svg viewBox="0 0 150 150" role="img" aria-label="${esc(n)}のドリンクイラスト" class="recipe-glass-svg ${compact ? "is-compact" : ""}"><defs><linearGradient id="glassshine" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".8"/><stop offset=".45" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient></defs><ellipse cx="75" cy="128" rx="38" ry="7" fill="#7d8da5" opacity=".13"/><path d="M44 37h62l-7 77c-.5 7-6 11-13 11H64c-7 0-12-4-13-11z" fill="${liquid}" opacity=".9"/><path d="M44 37h62l-7 77c-.5 7-6 11-13 11H64c-7 0-12-4-13-11z" fill="url(#glassshine)" stroke="#a8b8c9" stroke-width="3" stroke-linejoin="round"/><path d="M49 43h52" stroke="#fff" stroke-width="3" opacity=".9"/>${garnish}<path d="M56 51l6 57" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".42"/><path d="M102 48l-6 62" stroke="#fff" stroke-width="2" opacity=".32"/></svg>`;
+  const isDark = /カシス|レゲエ|コーク/.test(n);
+  const liquid = isBeer ? "#E7B64B" : isSour ? "#E8D65D" : isDark ? "#9B6B91" : "#9CCBC4";
+  const glass = isBeer
+    ? '<path d="M42 38h58v65a9 9 0 0 1-9 9H51a9 9 0 0 1-9-9z" fill="#fff" stroke="#53657A" stroke-width="4"/><path d="M101 53h12a12 12 0 0 1 0 24h-12" fill="none" stroke="#53657A" stroke-width="4"/><path d="M47 58h48v45a5 5 0 0 1-5 5H52a5 5 0 0 1-5-5z" fill="' + liquid + '"/>'
+    : '<path d="M43 35h64l-8 77a9 9 0 0 1-9 8H60a9 9 0 0 1-9-8z" fill="#fff" stroke="#53657A" stroke-width="4" stroke-linejoin="round"/><path d="M49 58h52l-5 51a5 5 0 0 1-5 4H60a5 5 0 0 1-5-4z" fill="' + liquid + '"/>';
+  const garnish = isSour
+    ? '<circle cx="91" cy="35" r="13" fill="#F4D94E" stroke="#53657A" stroke-width="3"/><path d="M91 23v24M79 35h24" stroke="#fff" stroke-width="2.5"/>'
+    : '<path d="M68 49l15-14 15 14" fill="none" stroke="#53657A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M83 35l10-13" stroke="#53657A" stroke-width="3.5" stroke-linecap="round"/>';
+  return `<svg viewBox="0 0 150 150" role="img" aria-label="${esc(n)}のアイコン" class="recipe-glass-svg ${compact ? "is-compact" : ""}"><path d="M38 128h76" stroke="#B7C3D1" stroke-width="4" stroke-linecap="round"/>${glass}${garnish}</svg>`;
 }
 function showDrinkRecipe(productName) {
   selectedRecipeName = productName;
   const recipe = (db.drinkRecipes || []).find(r => normalizeRecipeName(r.productName) === normalizeRecipeName(productName));
-  const ingredients = String(recipe?.ingredients || "").split(/\r?\n|[；;]/).map(x => x.trim()).filter(Boolean);
   const steps = String(recipe?.steps || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const overlay = document.createElement("div");
   overlay.className = "recipe-glass-overlay";
   overlay.id = "drinkRecipeOverlay";
-  overlay.innerHTML = `<section class="recipe-glass-dialog" role="dialog" aria-modal="true" aria-labelledby="recipeDialogTitle"><button type="button" class="recipe-glass-close" aria-label="閉じる">×</button><div class="recipe-dialog-art">${recipeGlassIllustration(productName)}</div><div class="recipe-dialog-content"><span class="recipe-eyebrow">TONIGHT! RECIPE</span><h2 id="recipeDialogTitle">${esc(productName)}</h2>${recipe ? `<div class="recipe-detail-block"><h3>材料</h3>${ingredients.length ? `<ul>${ingredients.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>材料の記載はありません。</p>`}</div><div class="recipe-detail-block"><h3>作り方</h3>${steps.length ? `<ol>${steps.map(x => `<li>${esc(x.replace(/^\d+[.)．、]\s*/, ""))}</li>`).join("")}</ol>` : `<p>作り方の記載はありません。</p>`}</div>${recipe.note ? `<p class="recipe-note">${esc(recipe.note)}</p>` : ""}` : `<div class="recipe-empty-state"><strong>作り方はまだ登録されていません</strong><p>ExcelまたはCSVから、この商品の材料と作り方を取り込んでください。</p></div>`}</div></section>`;
+  overlay.innerHTML = `<section class="recipe-glass-dialog" role="dialog" aria-modal="true" aria-labelledby="recipeDialogTitle"><button type="button" class="recipe-glass-close" aria-label="閉じる">×</button><div class="recipe-dialog-art">${recipeGlassIllustration(productName)}</div><div class="recipe-dialog-content"><h2 id="recipeDialogTitle">${esc(productName)}</h2>${recipe ? `<div class="recipe-detail-block"><h3>作り方</h3>${steps.length ? `<ol>${steps.map(x => `<li>${esc(x.replace(/^\d+[.)．、]\s*/, ""))}</li>`).join("")}</ol>` : `<p>作り方の記載はありません。</p>`}</div>${recipe.note ? `<p class="recipe-note">${esc(recipe.note)}</p>` : ""}` : `<div class="recipe-empty-state"><strong>作り方はまだ登録されていません</strong><p>ExcelまたはCSVから作り方を取り込んでください。</p></div>`}</div></section>`;
   const onEscape = e => { if (e.key === "Escape" && document.getElementById("drinkRecipeOverlay")) close(); };
   const close = () => { overlay.remove(); selectedRecipeName = ""; document.removeEventListener("keydown", onEscape); };
   overlay.addEventListener("click", e => { if (e.target === overlay || e.target.closest(".recipe-glass-close")) close(); });
@@ -3809,23 +3813,23 @@ async function importDrinkRecipes(file) {
       rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "", raw: false });
     }
     const norm = value => String(value ?? "").normalize("NFKC").toLowerCase().replace(/[\s　_*・:：()（）「」【】\[\]\-]/g, "");
-    let headerIndex = -1, cols = { name: -1, ingredients: -1, steps: -1, note: -1 };
+    let headerIndex = -1, cols = { name: -1, steps: -1, note: -1 };
     for (let i = 0; i < Math.min(rows.length, 30); i++) {
       const h = (rows[i] || []).map(norm);
       const find = names => h.findIndex(x => names.some(n => x === norm(n) || x.includes(norm(n))));
-      const candidate = { name: find(["商品名", "ドリンク名", "メニュー名", "名前", "name"]), ingredients: find(["材料", "ingredients"]), steps: find(["作り方", "手順", "レシピ", "steps", "method"]), note: find(["備考", "メモ", "note"]) };
-      if (candidate.name >= 0 && (candidate.ingredients >= 0 || candidate.steps >= 0)) { headerIndex = i; cols = candidate; break; }
+      const candidate = { name: find(["商品名", "ドリンク名", "メニュー名", "名前", "name"]), steps: find(["作り方", "手順", "レシピ", "steps", "method"]), note: find(["備考", "メモ", "note"]) };
+      if (candidate.name >= 0 && candidate.steps >= 0) { headerIndex = i; cols = candidate; break; }
     }
-    if (headerIndex < 0) throw new Error("見出し行を特定できません。『商品名』『材料』『作り方』の列を用意してください。");
+    if (headerIndex < 0) throw new Error("見出し行を特定できません。『商品名』『作り方』の列を用意してください。");
     let added = 0, updated = 0, skipped = 0;
     for (const row of rows.slice(headerIndex + 1)) {
       const productName = String(row[cols.name] ?? "").trim();
       if (!productName) { skipped++; continue; }
-      const value = { productName, ingredients: cols.ingredients >= 0 ? String(row[cols.ingredients] ?? "").trim() : "", steps: cols.steps >= 0 ? String(row[cols.steps] ?? "").trim() : "", note: cols.note >= 0 ? String(row[cols.note] ?? "").trim() : "" };
+      const value = { productName, steps: String(row[cols.steps] ?? "").trim(), note: cols.note >= 0 ? String(row[cols.note] ?? "").trim() : "" };
       const existing = (db.drinkRecipes || []).find(r => normalizeRecipeName(r.productName) === normalizeRecipeName(productName));
       if (existing) { Object.assign(existing, value); updated++; } else { db.drinkRecipes = [...(db.drinkRecipes || []), value]; added++; }
     }
-    if (!added && !updated) throw new Error("取り込める作り方がありませんでした。商品名と材料／作り方を確認してください。");
+    if (!added && !updated) throw new Error("取り込める作り方がありませんでした。商品名と作り方を確認してください。");
     db.drinkRecipesUpdated = Date.now(); persistDb();
     alert(`作り方の取り込みが完了しました。\n新規：${added}件／更新：${updated}件${skipped ? `／空欄スキップ：${skipped}行` : ""}`);
     renderBarHome();
@@ -3973,17 +3977,17 @@ function renderBarHome() {
   </div>
 
   <div class="card recipe-library-card" data-bar-section="recipes">
-    <div class="sales-heading"><div><div class="card-title">ドリンクの作り方</div><p class="sub-text">商品名をタップすると、材料と作り方を確認できます。</p></div><span class="sales-live"><i></i> RECIPE BOOK</span></div>
+    <div class="sales-heading"><div class="card-title">ドリンクの作り方</div></div>
     <div class="recipe-import-panel">
-      <div class="recipe-import-copy"><strong>作り方を一括登録</strong><small>Excel（.xlsx）またはCSV（.csv）から取り込めます。</small></div>
+      <div class="recipe-import-copy"><strong>作り方を一括登録</strong><span>ExcelまたはCSVから取り込めます。</span></div>
       <label class="btn btn-secondary recipe-import-button" for="drinkRecipeFile">ファイルを選択</label>
       <input type="file" id="drinkRecipeFile" accept=".csv,.xlsx,.xls" hidden>
-      <small class="recipe-format-hint">列名：商品名／材料／作り方（手順）　※イラストは商品に合わせて自動表示します。</small>
+      <div class="recipe-format-hint">列名：商品名／作り方／備考</div>
     </div>
     <div class="recipe-product-grid">
       ${b.products.map(p => {
         const recipe = (db.drinkRecipes || []).find(r => normalizeRecipeName(r.productName) === normalizeRecipeName(p.name));
-        return `<button type="button" class="recipe-product-tile" data-open-recipe="${esc(p.name)}"><span class="recipe-tile-art">${recipeGlassIllustration(p.name, true)}</span><strong>${esc(p.name)}</strong><small>${recipe ? "作り方を見る" : "作り方未登録"}</small></button>`;
+        return `<button type="button" class="recipe-product-tile" data-open-recipe="${esc(p.name)}"><span class="recipe-tile-art">${recipeGlassIllustration(p.name, true)}</span><strong>${esc(p.name)}</strong></button>`;
       }).join("") || `<div class="sub-text">販売メニューに商品がありません。</div>`}
     </div>
   </div>
