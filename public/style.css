@@ -4470,35 +4470,3 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   .offset-controls .btn{font-size:13px!important;min-height:48px;padding:0!important}
   .offset-controls strong{font-size:18px!important;min-height:48px}
 }
-
-
-/* v77: restore the reference CSS blue-button appearance only.
-   Intentionally excludes every button inside .offset-controls. */
-.btn-primary:not(.offset-controls .btn-primary),
-.primary-button:not(.offset-controls .primary-button),
-.button-primary:not(.offset-controls .button-primary),
-button.primary:not(.offset-controls button.primary),
-button.is-primary:not(.offset-controls button.is-primary),
-.cashier-confirm{
-  background:linear-gradient(180deg,#1684ed,#0071e3)!important;
-  background-color:#0071e3!important;
-  border-color:#0071e3!important;
-  color:#fff!important;
-  filter:none!important;
-  opacity:1!important;
-}
-@media(hover:hover) and (pointer:fine){
-  .btn-primary:not(.offset-controls .btn-primary):hover,
-  .primary-button:not(.offset-controls .primary-button):hover,
-  .button-primary:not(.offset-controls .button-primary):hover,
-  button.primary:not(.offset-controls button.primary):hover,
-  button.is-primary:not(.offset-controls button.is-primary):hover,
-  .cashier-confirm:hover:not(:disabled){
-    background:linear-gradient(180deg,#1684ed,#0071e3)!important;
-    border-color:#0071e3!important;
-    color:#fff!important;
-    transform:translateY(-2px)!important;
-    box-shadow:0 5px 14px rgba(0,0,0,.09)!important;
-    filter:none!important;opacity:1!important;
-  }
-}

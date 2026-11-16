@@ -280,8 +280,14 @@ export class Store {
           instagram: String(member.instagram || ''), genre: String(member.genre || ''), favoriteArtists: String(member.favoriteArtists || ''),
           favorite: String(member.favorite || ''), photo: /^https:\/\//i.test(String(member.photo || '')) ? String(member.photo) : '',
           spotifyPlaylist: /^https:\/\//i.test(String(member.spotifyPlaylist || '')) ? String(member.spotifyPlaylist) : '' }));
-        const products = (Array.isArray(event.bar?.products) ? event.bar.products : (Array.isArray(current.drinkLineup) ? current.drinkLineup : []))
-          .map(product => ({ id: String(product.id || ''), name: String(product.name || ''), price: Math.max(0, Number(product.price || 0)), soldOut: Boolean(product.soldOut) }));
+        // 商品名・価格は全端末共通の drinkLineup を正本とし、売切れ状態だけイベント別データから引き継ぐ。
+        const eventProducts = Array.isArray(event.bar?.products) ? event.bar.products : [];
+        const catalog = Array.isArray(current.drinkLineup) ? current.drinkLineup : eventProducts;
+        const products = catalog.map(product => ({
+          id: String(product.id || ''), name: String(product.name || ''),
+          price: Math.max(0, Number(product.price || 0)),
+          soldOut: Boolean(eventProducts.find(item => String(item.id) === String(product.id))?.soldOut)
+        }));
         return { id: String(event.id), name: String(event.name || ''), date: String(event.date || ''), flyer: Number(event.flyer || 0),
           archived: Boolean(event.archived), acts, members: publicMembers, products, offsetMinutes: Number(tt.offsetMinutes || 0),
           gallery: Array.isArray(event.gallery) ? event.gallery.filter(x => typeof x === 'string' && (/^https:\/\//.test(x) || /^\/api\/gallery\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(x))).slice(0, 60) : [],
