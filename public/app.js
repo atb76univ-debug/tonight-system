@@ -3960,7 +3960,7 @@ function renderBarHome() {
           const qty = selected ? selected.qty : 0;
           return `<div class="product-tile-card" data-product-card="${esc(p.id)}">
             <button type="button" class="product-tile ${p.soldOut ? "sold-out" : ""} ${qty ? "has-selection" : ""}" data-add-product="${esc(p.id)}" ${p.soldOut ? "disabled aria-disabled=\"true\"" : ""}>
-              <img class="sales-drink-icon" src="${drinkIconSrc(p.name)}" alt="" loading="lazy"><span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>${p.soldOut ? "売切れ" : "＋ 注文に追加"}</small>
+              <span class="product-tile-copy"><span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong></span><img class="sales-drink-icon" src="${drinkIconSrc(p.name)}" alt="" loading="lazy">
             </button>
             <div class="product-selection-qty" data-selection-qty="${esc(p.id)}" ${qty ? "" : "hidden"}>
               <button type="button" class="qty-btn" data-selection-dec="${esc(p.id)}" aria-label="${esc(p.name)}を1つ減らす">−</button>
@@ -3992,7 +3992,7 @@ function renderBarHome() {
     <div class="recipe-product-grid">
       ${b.products.map(p => {
         const recipe = (db.drinkRecipes || []).find(r => normalizeRecipeName(r.productName) === normalizeRecipeName(p.name));
-        return `<button type="button" class="recipe-product-tile" data-open-recipe="${esc(p.name)}"><span class="recipe-tile-art">${recipeGlassIllustration(p.name, true)}</span><strong>${esc(p.name)}</strong></button>`;
+        return `<button type="button" class="recipe-product-tile" data-open-recipe="${esc(p.name)}"><span class="recipe-product-copy"><strong>${esc(p.name)}</strong><b>${yen(Number(p.price || 0))}</b></span><span class="recipe-tile-art">${recipeGlassIllustration(p.name, true)}</span></button>`;
       }).join("") || `<div class="sub-text">販売メニューに商品がありません。</div>`}
     </div>
   </div>
