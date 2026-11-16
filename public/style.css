@@ -4112,3 +4112,33 @@ input,select,textarea{border-radius:12px}
 .thread-admin-actions .btn{min-width:76px;}
 .thread-admin-actions .btn-danger{background:#fff5f5;border:1px solid #f0caca;color:#b42318;}
 @media(max-width:600px){.thread-admin-actions .btn{flex:1;}}
+
+/* v60: place realtime status in normal flow directly below the admin header.
+   Override legacy absolute-centering rules that caused it to float over the flyer. */
+#eventPulse{
+  position:relative!important;
+  top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;
+  transform:none!important;
+  display:block!important;
+  width:100%!important;max-width:none!important;
+  margin:0!important;padding:10px 16px!important;
+  box-sizing:border-box!important;
+  flex:none!important;
+  z-index:1!important;
+  background:rgba(245,245,247,.96)!important;
+  border:0!important;border-bottom:1px solid #e5e5ea!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  backdrop-filter:blur(16px);
+}
+#eventPulse.hidden{display:none!important}
+#eventPulse #globalNowBox{width:min(100%,1200px)!important;margin:0 auto!important}
+#eventPulse .admin-header-pulse{
+  width:max-content;max-width:100%;margin:0 auto;
+  animation:none!important;transform:none!important;
+  box-shadow:0 2px 8px rgba(0,0,0,.06)!important;
+}
+@media(max-width:760px){
+  #eventPulse{padding:8px 10px!important}
+  #eventPulse .admin-header-pulse{width:max-content;max-width:100%;flex-wrap:wrap}
+}
