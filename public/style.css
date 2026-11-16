@@ -4298,3 +4298,14 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 /* v64: TMP mark in the administrator header */
 #pageTitle{display:flex;align-items:center;gap:10px;min-width:0}
 #pageTitle::before{content:"";display:inline-block;flex:0 0 32px;width:32px;height:32px;background:url("TMPlogo.png") center/contain no-repeat}
+
+
+/* v66: reliable event flyer thumbnails and visible no-flyer fallback */
+.event-card.compact-event{background:#f0f0f3!important;isolation:isolate}
+.event-card.compact-event .event-card-flyer{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;background:#ececf0;z-index:0}
+.event-card.compact-event .event-card-placeholder{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(145deg,#f7f7f9,#e5e5ea);z-index:0}
+.event-card.compact-event .event-card-placeholder img{width:34%;height:34%;object-fit:contain;opacity:.82}
+.event-card.compact-event.noflyer:before{background:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.62) 100%)!important;z-index:0}
+.event-card.compact-event.has-flyer:before{z-index:0}
+/* Keep the blue tone steady on hover; retain the existing subtle lift. */
+.btn-primary:hover,.primary-button:hover,.button-primary:hover,button.primary:hover,button.is-primary:hover,.cashier-confirm:hover:not(:disabled),.confirm-button:hover,.submit-button:hover{background:#0071e3!important;border-color:#0071e3!important;filter:none!important;opacity:1!important}

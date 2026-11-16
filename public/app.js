@@ -2867,7 +2867,8 @@ function renderEventList() {
     list.forEach((e, i) => {
       const s = stats[i], url = flyerUrl(e), drinks = summarizeBarSales(e.bar);
       const drinkCount = drinks.totalUnits || Number(e.bar?.tally || 0);
-      html += `<button class="event-card compact-event ${url ? "" : "noflyer"}" data-open="${esc(e.id)}" ${url ? `style="background-image:url('${url}')"` : ""}>
+      html += `<button class="event-card compact-event ${url ? "has-flyer" : "noflyer"}" data-open="${esc(e.id)}">
+        ${url ? `<img class="event-card-flyer" src="${url}" alt="${esc(e.name)} フライヤー" loading="lazy">` : `<span class="event-card-placeholder"><img src="TMPlogo.png" alt="TSUKUBA MUSIC PROJECT"></span>`}
         <span class="event-card-status ${e.archived ? "archived" : "live"}">${e.archived ? "ARCHIVE" : "LIVE"}</span>
         <span class="event-card-overlay">
           <span class="event-card-title">${esc(e.name)}</span>
@@ -2880,6 +2881,11 @@ function renderEventList() {
   document.getElementById("newEventBtn").onclick = () => navigate(renderEventNew);
   document.getElementById("guideBtn").onclick = () => navigate(renderGuide);
   document.getElementById("globalMessagesBtn").onclick = () => navigate(renderGlobalMessages);
+  screen.querySelectorAll(".event-card-flyer").forEach(img => img.addEventListener("error", () => {
+    const card = img.closest(".event-card");
+    img.remove();
+    if (card) { card.classList.remove("has-flyer"); card.classList.add("noflyer"); card.insertAdjacentHTML("afterbegin", `<span class="event-card-placeholder"><img src="TMPlogo.png" alt="TSUKUBA MUSIC PROJECT"></span>`); }
+  }, { once: true }));
   screen.querySelectorAll("[data-open]").forEach(el => el.onclick = () => openEvent(el.dataset.open));
 }
 
