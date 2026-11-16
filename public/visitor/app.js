@@ -202,7 +202,7 @@
       const res=await fetch('/api/public/messages',{cache:'no-store'}); if(!res.ok)throw new Error();
       globalMessages=await res.json();
       const preview=$('#selectMessagePreview');
-      if(preview) preview.innerHTML=globalMessages.length?globalMessages.slice(-2).reverse().map(m=>`<article class="thread-message"><div class="thread-message-meta"><span class="tmp-author"><img src="../TMPlogo.png" alt=""><strong>TMP</strong></span><time>${new Date(m.createdAt).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</time></div><div class="thread-message-body">${m.html||esc(m.text).replace(/\n/g,'<br>')}</div></article>`).join(''):'<p class="notice">TMPからのお知らせはまだありません。</p>';
+      if(preview) preview.innerHTML=globalMessages.length?globalMessages.slice(-2).reverse().map(m=>renderMessageCard(m,'preview')).join(''):'<p class="notice">TMPからのお知らせはまだありません。</p>';
       updateNotificationBadge();
       const list=$('#notificationMessages'); if(list) list.innerHTML=renderGlobalMessageRows();
     }catch{const preview=$('#selectMessagePreview');if(preview)preview.innerHTML='<p class="notice">お知らせを取得できませんでした。</p>';}
@@ -211,9 +211,13 @@
     const last=Number(localStorage.getItem(MESSAGE_READ_KEY)||0), unread=globalMessages.filter(m=>Number(m.createdAt||0)>last).length;
     const badge=$('#notificationBadge'); if(badge){badge.textContent=unread>99?'99+':String(unread);badge.hidden=!unread;}
   }
-  function renderGlobalMessageRows(){
+  function renderMessageCard(m,mode='full'){
     const emojis=['👍','❤️','🎉','👏','🔥'];
-    return globalMessages.length?globalMessages.slice().reverse().map(m=>`<article class="thread-message"><div class="thread-message-meta"><span class="tmp-author"><img src="../TMPlogo.png" alt=""><strong>TMP</strong></span><time>${new Date(m.createdAt).toLocaleString('ja-JP',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</time></div><div class="thread-message-body">${m.html||esc(m.text).replace(/\n/g,'<br>')}</div><div class="thread-reactions">${emojis.map(e=>`<button type="button" class="reaction-btn ${m.myReactions?.includes(e)?'is-selected':''}" aria-pressed="${m.myReactions?.includes(e)?'true':'false'}" data-reaction="${e}" data-message="${esc(m.id)}">${e} ${Number(m.reactions?.[e]||0)||''}</button>`).join('')}</div></article>`).join(''):'<p class="notice">TMPからのお知らせはまだありません。</p>';
+    const date=new Date(m.createdAt).toLocaleString('ja-JP',mode==='preview'?{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}:{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    return `<article class="thread-message"><div class="thread-message-meta"><span class="tmp-author"><img src="../TMPlogo.png" alt=""><strong>TMP</strong></span><time>${date}</time></div><div class="thread-message-body">${m.html||esc(m.text).replace(/\n/g,'<br>')}</div><div class="thread-reactions">${emojis.map(e=>{const selected=!!m.myReactions?.includes(e);return `<button type="button" class="reaction-btn ${selected?'is-selected':''}" aria-pressed="${selected?'true':'false'}" data-reaction="${e}" data-message="${esc(m.id)}" ${mode==='preview'?'':' '}>${e} <span>${Number(m.reactions?.[e]||0)}</span></button>`;}).join('')}</div></article>`;
+  }
+  function renderGlobalMessageRows(){
+    return globalMessages.length?globalMessages.slice().reverse().map(m=>renderMessageCard(m,'full')).join(''):'<p class="notice">TMPからのお知らせはまだありません。</p>';
   }
   async function openNotifications(){
     await refreshGlobalMessages();
@@ -233,8 +237,19 @@
       if(!res.ok)throw new Error(); alert('TMPからのお知らせ通知を受け取る設定が完了しました。');
     }catch{alert('通知の設定に失敗しました。ホーム画面への追加・HTTPS接続・ブラウザの通知設定をご確認ください。');}
   }
+  const reactionPending=new Set();
   async function toggleReaction(messageId,emoji){
-    try{const res=await fetch('/api/public/messages/reaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId,emoji})});if(!res.ok)throw new Error();await refreshGlobalMessages();}catch{alert('リアクションを送信できませんでした。');}
+    const key=`${messageId}:${emoji}`; if(reactionPending.has(key))return;
+    const message=globalMessages.find(m=>String(m.id)===String(messageId)); if(!message)return;
+    const active=!(message.myReactions||[]).includes(emoji);
+    reactionPending.add(key);
+    document.querySelectorAll(`[data-reaction="${CSS.escape(emoji)}"][data-message="${CSS.escape(messageId)}"]`).forEach(b=>b.disabled=true);
+    try{
+      const res=await fetch('/api/public/messages/reaction',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId,emoji,active})});
+      if(!res.ok)throw new Error(await res.text());
+      await refreshGlobalMessages();
+    }catch{alert('リアクションを更新できませんでした。通信環境を確認して、もう一度お試しください。');}
+    finally{reactionPending.delete(key);}
   }
   function render(){
     const back=$('#backBtn'), nav=$('.bottom-nav'), hasEvent=Boolean(selectedId);

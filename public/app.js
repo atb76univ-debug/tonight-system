@@ -3172,14 +3172,77 @@ function renderEventPage() {
 
 
 async function renderGlobalMessages() {
-  const editor = (html='') => `<div class="tmp-composer"><div class="tmp-composer-toolbar">${[['bold','B'],['italic','I'],['underline','U'],['strikeThrough','S'],['insertUnorderedList','• List'],['insertOrderedList','1. List']].map(([cmd,label])=>`<button type="button" data-format="${cmd}" title="${cmd}">${label}</button>`).join('')}<button type="button" data-format="createLink">リンク</button></div><div id="announcementEditor" class="tmp-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="TMPからのお知らせを入力してください">${html}</div></div>`;
+  const editor = (html='', id='announcementEditor') => `<div class="tmp-composer">
+    <div class="tmp-composer-toolbar" role="toolbar" aria-label="本文の書式">
+      <div class="tmp-tool-group">
+        <button type="button" data-format="bold" aria-label="太字" title="太字"><strong>B</strong></button>
+        <button type="button" data-format="italic" aria-label="斜体" title="斜体"><em>I</em></button>
+        <button type="button" data-format="underline" aria-label="下線" title="下線"><span class="tool-underline">U</span></button>
+        <button type="button" data-format="strikeThrough" aria-label="取り消し線" title="取り消し線"><s>S</s></button>
+      </div>
+      <span class="tmp-tool-divider"></span>
+      <div class="tmp-tool-group">
+        <button type="button" data-format="insertUnorderedList" aria-label="箇条書き" title="箇条書き">☷</button>
+        <button type="button" data-format="insertOrderedList" aria-label="番号付きリスト" title="番号付きリスト">1.</button>
+        <button type="button" data-format="formatBlock:blockquote" aria-label="引用" title="引用">❝</button>
+      </div>
+      <span class="tmp-tool-divider"></span>
+      <div class="tmp-tool-group">
+        <button type="button" data-format="createLink" aria-label="リンクを挿入" title="リンクを挿入">↗</button>
+        <button type="button" data-format="removeFormat" aria-label="書式を解除" title="書式を解除">Tx</button>
+      </div>
+    </div>
+    <div id="${id}" class="tmp-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="TMPからのお知らせを入力してください">${html}</div>
+    <div class="tmp-composer-footer"><span>書式ボタンを選択すると青く点灯します</span><span>リッチテキスト対応</span></div>
+  </div>`;
+  const wireEditor = (root, ed) => {
+    const toolbar=root.querySelector('.tmp-composer-toolbar');
+    if(!toolbar||!ed)return;
+    const refresh=()=>{
+      toolbar.querySelectorAll('[data-format]').forEach(btn=>{
+        const spec=btn.dataset.format; let active=false;
+        try{
+          if(spec.startsWith('formatBlock:')) active=document.queryCommandValue('formatBlock').toLowerCase()===spec.split(':')[1];
+          else if(!['createLink','removeFormat'].includes(spec)) active=document.queryCommandState(spec);
+        }catch{}
+        btn.classList.toggle('is-active',!!active); btn.setAttribute('aria-pressed',active?'true':'false');
+      });
+    };
+    toolbar.querySelectorAll('[data-format]').forEach(btn=>{
+      btn.addEventListener('mousedown',e=>e.preventDefault());
+      btn.addEventListener('click',()=>{
+        const spec=btn.dataset.format;
+        if(spec==='createLink'){
+          const url=prompt('リンク先URL（https://...）');
+          if(url&&/^https:\/\//i.test(url)){ed.focus();document.execCommand('createLink',false,url);}
+        }else if(spec.startsWith('formatBlock:')){ed.focus();document.execCommand('formatBlock',false,spec.split(':')[1]);}
+        else{ed.focus();document.execCommand(spec,false,null);}
+        refresh();
+      });
+    });
+    ['keyup','mouseup','focus','input'].forEach(type=>ed.addEventListener(type,refresh));
+    document.addEventListener('selectionchange',()=>{const sel=window.getSelection();if(sel&&sel.anchorNode&&ed.contains(sel.anchorNode))refresh();});
+    refresh();
+  };
   screen.innerHTML=`<div class="card"><div class="card-title">TMPからのお知らせ</div><p class="sub-text">投稿は来場者アプリ全体に表示されます。通知を許可したユーザーにはプッシュ通知も送信できます。</p>${editor()}<label class="check-row"><input id="announcementNotify" type="checkbox" checked> プッシュ通知も送信する</label><button class="btn btn-primary" id="publishAnnouncement">投稿する</button></div><div class="card"><div class="card-title">投稿済みスレッド</div><div id="adminMessageList">読み込み中…</div></div><button class="btn btn-secondary" id="messagesBack">イベント一覧へ戻る</button>`;
-  const wireEditor=()=>{document.querySelectorAll('[data-format]').forEach(btn=>btn.onclick=()=>{const cmd=btn.dataset.format;if(cmd==='createLink'){const url=prompt('リンク先URL（https://...）');if(url&&/^https:\/\//i.test(url))document.execCommand(cmd,false,url);}else document.execCommand(cmd,false,null);document.getElementById('announcementEditor').focus();});};
-  wireEditor();
-  const load=async()=>{const host=document.getElementById('adminMessageList');try{const r=await fetch('/api/public/messages',{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error();const rows=await r.json();host.innerHTML=rows.length?rows.slice().reverse().map(m=>`<article class="thread-message"><div class="thread-message-meta"><span class="tmp-author"><img src="TMPlogo.png" alt=""><strong>TMP</strong></span><time>${new Date(m.createdAt).toLocaleString('ja-JP')}</time></div><div class="thread-message-body">${m.html||esc(m.text).replace(/\n/g,'<br>')}</div><small>リアクション ${Object.values(m.reactions||{}).reduce((n,v)=>n+Number(v||0),0)}件</small><button class="btn btn-secondary btn-small" data-edit-message="${esc(m.id)}">編集</button></article>`).join(''):'<p class="sub-text">投稿はまだありません。</p>';host.querySelectorAll('[data-edit-message]').forEach(btn=>btn.onclick=()=>editMessage(rows.find(m=>m.id===btn.dataset.editMessage)));}catch{host.textContent='投稿を読み込めませんでした。';}};
-  const editMessage=async m=>{if(!m)return;const host=document.getElementById('adminMessageList');const article=host.querySelector(`[data-edit-message="${CSS.escape(m.id)}"]`)?.closest('.thread-message');if(!article)return;article.innerHTML=`<div class="thread-message-meta"><span class="tmp-author"><img src="TMPlogo.png" alt=""><strong>TMP</strong></span><time>投稿を編集</time></div>${editor(m.html||esc(m.text).replace(/\n/g,'<br>'))}<div class="btn-row"><button class="btn btn-primary" id="saveMessageEdit">変更を保存</button><button class="btn btn-secondary" id="cancelMessageEdit">キャンセル</button></div>`;article.querySelectorAll('[data-format]').forEach(btn=>btn.onclick=()=>{const cmd=btn.dataset.format;if(cmd==='createLink'){const url=prompt('リンク先URL（https://...）');if(url&&/^https:\/\//i.test(url))document.execCommand(cmd,false,url);}else document.execCommand(cmd,false,null);article.querySelector('.tmp-rich-editor').focus();});article.querySelector('#cancelMessageEdit').onclick=load;article.querySelector('#saveMessageEdit').onclick=async()=>{const ed=article.querySelector('.tmp-rich-editor'),html=ed.innerHTML,text=ed.innerText.trim();if(!text){alert('投稿内容を入力してください。');return;}try{const r=await fetch(`/api/admin/messages/${encodeURIComponent(m.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({html,text})});const d=await r.json();if(!r.ok)throw new Error(d.error||'編集に失敗しました');await load();}catch(e){alert(e.message);}};};
+  wireEditor(screen,document.getElementById('announcementEditor'));
+  const load=async()=>{
+    const host=document.getElementById('adminMessageList');
+    try{
+      const r=await fetch('/api/public/messages',{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error();const rows=await r.json();
+      host.innerHTML=rows.length?rows.slice().reverse().map(m=>`<article class="thread-message"><div class="thread-message-meta"><span class="tmp-author"><img src="TMPlogo.png" alt=""><strong>TMP</strong></span><time>${new Date(m.createdAt).toLocaleString('ja-JP')}</time></div><div class="thread-message-body">${m.html||esc(m.text).replace(/\n/g,'<br>')}</div><small>リアクション ${Object.values(m.reactions||{}).reduce((n,v)=>n+Number(v||0),0)}件</small><button class="btn btn-secondary btn-small" data-edit-message="${esc(m.id)}">編集</button></article>`).join(''):'<p class="sub-text">投稿はまだありません。</p>';
+      host.querySelectorAll('[data-edit-message]').forEach(btn=>btn.onclick=()=>editMessage(rows.find(m=>m.id===btn.dataset.editMessage)));
+    }catch{host.textContent='投稿を読み込めませんでした。';}
+  };
+  const editMessage=async m=>{
+    if(!m)return;const host=document.getElementById('adminMessageList');const article=[...host.querySelectorAll('.thread-message')].find(x=>x.querySelector(`[data-edit-message="${CSS.escape(m.id)}"]`));if(!article)return;
+    article.innerHTML=`<div class="thread-message-meta"><span class="tmp-author"><img src="TMPlogo.png" alt=""><strong>TMP</strong></span><time>投稿を編集</time></div>${editor(m.html||esc(m.text).replace(/\n/g,'<br>'),'editAnnouncementEditor')}<div class="btn-row"><button class="btn btn-primary" id="saveMessageEdit">変更を保存</button><button class="btn btn-secondary" id="cancelMessageEdit">キャンセル</button></div>`;
+    const ed=article.querySelector('.tmp-rich-editor');wireEditor(article,ed);
+    article.querySelector('#cancelMessageEdit').onclick=load;
+    article.querySelector('#saveMessageEdit').onclick=async()=>{const html=ed.innerHTML,text=ed.innerText.trim();if(!text){alert('投稿内容を入力してください。');return;}try{const r=await fetch(`/api/admin/messages/${encodeURIComponent(m.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({html,text})});const d=await r.json();if(!r.ok)throw new Error(d.error||'編集に失敗しました');await load();}catch(e){alert(e.message);}};
+  };
   document.getElementById('publishAnnouncement').onclick=async()=>{const ed=document.getElementById('announcementEditor'),html=ed.innerHTML,text=ed.innerText.trim();if(!text){alert('投稿内容を入力してください。');return;}const btn=document.getElementById('publishAnnouncement');btn.disabled=true;try{const r=await fetch('/api/admin/messages',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({text,html,notify:document.getElementById('announcementNotify').checked})});const data=await r.json();if(!r.ok)throw new Error(data.error||'投稿に失敗しました');ed.innerHTML='';alert(data.push?.configured?`投稿しました。通知送信数：${data.push.sent}`:'投稿しました。プッシュ通知のVAPID設定は未完了です。');await load();}catch(e){alert(e.message||'投稿に失敗しました。');}finally{btn.disabled=false;}};
-  document.getElementById('messagesBack').onclick=()=>navigate(renderEventList); await load();
+  document.getElementById('messagesBack').onclick=()=>navigate(renderEventList);await load();
 }
 
 function renderGalleryManagement() {

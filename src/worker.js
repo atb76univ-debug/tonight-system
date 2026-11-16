@@ -310,8 +310,10 @@ export class Store {
       const key=`messages:${eventId}`, messages=(await this.state.storage.get(key))||[], message=messages.find(m=>m.id===messageId);
       if (!message) return text('message not found',404);
       message.reactions=message.reactions||{}; const voters=Array.isArray(message.reactions[emoji])?message.reactions[emoji]:[];
-      message.reactions[emoji]=voters.includes(visitorId)?voters.filter(x=>x!==visitorId):[...voters,visitorId].slice(-500);
-      await this.state.storage.put(key,messages); return json({ok:true,reactions:message.reactions});
+      // Desired-state update: retries and double clicks cannot accidentally re-add a removed reaction.
+      const active=body.active===true;
+      message.reactions[emoji]=active?(voters.includes(visitorId)?voters:[...voters,visitorId].slice(-500)):voters.filter(x=>x!==visitorId);
+      await this.state.storage.put(key,messages); return json({ok:true,active,reactions:message.reactions});
     }
     if (path === '/push-subscription') {
       let body; try { body=await req.json(); } catch { return text('bad json',400); }
