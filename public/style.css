@@ -4649,8 +4649,12 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 }
 
 
-/* v82: ドリンクページの各セクション背面に重なる背景色のみを解除。
-   カード本体・余白・角丸・枠線・影・レイアウトは変更しない。 */
-#app:has(.bar-page-nav) .card[data-bar-section]{
-  background-color:transparent!important;
+/* ドリンクページ：セクション外側のカード面だけを解除。
+   セクション内のカード・入力欄・商品タイル等の見た目と配置は維持する。 */
+#app:has(.bar-page-nav) > .card[data-bar-section]{
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
 }
