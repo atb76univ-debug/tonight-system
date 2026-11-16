@@ -4116,15 +4116,16 @@ input,select,textarea{border-radius:12px}
 /* v60: place realtime status in normal flow directly below the admin header.
    Override legacy absolute-centering rules that caused it to float over the flyer. */
 #eventPulse{
-  position:relative!important;
-  top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;
+  position:sticky!important;
+  top:var(--topbar-h,68px)!important;
+  left:auto!important;right:auto!important;bottom:auto!important;
   transform:none!important;
   display:block!important;
   width:100%!important;max-width:none!important;
   margin:0!important;padding:10px 16px!important;
   box-sizing:border-box!important;
   flex:none!important;
-  z-index:1!important;
+  z-index:90!important;
   background:rgba(245,245,247,.96)!important;
   border:0!important;border-bottom:1px solid #e5e5ea!important;
   border-radius:0!important;
