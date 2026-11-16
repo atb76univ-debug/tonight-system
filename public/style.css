@@ -4647,3 +4647,27 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   #app .sales-summary-grid{grid-template-columns:1fr!important}
   #app .product-admin-row{grid-template-columns:minmax(0,1fr) 72px!important}
 }
+
+
+/* v77: 販売集計の3カードを囲む親背景を完全に解除 */
+#app .sales-summary-grid.report-summary{
+  display:grid!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  padding:0!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+
+
+/* v79: remove only the extra outer backdrop behind drink-page content.
+   Keep the current inner cards, controls, spacing, and component styling intact. */
+#app:has(.bar-page-nav) .card[data-bar-section]{
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
