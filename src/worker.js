@@ -226,6 +226,30 @@ async function sendPushNotifications(env, title, body) {
   return { sent, configured:true, subscribers:subscriptions.length };
 }
 
+async function sendAdminPushNotifications(env, title, body) {
+  if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) return {sent:0,configured:false,subscribers:0};
+  try {
+    const jwk=JSON.parse(env.VAPID_PRIVATE_JWK);
+    await crypto.subtle.importKey('jwk',jwk,{name:'ECDSA',namedCurve:'P-256'},false,['sign']);
+  } catch { return {sent:0,configured:false,subscribers:0}; }
+  const stub=env.STORE.get(env.STORE.idFromName('main'));
+  const latest={id:`admin-shift-${Date.now()}`,title:String(title||'tonight!管理用'),text:String(body||'').slice(0,240),createdAt:Date.now()};
+  await stub.fetch('https://do/latest-admin-message',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(latest)});
+  const result=await stub.fetch('https://do/admin-push-subscriptions');
+  const subscriptions=result.ok?await result.json():[];
+  if(!Array.isArray(subscriptions)||!subscriptions.length)return {sent:0,configured:true,subscribers:0};
+  let sent=0;
+  await Promise.all(subscriptions.map(async sub=>{
+    try{
+      const authorization=await vapidAuthorization(sub.endpoint,env);
+      const response=await fetch(sub.endpoint,{method:'POST',headers:{Authorization:authorization,TTL:'120',Urgency:'high'}});
+      if(response.ok||response.status===201)sent++;
+      else if(response.status===404||response.status===410)await stub.fetch('https://do/admin-push-subscription',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});
+    }catch{}
+  }));
+  return {sent,configured:true,subscribers:subscriptions.length};
+}
+
 export class Store {
   constructor(state) { this.state = state; }
   async fetch(req) {
@@ -369,6 +393,29 @@ export class Store {
       return text('method not allowed',405,{Allow:'POST, DELETE'});
     }
     if (path === '/push-subscriptions' && req.method==='GET') return json((await this.state.storage.get('push-subscriptions'))||[]);
+    if (path === '/admin-push-subscription') {
+      let body; try{body=await req.json();}catch{return text('bad json',400);}
+      const endpoint=String(body.endpoint||''); if(!/^https:\/\//i.test(endpoint)||endpoint.length>2048)return text('bad endpoint',400);
+      const subs=(await this.state.storage.get('admin-push-subscriptions'))||[];
+      if(req.method==='POST'){const clean={endpoint,expirationTime:body.expirationTime||null};await this.state.storage.put('admin-push-subscriptions',[...subs.filter(x=>x.endpoint!==endpoint),clean].slice(-500));return json({ok:true});}
+      if(req.method==='DELETE'){await this.state.storage.put('admin-push-subscriptions',subs.filter(x=>x.endpoint!==endpoint));return json({ok:true});}
+      return text('method not allowed',405);
+    }
+    if (path === '/admin-push-subscriptions' && req.method==='GET') return json((await this.state.storage.get('admin-push-subscriptions'))||[]);
+    if (path === '/admin-system-message' && req.method==='POST') {
+      let body;try{body=await req.json();}catch{return text('bad json',400);}
+      const key=String(body.key||'').slice(0,220), message={id:String(body.id||`admin-${Date.now()}`),title:String(body.title||'tonight!管理用｜シフト開始'),text:String(body.text||'').slice(0,240),createdAt:Date.now()};
+      if(!key)return text('key required',400);
+      const keys=(await this.state.storage.get('admin-system-message-keys'))||[];
+      if(keys.includes(key))return json({created:false,message});
+      await this.state.storage.put('admin-system-message-keys',[...keys.slice(-4999),key]);
+      await this.state.storage.put('latest-admin-message',message);
+      return json({created:true,message});
+    }
+    if (path === '/latest-admin-message') {
+      if(req.method==='PUT'){let item;try{item=await req.json();}catch{return text('bad json',400);}await this.state.storage.put('latest-admin-message',item);return json({ok:true});}
+      if(req.method==='GET')return json((await this.state.storage.get('latest-admin-message'))||{});
+    }
     if (path === '/latest-message' && req.method==='GET') {
       const messages=(await this.state.storage.get('messages:global'))||[];
       return json(messages[messages.length-1]||{});
@@ -473,8 +520,9 @@ async function publishDueAnnouncements(env) {
       const memberNames=(Array.isArray(shift.memberIds)?shift.memberIds:[]).map(id=>(db.members||[]).find(m=>String(m.id)===String(id))).filter(Boolean).map(m=>m.nickname||m.name).filter(Boolean);
       const staff=memberNames.join('、')||shift.name||'担当スタッフ';
       const role=String(shift.role||'シフト');
-      const r=await stub.fetch('https://do/system-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,text:`シフト開始のお知らせ：「${ev.name}」の${role}、${staff}の勤務時間になりました。担当業務の確認をお願いします。`})});
-      if (r.ok) { const d=await r.json(); if(d.created) await sendPushNotifications(env,'tonight!｜シフト開始',d.message.text.slice(0,120)); }
+      const noticeText=`シフト開始のお知らせ：「${ev.name}」の${role}、${staff}の勤務時間になりました。担当業務の確認をお願いします。`;
+      const r=await stub.fetch('https://do/admin-system-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,title:'tonight!管理用｜シフト開始',text:noticeText})});
+      if (r.ok) { const d=await r.json(); if(d.created) await sendAdminPushNotifications(env,'tonight!管理用｜シフト開始',d.message.text.slice(0,120)); }
     }
   }
 }
@@ -533,6 +581,27 @@ export default {
       response=await stub.fetch(new Request(innerUrl,{method:request.method,headers,body:forwardedBody}));
       const outHeaders=new Headers(response.headers); outHeaders.set('Cache-Control','no-store'); if(identity.cookie)outHeaders.append('Set-Cookie',identity.cookie);
       return secureResponse(new Response(response.body,{status:response.status,headers:outHeaders}),url);
+    }
+    if (url.pathname === '/api/admin/push-subscription') {
+      if(!await validSession(request,env)) return secureResponse(json({error:'unauthorized'},401),url);
+      if(!['POST','DELETE'].includes(request.method)) return secureResponse(text('method not allowed',405),url);
+      if(!sameOrigin(request)) return secureResponse(json({error:'origin rejected'},403),url);
+      if(await exceedsBodyLimit(request,12000)) return secureResponse(json({error:'payload too large'},413),url);
+      let body;try{body=await request.clone().json();}catch{return secureResponse(text('bad json',400),url);}
+      if(request.method==='POST'){let host='';try{host=new URL(body.endpoint).hostname.toLowerCase();}catch{}if(!(host==='fcm.googleapis.com'||host.endsWith('.push.services.mozilla.com')||host==='web.push.apple.com'||host.endsWith('.notify.windows.com')))return secureResponse(json({error:'unsupported push endpoint'},400),url);}
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      const response=await stub.fetch(new Request('https://do/admin-push-subscription',{method:request.method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+      return secureResponse(response,url);
+    }
+    if (url.pathname === '/api/admin/push-key' && request.method==='GET') {
+      if(!await validSession(request,env)) return secureResponse(json({error:'unauthorized'},401),url);
+      return secureResponse(json({publicKey:env.VAPID_PUBLIC_KEY||''}),url);
+    }
+    if (url.pathname === '/api/admin/notification-latest' && request.method==='GET') {
+      if(!await validSession(request,env)) return secureResponse(json({error:'unauthorized'},401),url);
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      const response=await stub.fetch('https://do/latest-admin-message');
+      return secureResponse(response,url);
     }
     if (url.pathname === '/api/public/push-key' && request.method==='GET') return secureResponse(json({publicKey:env.VAPID_PUBLIC_KEY||''}),url);
     if (url.pathname === '/api/public/push-subscription') {

@@ -2843,6 +2843,31 @@ function evStats(st, bar, pricing = getPricing()) {
 }
 
 /* ---------- 回の一覧（月ごとの概要） ---------- */
+async function configureAdminShiftNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    alert('このブラウザはプッシュ通知に対応していません。'); return;
+  }
+  try {
+    const keyRes=await fetch('/api/admin/push-key',{cache:'no-store',credentials:'same-origin'});
+    if(!keyRes.ok) throw new Error(keyRes.status===401?'管理者としてログインし直してください。':'VAPID公開鍵を取得できませんでした。');
+    const keyData=await keyRes.json();
+    if(!keyData.publicKey) throw new Error('VAPID_PUBLIC_KEYが設定されていません。');
+    let permission=Notification.permission;
+    if(permission==='default') permission=await Notification.requestPermission();
+    if(permission!=='granted') throw new Error('ブラウザの通知許可が必要です。');
+    const registration=await navigator.serviceWorker.ready;
+    let subscription=await registration.pushManager.getSubscription();
+    if(!subscription){
+      const encoded=keyData.publicKey.replace(/-/g,'+').replace(/_/g,'/');
+      const applicationServerKey=Uint8Array.from(atob(encoded+'='.repeat((4-encoded.length%4)%4)),c=>c.charCodeAt(0));
+      subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});
+    }
+    const save=await fetch('/api/admin/push-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription),credentials:'same-origin'});
+    if(!save.ok) throw new Error('管理者用通知の登録に失敗しました。');
+    alert('管理者用のシフト開始通知を有効にしました。この端末にシフト通知が届きます。');
+  }catch(error){alert(error.message||'通知設定に失敗しました。');}
+}
+
 function renderEventList() {
   const evs = db.events.filter(e => !e.deleted).sort((a, b) => b.date.localeCompare(a.date));
   const months = {};
@@ -2850,7 +2875,7 @@ function renderEventList() {
 
   let html = `<div class="event-list-toolbar">
     <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="list-heading">パーティ開始！</div></div></div>
-    <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-secondary" id="globalMessagesBtn">お知らせ・スレッド</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
+    <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-secondary" id="adminShiftNoticeBtn">シフト通知を設定</button><button class="btn btn-secondary" id="globalMessagesBtn">お知らせ・スレッド</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
   </div>`;
   if (!evs.length) html += `<div class="card sub-text">まだ回がありません。「新しい回」から作成してください。</div>`;
 
@@ -2881,6 +2906,7 @@ function renderEventList() {
   document.getElementById("newEventBtn").onclick = () => navigate(renderEventNew);
   document.getElementById("guideBtn").onclick = () => navigate(renderGuide);
   document.getElementById("globalMessagesBtn").onclick = () => navigate(renderGlobalMessages);
+  document.getElementById("adminShiftNoticeBtn").onclick = configureAdminShiftNotifications;
   screen.querySelectorAll(".event-card-flyer").forEach(img => img.addEventListener("error", () => {
     const card = img.closest(".event-card");
     img.remove();

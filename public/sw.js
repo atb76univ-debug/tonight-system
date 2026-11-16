@@ -1,5 +1,5 @@
 // ネットワーク優先。通信できない時だけ保存済みの画面を表示する（/api は対象外）
-const C = 'tonight-v70';
+const C = 'tonight-v71';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
@@ -39,11 +39,11 @@ self.addEventListener('push', event => {
   event.waitUntil((async () => {
     let message = {};
     try {
-      const response = await fetch('/api/public/messages/latest', { cache: 'no-store' });
+      const response = await fetch('/api/admin/notification-latest', { cache: 'no-store', credentials: 'same-origin' });
       if (response.ok) message = await response.json();
     } catch {}
-    const title = 'tonight!管理用｜TMPからのお知らせ';
-    const body = String(message.text || '新しい運営通知があります。').slice(0, 120);
+    const title = String(message.title || 'tonight!管理用｜シフト開始');
+    const body = String(message.text || 'シフト開始時刻になりました。').slice(0, 120);
     await self.registration.showNotification(title, {
       body,
       icon: '/TMPlogo.png',
