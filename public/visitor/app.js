@@ -502,6 +502,7 @@
       return;
     }
     const close=e.target.closest('[data-close]');if(close||e.target.matches('.modal[data-dismiss],.photo-viewer[data-dismiss]')){modalRoot.innerHTML='';return;}
+    const brandHome=e.target.closest('.brand');if(brandHome){e.preventDefault();selectedId=null;setPage('select');history.replaceState(null,'',location.pathname+location.search);return;}
     const nav=e.target.closest('[data-page]');if(nav){setPage(nav.dataset.page);return;}
     const selectEvent=e.target.closest('[data-select-event]');if(selectEvent){selectedId=selectEvent.dataset.selectEvent;page='home';render();window.scrollTo(0,0);return;}
     if(e.target.closest('[data-switch-event],#eventSwitchTop')){selectedId=null;setPage('select');return;}

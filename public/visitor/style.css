@@ -777,15 +777,18 @@ html,body{
 .notification-setting-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 0;border-top:1px solid var(--border)}.notification-setting-row p{margin:5px 0 0;font-size:12px;color:var(--sub);line-height:1.5}.notification-setting-row .pill{flex:0 0 auto}
 
 
-/* v67: tonight! wordmark header and restrained desktop hover feedback */
+/* v68: align visitor primary-button hover motion with the shared Apple-like button behavior */
 .brand{gap:0!important;min-width:0}
 .brand img{display:block;width:142px!important;height:42px!important;max-width:min(38vw,142px);object-fit:contain;object-position:left center}
+.brand{cursor:pointer}
+.brand:focus-visible{outline:3px solid #80baff;outline-offset:4px;border-radius:8px}
 .loading img{width:min(230px,68vw)!important;height:auto!important;max-height:105px;object-fit:contain}
 .btn:not(.secondary):not(.blue),.btn.blue,.btn:not(.secondary):not(.blue):hover,.btn.blue:hover{background:#0071e3!important;border-color:#0071e3!important;color:#fff!important;filter:none!important;opacity:1!important}
-.btn{transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s ease!important}
+.btn{transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s ease,background-color .18s ease!important}
 @media (hover:hover) and (pointer:fine){
-  .btn:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 7px 18px rgba(0,0,0,.12)!important}
-  .btn.blue:hover,.btn:not(.secondary):not(.blue):hover{background:#0071e3!important;box-shadow:0 7px 18px rgba(0,113,227,.22)!important}
+  /* Match admin buttons: same lift, scale, easing and shadow strength. */
+  .btn:not(:disabled):hover{transform:translateY(-2px) scale(1.015);box-shadow:0 9px 18px rgba(0,0,0,.12)!important}
+  .btn.blue:hover,.btn:not(.secondary):not(.blue):hover{background:#0071e3!important;border-color:#0071e3!important;filter:none!important;opacity:1!important}
   .quick:hover,.event-tile:hover,.event-select-card:hover,.performer button:hover,.notification-top:hover,.event-switch-top:hover,.share-top:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.10)!important}
   .bottom-nav button:hover{color:#0071e3!important}
 }
