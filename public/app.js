@@ -3774,19 +3774,24 @@ function getIssuedDrinkTicketCount(eventState) {
 function normalizeRecipeName(value) {
   return String(value || "").normalize("NFKC").toLocaleLowerCase("ja").replace(/[\s　・]/g, "");
 }
+function drinkIconKey(name) {
+  const n = String(name || "").normalize("NFKC").replace(/[\s　・（）()]/g, "");
+  const rules = [
+    [/シャンディガフ/, "shandy_gaf"], [/コークビア/, "coke_beer"], [/カシスビア/, "cassis_beer"],
+    [/レモンサワー/, "lemon_sour"], [/モスコミュール/, "moscow_mule"], [/ウォッカトニック/, "vodka_tonic"], [/ルシアンコーク/, "russian_coke"],
+    [/ラムバック/, "rum_buck"], [/ラムトニック/, "rum_tonic"], [/ラムコーク/, "rum_coke"],
+    [/ジンバック/, "gin_buck"], [/ジントニック/, "gin_tonic"], [/ジンコーク/, "gin_coke"],
+    [/ジンジャーハイ/, "ginger_highball"], [/コークハイ/, "coke_highball"], [/ハイボール/, "highball"],
+    [/カシスウーロン/, "cassis_oolong"], [/レゲエパンチ/, "reggae_punch"], [/ウーロンハイ/, "oolong_high"],
+    [/ロック/, "shochu_rock"], [/水割り/, "shochu_water"], [/ソーダ割/, "shochu_soda"],
+    [/ジンジャーエール/, "ginger_ale"], [/トニックウォーター/, "tonic_water"], [/ウーロン茶/, "oolong_tea"], [/炭酸水/, "soda_water"],
+    [/コーラ/, "cola"], [/ビール/, "beer"], [/ウォッカトニック/, "vodka_tonic"], [/ウォッカ/, "vodka_tonic"],
+  ];
+  return rules.find(([re]) => re.test(n))?.[1] || "highball";
+}
+function drinkIconSrc(name) { return `/drink-icons/${drinkIconKey(name)}.png`; }
 function recipeGlassIllustration(name, compact = false) {
-  const n = String(name || "");
-  const isBeer = /ビール|シャンディ|コークビア/.test(n);
-  const isSour = /サワー|レモン/.test(n);
-  const isDark = /カシス|レゲエ|コーク/.test(n);
-  const liquid = isBeer ? "#E7B64B" : isSour ? "#E8D65D" : isDark ? "#9B6B91" : "#9CCBC4";
-  const glass = isBeer
-    ? '<path d="M42 38h58v65a9 9 0 0 1-9 9H51a9 9 0 0 1-9-9z" fill="#fff" stroke="#53657A" stroke-width="4"/><path d="M101 53h12a12 12 0 0 1 0 24h-12" fill="none" stroke="#53657A" stroke-width="4"/><path d="M47 58h48v45a5 5 0 0 1-5 5H52a5 5 0 0 1-5-5z" fill="' + liquid + '"/>'
-    : '<path d="M43 35h64l-8 77a9 9 0 0 1-9 8H60a9 9 0 0 1-9-8z" fill="#fff" stroke="#53657A" stroke-width="4" stroke-linejoin="round"/><path d="M49 58h52l-5 51a5 5 0 0 1-5 4H60a5 5 0 0 1-5-4z" fill="' + liquid + '"/>';
-  const garnish = isSour
-    ? '<circle cx="91" cy="35" r="13" fill="#F4D94E" stroke="#53657A" stroke-width="3"/><path d="M91 23v24M79 35h24" stroke="#fff" stroke-width="2.5"/>'
-    : '<path d="M68 49l15-14 15 14" fill="none" stroke="#53657A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M83 35l10-13" stroke="#53657A" stroke-width="3.5" stroke-linecap="round"/>';
-  return `<svg viewBox="0 0 150 150" role="img" aria-label="${esc(n)}のアイコン" class="recipe-glass-svg ${compact ? "is-compact" : ""}"><path d="M38 128h76" stroke="#B7C3D1" stroke-width="4" stroke-linecap="round"/>${glass}${garnish}</svg>`;
+  return `<img src="${drinkIconSrc(name)}" alt="${esc(name)}" class="drink-cutout-icon ${compact ? "is-compact" : "is-large"}" loading="lazy">`;
 }
 function showDrinkRecipe(productName) {
   selectedRecipeName = productName;
@@ -3955,7 +3960,7 @@ function renderBarHome() {
           const qty = selected ? selected.qty : 0;
           return `<div class="product-tile-card" data-product-card="${esc(p.id)}">
             <button type="button" class="product-tile ${p.soldOut ? "sold-out" : ""} ${qty ? "has-selection" : ""}" data-add-product="${esc(p.id)}" ${p.soldOut ? "disabled aria-disabled=\"true\"" : ""}>
-              <span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>${p.soldOut ? "売切れ" : "＋ 注文に追加"}</small>
+              <img class="sales-drink-icon" src="${drinkIconSrc(p.name)}" alt="" loading="lazy"><span class="product-tile-name">${esc(p.name)}</span><strong>${yen(Number(p.price || 0))}</strong><small>${p.soldOut ? "売切れ" : "＋ 注文に追加"}</small>
             </button>
             <div class="product-selection-qty" data-selection-qty="${esc(p.id)}" ${qty ? "" : "hidden"}>
               <button type="button" class="qty-btn" data-selection-dec="${esc(p.id)}" aria-label="${esc(p.name)}を1つ減らす">−</button>
