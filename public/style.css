@@ -4649,53 +4649,12 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 }
 
 
-/* v83: ドリンクページのカードを会計ページと同じ通常カードに統一。
-   以前の透明化指定がカード面と背後の四角い面を不自然に見せていたため撤去し、
-   セクション自身に背景・境界線・角丸・クリップを一貫して持たせる。 */
+/* ドリンクページ：セクション外側のカード面だけを解除。
+   セクション内のカード・入力欄・商品タイル等の見た目と配置は維持する。 */
 #app:has(.bar-page-nav) > .card[data-bar-section]{
-  display:block!important;
-  position:relative!important;
-  isolation:isolate!important;
-  box-sizing:border-box!important;
-  width:100%!important;
-  max-width:100%!important;
-  min-width:0!important;
-  margin:0 0 16px!important;
-  padding:22px!important;
-  overflow:hidden!important;
-  border:1px solid rgba(60,60,67,.10)!important;
-  border-radius:20px!important;
-  background:#fff!important;
-  color:var(--text,#1d1d1f)!important;
-  box-shadow:0 2px 10px rgba(0,0,0,.035),0 12px 30px rgba(0,0,0,.035)!important;
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
   -webkit-backdrop-filter:none!important;
   backdrop-filter:none!important;
-}
-#app:has(.bar-page-nav) > .card[data-bar-section]::before,
-#app:has(.bar-page-nav) > .card[data-bar-section]::after{
-  content:none!important;
-  display:none!important;
-}
-/* 商品設定も会計画面のリストと同じ、角丸の独立した行にする。 */
-#app:has(.bar-page-nav) .product-admin-list{
-  display:grid!important;
-  gap:9px!important;
-  border:0!important;
-}
-#app:has(.bar-page-nav) .product-admin-row{
-  box-sizing:border-box!important;
-  padding:10px!important;
-  border:1px solid rgba(60,60,67,.10)!important;
-  border-radius:14px!important;
-  background:#f8f8fa!important;
-  box-shadow:none!important;
-}
-#app:has(.bar-page-nav) .sales-summary-grid>div{
-  border:1px solid rgba(60,60,67,.08)!important;
-  border-radius:15px!important;
-  background:#f5f5f7!important;
-}
-@media(max-width:760px){
-  #app:has(.bar-page-nav) > .card[data-bar-section]{padding:16px!important;border-radius:17px!important}
-  #app:has(.bar-page-nav) .product-admin-row{padding:9px!important;border-radius:13px!important}
 }
