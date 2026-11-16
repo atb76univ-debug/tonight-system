@@ -84,3 +84,10 @@ Set these using `npx wrangler secret put VAPID_PUBLIC_KEY`, `npx wrangler secret
 - 管理者のお知らせ投稿に太字・斜体・下線・取り消し線・箇条書き・番号付きリスト・HTTPSリンクの書式ツールを追加。
 - 管理者は投稿済みのお知らせを編集可能。
 - リッチテキストHTMLはWorker側で許可タグ・リンクを制限して保存・配信。
+
+## v64 updates
+- Applied the supplied TSUKUBA MUSIC PROJECT logo to the administrator and visitor app branding, favicon, and PWA icons.
+- Fixed visitor cookie parsing: visitor tokens are `id.expiry.signature`, so validation now splits at the final period. This preserves one signed visitor identity across RSVP requests.
+- RSVP writes explicitly use same-origin credentials and update the existing record for that visitor/event instead of creating a second record.
+- Added notification settings in the visitor notification panel. Push subscriptions can be removed from the server and browser; in-app event/performance notifications can also be turned off.
+- Notification dialogs are centered on screen.

@@ -183,7 +183,7 @@
     const name=enteredName||(status==='not-going'?'非公開':'');
     if(!name){alert('参加・興味ありの場合は、一覧に表示する名前を入力してください。');$('#rsvpName')?.focus();return;}
     try{
-      const res=await fetch(`/api/public/rsvp?eventId=${encodeURIComponent(ev.id)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,status})});
+      const res=await fetch(`/api/public/rsvp?eventId=${encodeURIComponent(ev.id)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,status}),credentials:'same-origin',cache:'no-store'});
       if(!res.ok)throw new Error(await res.text());
       saveRsvp(ev.id,status);if(status!=='not-going')localStorage.setItem('tonight_visitor_display_name',name);render();
     }catch(error){alert('参加表明を保存できませんでした。通信環境を確認して、もう一度お試しください。');}
@@ -192,7 +192,7 @@
   async function cancelRsvp(){
     const ev=selected();if(!ev)return;
     try{
-      const res=await fetch(`/api/public/rsvp?eventId=${encodeURIComponent(ev.id)}`,{method:'DELETE',credentials:'same-origin'});
+      const res=await fetch(`/api/public/rsvp?eventId=${encodeURIComponent(ev.id)}`,{method:'DELETE',credentials:'same-origin',cache:'no-store'});
       if(!res.ok)throw new Error(await res.text());
       saveRsvp(ev.id,null);render();
     }catch{alert('参加表明を取り消せませんでした。通信環境を確認して、もう一度お試しください。');}
@@ -222,9 +222,36 @@
   async function openNotifications(){
     await refreshGlobalMessages();
     localStorage.setItem(MESSAGE_READ_KEY,String(Date.now())); updateNotificationBadge();
-    openModal(`<div class="notification-panel"><div class="notification-panel-head"><div><div class="eyebrow">TONIGHT! NOTIFICATIONS</div><h2>通知</h2><p>TMPからのお知らせ · ${globalMessages.length}件</p></div><button class="text-link" id="enablePushBtn" type="button">通知をオンにする</button></div><div id="notificationMessages">${renderGlobalMessageRows()}</div></div>`);
+    openModal(`<div class="notification-panel"><div class="notification-panel-head"><div><div class="eyebrow">TONIGHT! NOTIFICATIONS</div><h2>通知</h2><p>TMPからのお知らせ · ${globalMessages.length}件</p></div><button class="text-link" id="notificationSettingsBtn" type="button">通知設定</button></div><div id="notificationMessages">${renderGlobalMessageRows()}</div></div>`);
+  }
+  async function openNotificationSettings(){
+    const sub=await getPushSubscription();
+    const pushOn=!!sub && ('Notification' in window) && Notification.permission==='granted';
+    const inAppOn=localStorage.getItem(NOTICE_KEY)==='1';
+    openModal(`<section class="push-prompt" role="dialog" aria-modal="true" aria-labelledby="notificationSettingsTitle">
+      <div class="eyebrow">TONIGHT! NOTIFICATIONS</div><h2 id="notificationSettingsTitle">通知設定</h2>
+      <div class="notification-setting-row"><div><strong>プッシュ通知</strong><p>アプリを閉じているときもTMPからのお知らせを受け取ります。</p></div><span class="pill ${pushOn?'live':'blue'}">${pushOn?'オン':'オフ'}</span></div>
+      <div class="notification-setting-row"><div><strong>アプリ内の出演・開催通知</strong><p>アプリを開いている間に開催日や出演開始をお知らせします。</p></div><span class="pill ${inAppOn?'live':'blue'}">${inAppOn?'オン':'オフ'}</span></div>
+      <div class="push-prompt-actions">${pushOn?'<button class="btn secondary" id="disablePushBtn" type="button">プッシュ通知をオフにする</button>':'<button class="btn" id="enablePushBtn" type="button">プッシュ通知をオンにする</button>'}
+      <button class="btn ${inAppOn?'secondary':''}" id="toggleInAppNoticeBtn" type="button">${inAppOn?'アプリ内通知をオフにする':'アプリ内通知をオンにする'}</button></div>
+      <p class="push-prompt-footnote">端末・ブラウザ自体の通知許可は、端末の設定から変更できます。</p>
+    </section>`);
+  }
+  async function disablePushNotifications(){
+    try{
+      const sub=await getPushSubscription();
+      if(sub){
+        const res=await fetch('/api/public/push-subscription',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub),credentials:'same-origin'});
+        if(!res.ok) throw new Error('server-unsubscribe');
+        await sub.unsubscribe();
+      }
+      localStorage.setItem(PUSH_DISABLED_KEY,'1');
+      sessionStorage.setItem(PUSH_PROMPT_SESSION_KEY,'1');
+      await openNotificationSettings();
+    }catch(error){alert('プッシュ通知をオフにできませんでした。通信状態を確認して、もう一度お試しください。');}
   }
   const PUSH_PROMPT_SESSION_KEY = 'tonight_push_prompt_seen_v1';
+  const PUSH_DISABLED_KEY = 'tonight_push_disabled_v1';
   function pushEnvironment(){
     const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     const standalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -267,7 +294,7 @@
   }
   async function showPushSetupPrompt(){
     const {supported,standalone} = pushEnvironment();
-    if(!supported || sessionStorage.getItem(PUSH_PROMPT_SESSION_KEY)==='1') return;
+    if(!supported || localStorage.getItem(PUSH_DISABLED_KEY)==='1' || sessionStorage.getItem(PUSH_PROMPT_SESSION_KEY)==='1') return;
     let subscription = await getPushSubscription();
     if(Notification.permission==='granted' && subscription) return;
     sessionStorage.setItem(PUSH_PROMPT_SESSION_KEY,'1');
@@ -297,7 +324,7 @@
       const applicationServerKey=Uint8Array.from(atob(encoded+'='.repeat((4-encoded.length%4)%4)),c=>c.charCodeAt(0));
       subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});
     }
-    const res=await fetch('/api/public/push-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription)});
+    const res=await fetch('/api/public/push-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription),credentials:'same-origin'});
     if(!res.ok) throw new Error('push-subscription');
     return subscription;
   }
@@ -313,6 +340,7 @@
         return;
       }
       await subscribeForPush();
+      localStorage.removeItem(PUSH_DISABLED_KEY);
       sessionStorage.setItem(PUSH_PROMPT_SESSION_KEY,'1');
       modalRoot.innerHTML='';
       alert('TMPからのお知らせ通知を受け取る設定が完了しました。');
@@ -476,7 +504,7 @@
       if(!silent)app.innerHTML=`${headerTitle('情報を読み込めませんでした')}<div class="error">イベント情報の取得に失敗しました。通信環境を確認して、再読み込みしてください。<br><br><button class="btn" id="retry">再読み込み</button></div>`;
     }
   }
-  document.addEventListener('click',e=>{
+  document.addEventListener('click',async e=>{
     const carouselMove=e.target.closest('[data-carousel-move]');
     if(carouselMove){
       const shell=carouselMove.closest('.carousel-shell');
@@ -506,6 +534,9 @@
     const rsvpChoice=e.target.closest('[data-rsvp-choice]');if(rsvpChoice){setRsvpStatus(rsvpChoice.dataset.rsvpChoice);return;}
     if(e.target.closest('#rsvpCancel')){cancelRsvp();return;}
     if(e.target.closest('#enablePushBtn,#pushPromptOpenSettings')){enablePushNotifications();return;}
+    if(e.target.closest('#notificationSettingsBtn')){openNotificationSettings();return;}
+    if(e.target.closest('#disablePushBtn')){disablePushNotifications();return;}
+    if(e.target.closest('#toggleInAppNoticeBtn')){if(localStorage.getItem(NOTICE_KEY)==='1')localStorage.removeItem(NOTICE_KEY);else{if(!('Notification' in window)){alert('このブラウザは通知に対応していません。');return;}const permission=await Notification.requestPermission();if(permission!=='granted'){alert('端末の通知許可が必要です。');return;}localStorage.setItem(NOTICE_KEY,'1');}openNotificationSettings();return;}
     if(e.target.closest('#notificationBtn,[data-open-notifications]')){openNotifications();return;}
     const reaction=e.target.closest('[data-reaction]');if(reaction){toggleReaction(reaction.dataset.message,reaction.dataset.reaction);return;}
     if(e.target.closest('#backBtn')){if(page==='detail'){setPage('home');return;}setPage('home');return;}

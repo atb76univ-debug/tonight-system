@@ -4294,3 +4294,7 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }
+
+/* v64: TMP mark in the administrator header */
+#pageTitle{display:flex;align-items:center;gap:10px;min-width:0}
+#pageTitle::before{content:"";display:inline-block;flex:0 0 32px;width:32px;height:32px;background:url("TMPlogo.png") center/contain no-repeat}

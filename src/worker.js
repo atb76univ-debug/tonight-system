@@ -168,7 +168,8 @@ async function visitorCookie(request, env) {
   if (!part || !configured(env)) return null;
   try {
     const token = decodeURIComponent(part.slice(VISITOR_COOKIE.length + 1));
-    const dot = token.indexOf('.'); if (dot < 1) return null;
+    // Token format is id.expiry.signature; split at the final dot so the signed payload retains id.expiry.
+    const dot = token.lastIndexOf('.'); if (dot < 1) return null;
     const payload = token.slice(0, dot), signature = token.slice(dot + 1);
     const [id, expiresText] = payload.split('.'); const expires = Number(expiresText);
     if (!/^[A-Za-z0-9_-]{20,80}$/.test(id || '') || !Number.isSafeInteger(expires) || expires <= Math.floor(Date.now()/1000)) return null;
@@ -290,8 +291,11 @@ export class Store {
         if (!['going', 'interested', 'not-going'].includes(status)) return text('bad status', 400);
         if (!name) return text('name required', 400);
         if (Object.keys(records).length >= 1000 && !records[visitorId]) return text('full', 409);
-        records[visitorId] = { name, status, createdAt: Date.now() }; await this.state.storage.put(key, records);
-        return json({ ok: true, count: Object.keys(records).length });
+        const previous = records[visitorId];
+        // One record per signed visitor identity per event. Repeated submissions update that record.
+        records[visitorId] = { name, status, createdAt: previous?.createdAt || Date.now(), updatedAt: Date.now() };
+        await this.state.storage.put(key, records);
+        return json({ ok: true, count: Object.keys(records).length, updated: Boolean(previous) });
       }
       return text('method not allowed', 405, { Allow: 'GET, POST, DELETE' });
     }
@@ -452,7 +456,7 @@ export default {
       const headers=new Headers(request.headers); headers.set('X-Visitor-Id',identity.id);
       const forwardedBody=['GET','HEAD'].includes(request.method)?undefined:await request.arrayBuffer();
       response=await stub.fetch(new Request(innerUrl,{method:request.method,headers,body:forwardedBody}));
-      const outHeaders=new Headers(response.headers); if(identity.cookie)outHeaders.append('Set-Cookie',identity.cookie);
+      const outHeaders=new Headers(response.headers); outHeaders.set('Cache-Control','no-store'); if(identity.cookie)outHeaders.append('Set-Cookie',identity.cookie);
       return secureResponse(new Response(response.body,{status:response.status,headers:outHeaders}),url);
     }
     if (url.pathname === '/api/public/push-key' && request.method==='GET') return secureResponse(json({publicKey:env.VAPID_PUBLIC_KEY||''}),url);
