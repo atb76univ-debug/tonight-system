@@ -4554,3 +4554,148 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   #app .offset-controls{gap:5px!important}
   #app .offset-controls button{min-width:0!important;flex:1 1 28%!important;padding:0 6px!important}
 }
+
+
+/* v76: ドリンクページは旧バージョンのシンプルな管理UIに戻す */
+#app .product-admin-list{
+  display:grid!important;gap:8px!important;
+  border:0!important;
+}
+#app .product-admin-row{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 90px auto auto!important;
+  gap:6px!important;align-items:center!important;
+  width:100%!important;min-width:0!important;max-width:none!important;
+  padding:0!important;margin:0!important;
+  border:0!important;border-radius:0!important;
+  background:transparent!important;box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app .product-admin-row>input{
+  display:block!important;width:100%!important;min-width:0!important;
+  height:auto!important;min-height:0!important;
+  padding:10px!important;font-size:13px!important;
+  border:1px solid var(--border)!important;border-radius:12px!important;
+  background:#fff!important;box-shadow:none!important;
+}
+#app .product-admin-row .btn{
+  width:auto!important;padding:9px 10px!important;
+  min-height:38px!important;font-size:12px!important;
+  white-space:nowrap!important;box-shadow:none!important;
+}
+#app .product-admin-row .mini-danger{
+  width:auto!important;padding:9px 8px!important;
+  min-height:38px!important;white-space:nowrap!important;
+  border:1px solid #f1d5d5!important;border-radius:10px!important;
+  background:#fff7f7!important;color:#c33!important;
+}
+#app .product-admin-actions{
+  display:contents!important;
+}
+#app .add-product-form{
+  display:grid!important;grid-template-columns:minmax(0,1fr) 100px!important;
+  gap:8px!important;margin-top:14px!important;
+}
+#app .add-product-form input{
+  min-width:0!important;padding:10px!important;font-size:13px!important;
+  border-radius:12px!important;border:1px solid var(--border)!important;
+}
+#app .add-product-form .btn{
+  grid-column:1/-1!important;padding:12px!important;font-size:14px!important;
+}
+#app .sales-summary-grid{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:8px!important;margin:2px 0 18px!important;
+}
+#app .sales-summary-grid>div{
+  min-width:0!important;padding:11px 10px!important;
+  border:0!important;border-radius:12px!important;
+  background:#f5f5f8!important;box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app .sales-summary-grid small{
+  display:block!important;font-size:10px!important;color:var(--sub)!important;
+  font-weight:700!important;margin-bottom:5px!important;
+}
+#app .sales-summary-grid strong{
+  display:block!important;font-size:clamp(15px,3.6vw,21px)!important;
+  font-weight:900!important;overflow-wrap:anywhere!important;
+}
+#app .sales-summary-grid em{
+  font-size:11px!important;font-style:normal!important;
+  margin-left:3px!important;color:var(--sub)!important;
+}
+#app .report-summary{margin-bottom:12px!important}
+@media(max-width:700px){
+  #app .product-admin-row{
+    grid-template-columns:minmax(0,1fr) 82px!important;
+    gap:7px!important;
+  }
+  #app .product-admin-actions{
+    display:grid!important;grid-column:1/-1!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:5px!important;
+  }
+  #app .product-admin-actions>button{
+    width:100%!important;min-width:0!important;min-height:38px!important;
+    padding:7px 4px!important;font-size:11px!important;
+    white-space:nowrap!important;
+  }
+  #app .product-admin-row .mini-danger{grid-column:auto!important}
+}
+@media(max-width:420px){
+  #app .sales-summary-grid{grid-template-columns:1fr!important}
+  #app .product-admin-row{grid-template-columns:minmax(0,1fr) 72px!important}
+}
+
+
+/* v83: ドリンクページのカードを会計ページと同じ通常カードに統一。
+   以前の透明化指定がカード面と背後の四角い面を不自然に見せていたため撤去し、
+   セクション自身に背景・境界線・角丸・クリップを一貫して持たせる。 */
+#app:has(.bar-page-nav) > .card[data-bar-section]{
+  display:block!important;
+  position:relative!important;
+  isolation:isolate!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  margin:0 0 16px!important;
+  padding:22px!important;
+  overflow:hidden!important;
+  border:1px solid rgba(60,60,67,.10)!important;
+  border-radius:20px!important;
+  background:#fff!important;
+  color:var(--text,#1d1d1f)!important;
+  box-shadow:0 2px 10px rgba(0,0,0,.035),0 12px 30px rgba(0,0,0,.035)!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+#app:has(.bar-page-nav) > .card[data-bar-section]::before,
+#app:has(.bar-page-nav) > .card[data-bar-section]::after{
+  content:none!important;
+  display:none!important;
+}
+/* 商品設定も会計画面のリストと同じ、角丸の独立した行にする。 */
+#app:has(.bar-page-nav) .product-admin-list{
+  display:grid!important;
+  gap:9px!important;
+  border:0!important;
+}
+#app:has(.bar-page-nav) .product-admin-row{
+  box-sizing:border-box!important;
+  padding:10px!important;
+  border:1px solid rgba(60,60,67,.10)!important;
+  border-radius:14px!important;
+  background:#f8f8fa!important;
+  box-shadow:none!important;
+}
+#app:has(.bar-page-nav) .sales-summary-grid>div{
+  border:1px solid rgba(60,60,67,.08)!important;
+  border-radius:15px!important;
+  background:#f5f5f7!important;
+}
+@media(max-width:760px){
+  #app:has(.bar-page-nav) > .card[data-bar-section]{padding:16px!important;border-radius:17px!important}
+  #app:has(.bar-page-nav) .product-admin-row{padding:9px!important;border-radius:13px!important}
+}
