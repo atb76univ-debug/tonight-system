@@ -2524,6 +2524,18 @@ function touchDrinkLineup() {
   db.drinkLineupUpdated = Math.max(Date.now(), Number(db.drinkLineupUpdated || 0) + 1);
   db.updated = Math.max(Date.now(), Number(db.updated || 0) + 1);
 }
+async function syncDrinkLineup() {
+  const response = await fetch('/api/drink-lineup', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ drinkLineup: db.drinkLineup || [] })
+  });
+  if (!response.ok) throw new Error(response.status === 401 ? 'ログイン状態を確認してください。' : 'ドリンクラインナップをクラウドに保存できませんでした。');
+  const result = await response.json();
+  db.drinkLineup = Array.isArray(result.drinkLineup) ? result.drinkLineup : db.drinkLineup;
+  db.drinkLineupUpdated = Number(result.drinkLineupUpdated || Date.now());
+  saveLocalDb();
+}
 function normalizeMemberFilter(value) {
   return String(value || "").normalize("NFKC").toLocaleLowerCase("ja")
     .replace(/[\s　・]/g, "");
@@ -4173,7 +4185,7 @@ function renderBarHome() {
     };
   };
 
-  screen.querySelectorAll("[data-save-product]").forEach(btn => btn.onclick = () => {
+  screen.querySelectorAll("[data-save-product]").forEach(btn => btn.onclick = async () => {
     const id = btn.dataset.saveProduct, p = b.products.find(x => x.id === id);
     const row = btn.closest("[data-product-row]");
     const name = row.querySelector("[data-product-name]").value.trim();
@@ -4187,7 +4199,8 @@ function renderBarHome() {
       event.bar.products = db.drinkLineup.map(x => ({ ...x, soldOut: x.id === id ? soldOut : Boolean(event.bar.products?.find(y => y.id === x.id)?.soldOut) }));
     }
     barCart = barCart.map(x => x.productId === id ? { ...x, name, price } : x);
-    saveBar(); renderBarHome();
+    try { await syncDrinkLineup(); saveBar(); renderBarHome(); }
+    catch (error) { setSync("同期エラー"); alert(error.message || "クラウド同期に失敗しました。"); }
   });
   screen.querySelectorAll("[data-toggle-soldout]").forEach(btn => btn.onclick = () => {
     const p = b.products.find(x => x.id === btn.dataset.toggleSoldout); if (!p) return;
@@ -4195,7 +4208,7 @@ function renderBarHome() {
     if (p.soldOut) barCart = barCart.filter(x => x.productId !== p.id);
     saveBar(); renderBarHome();
   });
-  screen.querySelectorAll("[data-delete-product]").forEach(btn => btn.onclick = () => {
+  screen.querySelectorAll("[data-delete-product]").forEach(btn => btn.onclick = async () => {
     if (!confirm("この商品を販売メニューから削除しますか？\n過去の販売履歴は残ります。")) return;
     const deletedId = btn.dataset.deleteProduct;
     db.drinkLineup = (db.drinkLineup || []).filter(x => x.id !== deletedId);
@@ -4203,9 +4216,10 @@ function renderBarHome() {
     for (const event of db.events) if (event.bar) event.bar.products = (event.bar.products || []).filter(x => x.id !== deletedId);
     b.products = b.products.filter(x => x.id !== deletedId);
     barCart = barCart.filter(x => x.productId !== deletedId);
-    saveBar(); renderBarHome();
+    try { await syncDrinkLineup(); saveBar(); renderBarHome(); }
+    catch (error) { setSync("同期エラー"); alert(error.message || "クラウド同期に失敗しました。"); }
   });
-  $("addBarProduct").onclick = () => {
+  $("addBarProduct").onclick = async () => {
     const name = $("newProductName").value.trim(), price = Number($("newProductPrice").value);
     if (!name || !Number.isInteger(price) || price <= 0) { alert("商品名と1円以上の整数価格を入力してください"); return; }
     const product = { id: uid(), name, price };
@@ -4213,7 +4227,8 @@ function renderBarHome() {
     touchDrinkLineup();
     for (const event of db.events) if (event.bar) event.bar.products = [...(event.bar.products || []), { ...product }];
     b.products = [...b.products, { ...product }];
-    saveBar(); renderBarHome();
+    try { await syncDrinkLineup(); saveBar(); renderBarHome(); }
+    catch (error) { setSync("同期エラー"); alert(error.message || "クラウド同期に失敗しました。"); }
   };
   screen.querySelectorAll("[data-cancel-sale]").forEach(btn => btn.onclick = () => {
     if (!confirm("この販売記録を取り消しますか？集計からも差し引かれます。削除ログは30日間保存され、あとから復元できます。")) return;

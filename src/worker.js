@@ -420,6 +420,21 @@ export class Store {
       const messages=(await this.state.storage.get('messages:global'))||[];
       return json(messages[messages.length-1]||{});
     }
+    if (path === '/drink-lineup' && req.method === 'PUT') {
+      let body; try { body = await req.json(); } catch { return text('bad json', 400); }
+      if (!Array.isArray(body.drinkLineup) || body.drinkLineup.length > 100) return text('bad lineup', 400);
+      const current = (await this.state.storage.get('db')) || { events: [], members: [], membersUpdated: 0, drinkLineup: [], drinkLineupUpdated: 0 };
+      const clean = body.drinkLineup.map((item, index) => ({
+        id: String(item?.id || `drink-${index}`).slice(0, 100),
+        name: String(item?.name || '').trim().slice(0, 80),
+        price: Math.max(1, Math.min(1000000, Math.round(Number(item?.price || 0))))
+      })).filter(item => item.name && item.price > 0);
+      current.drinkLineup = clean;
+      current.drinkLineupUpdated = Math.max(Date.now(), Number(current.drinkLineupUpdated || 0) + 1);
+      current.updated = Date.now();
+      await this.state.storage.put('db', current);
+      return json({ drinkLineup: current.drinkLineup, drinkLineupUpdated: current.drinkLineupUpdated });
+    }
     if (path === '/db') {
       const current = (await this.state.storage.get('db')) || { events: [], members: [], membersUpdated: 0, drinkLineup: [], drinkLineupUpdated: 0 };
       if (req.method === 'PUT') {
@@ -671,6 +686,16 @@ export default {
       let body;try{body=await request.json()}catch{return secureResponse(text('bad json',400),url)}
       const inner=await stub.fetch('https://do/messages/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:body.text,html:sanitizeAnnouncementHtml(String(body.html||'')),scheduledAt:body.scheduledAt})});
       return secureResponse(inner,url);
+    }
+    if (url.pathname === '/api/drink-lineup') {
+      if (!(await requireAdmin(request, env))) return secureResponse(json({ error: 'authentication required' }, 401), url);
+      if (request.method !== 'PUT') return secureResponse(text('method not allowed', 405, { Allow: 'PUT' }), url);
+      if (!sameOrigin(request)) return secureResponse(json({ error: 'origin rejected' }, 403), url);
+      if (!(request.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) return secureResponse(json({ error: 'json required' }, 415), url);
+      if (await exceedsBodyLimit(request, 20000)) return secureResponse(json({ error: 'payload too large' }, 413), url);
+      const stub = env.STORE.get(env.STORE.idFromName('main'));
+      const inner = await stub.fetch(new Request('https://do/drink-lineup', request));
+      return secureResponse(inner, url);
     }
     if (url.pathname === '/api/db') {
       if (!(await requireAdmin(request, env))) return secureResponse(json({ error: 'authentication required' }, 401), url);
