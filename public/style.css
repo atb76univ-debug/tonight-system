@@ -4315,3 +4315,14 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 .btn-primary,.btn-primary:hover,.primary-button,.primary-button:hover,.button-primary,.button-primary:hover,button.primary,button.primary:hover,button.is-primary,button.is-primary:hover,.cashier-confirm,.cashier-confirm:hover:not(:disabled),.confirm-button,.confirm-button:hover,.submit-button,.submit-button:hover{background:linear-gradient(180deg,#1684ed,#0071e3)!important;background-color:#0071e3!important;border-color:#0071e3!important;color:#fff!important;filter:none!important;opacity:1!important}
 .btn-primary,.primary-button,.button-primary,button.primary,button.is-primary,.cashier-confirm,.confirm-button,.submit-button{transition:transform .16s ease,box-shadow .18s ease!important}
 .btn-primary:hover,.primary-button:hover,.button-primary:hover,button.primary:hover,button.is-primary:hover,.cashier-confirm:hover:not(:disabled),.confirm-button:hover,.submit-button:hover{transform:translateY(-2px);box-shadow:0 7px 18px rgba(0,113,227,.22)!important}
+
+
+/* v69: make primary blue buttons use the exact same hover lift as other admin menu buttons */
+@media (hover:hover) and (pointer:fine){
+  .btn-primary:hover,.primary-button:hover,.button-primary:hover,button.primary:hover,button.is-primary:hover,
+  .cashier-confirm:hover:not(:disabled),.confirm-button:hover,.submit-button:hover{
+    transform:translateY(-2px)!important;
+    box-shadow:0 5px 14px rgba(0,0,0,.09)!important;
+    filter:none!important;opacity:1!important;
+  }
+}
