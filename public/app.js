@@ -2524,18 +2524,6 @@ function touchDrinkLineup() {
   db.drinkLineupUpdated = Math.max(Date.now(), Number(db.drinkLineupUpdated || 0) + 1);
   db.updated = Math.max(Date.now(), Number(db.updated || 0) + 1);
 }
-async function syncDrinkLineup() {
-  const response = await fetch('/api/drink-lineup', {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    credentials: 'same-origin',
-    body: JSON.stringify({ drinkLineup: db.drinkLineup || [] })
-  });
-  if (!response.ok) throw new Error(response.status === 401 ? 'ログイン状態を確認してください。' : 'ドリンクラインナップをクラウドに保存できませんでした。');
-  const result = await response.json();
-  db.drinkLineup = Array.isArray(result.drinkLineup) ? result.drinkLineup : db.drinkLineup;
-  db.drinkLineupUpdated = Number(result.drinkLineupUpdated || Date.now());
-  saveLocalDb();
-}
 function normalizeMemberFilter(value) {
   return String(value || "").normalize("NFKC").toLocaleLowerCase("ja")
     .replace(/[\s　・]/g, "");
@@ -2584,7 +2572,11 @@ function loadDb() {
       if (!Array.isArray(d.drinkLineup)) {
         const first = d.events.find(e => Array.isArray(e.bar?.products) && e.bar.products.length);
         d.drinkLineup = first ? first.bar.products.map(p => ({ id:p.id || uid(), name:p.name, price:Number(p.price||0) })) : defaultBarProducts();
-        d.drinkLineupUpdated = Date.now();
+        // 初期化・旧データ移行は実更新ではない。既存クラウドデータより新しい扱いにしない。
+        d.drinkLineupUpdated = 1;
+      } else if (!Number(d.drinkLineupUpdated || 0)) {
+        // 旧形式で更新番号がない場合のみ、移行データとして最小値を付ける。
+        d.drinkLineupUpdated = 1;
       }
       return d;
     }
@@ -2596,7 +2588,8 @@ function loadDb() {
     d.events.push(newEvent("過去データ（移行）", todayStr(), old));
   }
   d.drinkLineup = defaultBarProducts().map(p => ({ id:p.id, name:p.name, price:p.price }));
-  d.drinkLineupUpdated = Date.now();
+  // 初期メニューをクラウドへ初回登録できるよう、0より大きい初期バージョンを付与。
+  d.drinkLineupUpdated = 1;
   return d;
 }
 
@@ -4194,13 +4187,10 @@ function renderBarHome() {
     p.name = name; p.price = price;
     db.drinkLineup = (db.drinkLineup || []).map(x => x.id === id ? { id, name, price } : x);
     touchDrinkLineup();
-    for (const event of db.events) if (event.bar) {
-      const soldOut = Boolean(event.bar.products?.find(x => x.id === id)?.soldOut);
-      event.bar.products = db.drinkLineup.map(x => ({ ...x, soldOut: x.id === id ? soldOut : Boolean(event.bar.products?.find(y => y.id === x.id)?.soldOut) }));
-    }
     barCart = barCart.map(x => x.productId === id ? { ...x, name, price } : x);
-    try { await syncDrinkLineup(); saveBar(); renderBarHome(); }
-    catch (error) { setSync("同期エラー"); alert(error.message || "クラウド同期に失敗しました。"); }
+    saveBar();
+    if (ctx.mode === "archive") persistDb();
+    renderBarHome();
   });
   screen.querySelectorAll("[data-toggle-soldout]").forEach(btn => btn.onclick = () => {
     const p = b.products.find(x => x.id === btn.dataset.toggleSoldout); if (!p) return;
@@ -4213,11 +4203,11 @@ function renderBarHome() {
     const deletedId = btn.dataset.deleteProduct;
     db.drinkLineup = (db.drinkLineup || []).filter(x => x.id !== deletedId);
     touchDrinkLineup();
-    for (const event of db.events) if (event.bar) event.bar.products = (event.bar.products || []).filter(x => x.id !== deletedId);
     b.products = b.products.filter(x => x.id !== deletedId);
     barCart = barCart.filter(x => x.productId !== deletedId);
-    try { await syncDrinkLineup(); saveBar(); renderBarHome(); }
-    catch (error) { setSync("同期エラー"); alert(error.message || "クラウド同期に失敗しました。"); }
+    saveBar();
+    if (ctx.mode === "archive") persistDb();
+    renderBarHome();
   });
   $("addBarProduct").onclick = async () => {
     const name = $("newProductName").value.trim(), price = Number($("newProductPrice").value);
@@ -4225,10 +4215,10 @@ function renderBarHome() {
     const product = { id: uid(), name, price };
     db.drinkLineup = [...(db.drinkLineup || []), product];
     touchDrinkLineup();
-    for (const event of db.events) if (event.bar) event.bar.products = [...(event.bar.products || []), { ...product }];
     b.products = [...b.products, { ...product }];
-    try { await syncDrinkLineup(); saveBar(); renderBarHome(); }
-    catch (error) { setSync("同期エラー"); alert(error.message || "クラウド同期に失敗しました。"); }
+    saveBar();
+    if (ctx.mode === "archive") persistDb();
+    renderBarHome();
   };
   screen.querySelectorAll("[data-cancel-sale]").forEach(btn => btn.onclick = () => {
     if (!confirm("この販売記録を取り消しますか？集計からも差し引かれます。削除ログは30日間保存され、あとから復元できます。")) return;
