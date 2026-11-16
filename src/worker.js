@@ -464,6 +464,18 @@ async function publishDueAnnouncements(env) {
       const r=await stub.fetch('https://do/system-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,text:`まもなく出演開始！「${ev.name}」の${label}、${performer}の出演が始まります。タイムテーブルをチェック！`})});
       if (r.ok) { const d=await r.json(); if(d.created) await sendPushNotifications(env,'tonight!｜出演開始',d.message.text.slice(0,120)); }
     }
+    // Staff shift start notices: publish once per event/shift start and send push as well.
+    for (const shift of (tt.shifts||[])) {
+      const date=shift.startDate||ev.date;
+      const at=jstTime(date,shift.start||'') + Number(tt.offsetMinutes||0)*60000;
+      if (!Number.isFinite(at) || now < at || now >= at+60*1000) continue;
+      const key=`shift-start:${ev.id}:${shift.id||`${date}-${shift.start}-${shift.role||''}-${shift.name||''}`}`;
+      const memberNames=(Array.isArray(shift.memberIds)?shift.memberIds:[]).map(id=>(db.members||[]).find(m=>String(m.id)===String(id))).filter(Boolean).map(m=>m.nickname||m.name).filter(Boolean);
+      const staff=memberNames.join('、')||shift.name||'担当スタッフ';
+      const role=String(shift.role||'シフト');
+      const r=await stub.fetch('https://do/system-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,text:`シフト開始のお知らせ：「${ev.name}」の${role}、${staff}の勤務時間になりました。担当業務の確認をお願いします。`})});
+      if (r.ok) { const d=await r.json(); if(d.created) await sendPushNotifications(env,'tonight!｜シフト開始',d.message.text.slice(0,120)); }
+    }
   }
 }
 

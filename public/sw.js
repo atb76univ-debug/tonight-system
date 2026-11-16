@@ -1,5 +1,5 @@
 // ネットワーク優先。通信できない時だけ保存済みの画面を表示する（/api は対象外）
-const C = 'tonight-v64';
+const C = 'tonight-v70';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
@@ -31,4 +31,32 @@ self.addEventListener('fetch', event => {
       return cached || caches.match('./');
     })
   );
+});
+
+
+// Admin app push notifications use the TMP logo supplied by the operator.
+self.addEventListener('push', event => {
+  event.waitUntil((async () => {
+    let message = {};
+    try {
+      const response = await fetch('/api/public/messages/latest', { cache: 'no-store' });
+      if (response.ok) message = await response.json();
+    } catch {}
+    const title = 'tonight!管理用｜TMPからのお知らせ';
+    const body = String(message.text || '新しい運営通知があります。').slice(0, 120);
+    await self.registration.showNotification(title, {
+      body,
+      icon: '/TMPlogo.png',
+      badge: '/TMPlogo.png',
+      data: { url: './' },
+      tag: message.id || 'tonight-admin-notice'
+    });
+  })());
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const client of list) if ('focus' in client) return client.focus();
+    return clients.openWindow('./');
+  }));
 });
