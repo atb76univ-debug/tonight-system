@@ -3935,6 +3935,7 @@ function renderBarHome() {
         <input id="newProductPrice" type="number" min="1" step="1" value="500" aria-label="販売価格">
         <button class="btn btn-primary" id="addBarProduct">商品を追加</button>
       </div>
+      <br>
       <div class="member-import">
         <label>CSV／Excelを読み込む<input type="file" id="drinkMenuFile" accept=".csv,.xlsx,.xls"></label>
         <small>「商品名（ドリンク名）」と「価格」の列を読み込みます。同じ商品名が登録済みの場合は価格を更新し、新しい商品は追加します。</small>
