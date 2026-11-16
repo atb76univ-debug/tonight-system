@@ -4347,3 +4347,52 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   .admin-shift-push-actions{justify-content:flex-start;flex-wrap:wrap}
   .admin-shift-push-actions .btn{flex:1}
 }
+
+
+/* v73: 角丸カードの後ろに四角い背景・影が見える問題の修正
+   原因: 角丸のないラッパー(.report-summary, .product-admin-row 等)にまで
+   背景・枠・影・backdrop-filter が適用され、角丸の子要素の後ろに四角が出ていた。
+   Safari では backdrop-filter が border-radius で切り抜かれない不具合も重なる。 */
+
+/* 1) レイアウト専用のラッパーはカード装飾を外す */
+.report-summary,
+.sales-summary-grid.report-summary,
+.product-admin-row,
+.shift-timeline-item,
+.history-card,
+.gallery-admin-card{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  border-radius:0;
+}
+
+/* 2) 実際にカードとして見せる要素は角丸を必ず付け、ぼかしは使わない */
+.card,.admin-login-card,.event-card,.member-record,.product-tile-card,
+.cart-panel,.bar-cart-dock,.bar-latest-order,.bar-order-complete,
+.success-screen,.tmp-composer,.admin-shift-push-prompt,
+.schedule-shift-row,.stat,.stat-card,.counter-row,.sale-history-row{
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  background-clip:padding-box;
+}
+.card{background:#fff!important;border-radius:var(--radius)!important}
+.member-record,.cart-panel,.bar-latest-order,.sale-history-row{
+  background:#fff!important;border-radius:14px!important;
+}
+.bar-cart-dock,.bar-order-complete,.success-screen{
+  background:#fff!important;border-radius:20px!important;
+}
+.schedule-shift-row{border-radius:10px!important}
+
+/* 3) カード内のカードは影を付けず、二重の四角を防ぐ */
+.card .card,.card .member-record,.card .sale-history-row,.card .cart-panel{
+  box-shadow:none!important;
+}
+
+/* 4) 角丸の子要素が親の四角からはみ出して見えないようにする */
+.sales-summary-grid{background:transparent!important;box-shadow:none!important;border:0!important;padding:0}
+.sales-summary-grid>div{border-radius:12px!important}
+.product-admin-list{background:transparent;box-shadow:none;border:0}
