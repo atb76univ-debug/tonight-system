@@ -4807,10 +4807,3 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   #app:has(.bar-page-nav) .sales-summary-grid{grid-template-columns:1fr!important}
   #app:has(.bar-page-nav) .product-admin-row{grid-template-columns:minmax(0,1fr) 72px!important}
 }
-
-
-/* v80: Remove the extra fill behind drink-page sections without changing layout. */
-#app:has(.bar-page-nav) > .card[data-bar-section],
-#app:has(.bar-page-nav) .card[data-bar-section]{
-  background-color:transparent!important;
-}
