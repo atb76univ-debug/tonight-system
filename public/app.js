@@ -3992,7 +3992,7 @@ function renderBarHome() {
     <div class="recipe-product-grid">
       ${b.products.map(p => {
         const recipe = (db.drinkRecipes || []).find(r => normalizeRecipeName(r.productName) === normalizeRecipeName(p.name));
-        return `<button type="button" class="recipe-product-tile" data-open-recipe="${esc(p.name)}"><span class="recipe-product-copy"><strong>${esc(p.name)}</strong><b>${yen(Number(p.price || 0))}</b></span><span class="recipe-tile-art">${recipeGlassIllustration(p.name, true)}</span></button>`;
+        return `<button type="button" class="recipe-product-tile" data-open-recipe="${esc(p.name)}"><span class="recipe-product-copy"><strong>${esc(p.name)}</strong></span><span class="recipe-tile-art">${recipeGlassIllustration(p.name, true)}</span></button>`;
       }).join("") || `<div class="sub-text">販売メニューに商品がありません。</div>`}
     </div>
   </div>
