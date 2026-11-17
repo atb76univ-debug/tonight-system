@@ -4715,3 +4715,23 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   .recipe-product-tile .recipe-tile-art{width:56px!important;height:56px!important}
   .recipe-product-tile{grid-template-columns:minmax(0,1fr) 56px!important}
 }
+
+/* v75: 選択時のフロスト表示を全商品で均一化し、数量ボタンを正円に統一 */
+.product-tile-card .product-tile.has-selection{filter:none!important}
+.product-tile-card .product-selection-qty{
+  inset:0!important;width:100%!important;height:100%!important;box-sizing:border-box!important;
+  border:1px solid rgba(255,255,255,.72)!important;border-radius:16px!important;
+  background:rgba(235,239,246,.72)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(145%)!important;
+  backdrop-filter:blur(16px) saturate(145%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.82)!important;
+}
+.product-tile-card .product-selection-qty .qty-btn{
+  appearance:none!important;-webkit-appearance:none!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  flex:0 0 40px!important;width:40px!important;min-width:40px!important;max-width:40px!important;
+  height:40px!important;min-height:40px!important;max-height:40px!important;aspect-ratio:1/1!important;
+  box-sizing:border-box!important;padding:0!important;border-radius:50%!important;overflow:hidden!important;
+  line-height:1!important;font-variant-numeric:tabular-nums!important;
+}
+@media(max-width:560px){.product-tile-card .product-selection-qty .qty-btn{flex-basis:38px!important;width:38px!important;min-width:38px!important;max-width:38px!important;height:38px!important;min-height:38px!important;max-height:38px!important}}

@@ -2525,6 +2525,10 @@ function touchDrinkLineup() {
   db.drinkLineupUpdated = Math.max(Date.now(), Number(db.drinkLineupUpdated || 0) + 1);
   db.updated = Math.max(Date.now(), Number(db.updated || 0) + 1);
 }
+function touchDrinkRecipes() {
+  db.drinkRecipesUpdated = Math.max(Date.now(), Number(db.drinkRecipesUpdated || 0) + 1);
+  db.updated = Math.max(Date.now(), Number(db.updated || 0) + 1);
+}
 async function syncDrinkLineup() {
   const response = await fetch('/api/drink-lineup', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -2536,6 +2540,65 @@ async function syncDrinkLineup() {
   db.drinkLineup = Array.isArray(result.drinkLineup) ? result.drinkLineup : db.drinkLineup;
   db.drinkLineupUpdated = Number(result.drinkLineupUpdated || Date.now());
   saveLocalDb();
+}
+
+// ドリンク商品CSV／Excelを読み込み、全イベント共通のラインナップとしてクラウドへ保存する。
+async function importDrinkLineup(file) {
+  if (!file) return;
+  try {
+    let rows;
+    if (/\.csv$/i.test(file.name)) {
+      let content = await file.text();
+      // Excelで保存されたShift-JIS CSVにも対応する。
+      if (content.includes("�")) {
+        const buffer = await file.arrayBuffer();
+        content = new TextDecoder("shift_jis").decode(buffer);
+      }
+      rows = parseMemberCSVRows(content);
+    } else {
+      if (!window.XLSX) throw new Error("Excel読み込みライブラリを読み込めません。CSV形式で保存して取り込んでください。");
+      const workbook = window.XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+    }
+    if (!rows?.length || rows.length < 2) throw new Error("商品データが見つかりません。");
+    const headers = rows[0].map(v => String(v || "").trim().normalize("NFKC").toLowerCase());
+    const findColumn = aliases => headers.findIndex(h => aliases.some(a => h === a || h.includes(a)));
+    const nameIndex = findColumn(["ドリンク名", "商品名", "品名", "メニュー名", "商品", "ドリンク", "name"]);
+    const priceIndex = findColumn(["販売価格", "価格", "金額", "値段", "price"]);
+    if (nameIndex < 0 || priceIndex < 0) throw new Error("列名を判別できません。『ドリンク名（または商品名）』と『価格』の列を用意してください。");
+    const previous = Array.isArray(db.drinkLineup) ? db.drinkLineup : defaultBarProducts();
+    const byName = new Map(previous.map(p => [normalizeRecipeName(p.name), p]));
+    const imported = [];
+    for (const row of rows.slice(1)) {
+      const name = String(row[nameIndex] ?? "").trim();
+      const priceText = String(row[priceIndex] ?? "").replace(/[￥¥,，\s円]/g, "").trim();
+      if (!name && !priceText) continue;
+      const price = Number(priceText);
+      if (!name || !Number.isFinite(price) || price <= 0) continue;
+      const old = byName.get(normalizeRecipeName(name));
+      imported.push({ id: old?.id || uid(), name, price: Math.round(price) });
+    }
+    if (!imported.length) throw new Error("有効な商品がありません。商品名と1円以上の価格を確認してください。");
+    if (imported.length > 100) throw new Error("一度に取り込める商品は100件までです。");
+    if (!confirm(`${imported.length}件の商品を取り込みます。\n現在の商品ラインナップはこの内容に置き換わり、全イベント・来場者画面に同期されます。よろしいですか？`)) return;
+    db.drinkLineup = imported;
+    touchDrinkLineup();
+    for (const event of db.events || []) {
+      if (!event.bar) continue;
+      const oldProducts = event.bar.products || [];
+      event.bar.products = imported.map(product => ({ ...product, soldOut: Boolean(oldProducts.find(x => x.id === product.id)?.soldOut) }));
+    }
+    ctx.bar = ensureBar(ctx.bar);
+    ctx.bar.products = imported.map(product => ({ ...product, soldOut: Boolean(ctx.bar.products?.find(x => x.id === product.id)?.soldOut) }));
+    await syncDrinkLineup();
+    saveBar();
+    alert(`${imported.length}件の商品を取り込み、クラウドへ同期しました。来場者画面にも反映されます。`);
+    renderBarHome();
+  } catch (error) {
+    console.error("[ドリンク商品インポート失敗]", error);
+    alert(`ドリンクデータの読み込み・同期に失敗しました：${error.message}`);
+  }
 }
 function normalizeMemberFilter(value) {
   return String(value || "").normalize("NFKC").toLocaleLowerCase("ja")
@@ -2681,7 +2744,7 @@ function mergeInto(t, s) {
   return t;
 }
 function dbSig() {
-  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||recipes=" + (db.drinkRecipesUpdated || 0) + ":" + (db.drinkRecipes || []).map(r => `${r.productName}:${r.steps||""}`).join("|") + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt", "gallery"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
+  return "members=" + (db.membersUpdated || 0) + ":" + (db.members || []).map(m => `${m.id}:${m.name}:${m.grade}:${m.nickname||""}`).join("|") + "||lineup=" + (db.drinkLineup || []).map(p => `${p.id}:${p.name}:${p.price}`).join("|") + ":" + (db.drinkLineupUpdated || 0) + "||recipes=" + (db.drinkRecipesUpdated || 0) + ":" + (db.drinkRecipes || []).map(r => `${r.productName}:${r.steps||""}:${r.note||""}`).join("|") + "||" + db.events.map(e => e.id + ":" + ["meta", "rec", "bar", "tt", "gallery"].map(p => (e.u || {})[p] || 0).join(",") + ":sales=" + (e.bar?.sales || []).map(x => x.id).sort().join(".") + ":deletedSales=" + (e.bar?.deletedSales || []).map(x => `${x.sale?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":hist=" + (e.state?.receptionHistory || []).map(x => x.id).sort().join(".") + ":deletedRec=" + (e.state?.deletedReceptionHistory || []).map(x => `${x.entry?.id}:${x.deletedAt}:${x.restoredAt||0}`).sort().join(".") + ":reset=" + Number(e.bar?.resetAt || 0)).join("|");
 }
 function setSync(t) { const e = document.getElementById("sync"); if (e) e.textContent = t; }
 function saveLocalDb() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {} }
@@ -2693,11 +2756,16 @@ function persistDb() {
 }
 async function syncPush() {
   try {
-    const r = await fetch("/api/db", { method: "PUT", body: JSON.stringify(db) });
-    if (!r.ok) throw 0;
+    const r = await fetch("/api/db", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(db) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     applyRemote(await r.json());
     setSync("☁ 同期済み");
-  } catch { setSync("オフライン（この端末に保存済み）"); }
+    return true;
+  } catch (error) {
+    console.error("[クラウド同期失敗]", error);
+    setSync("オフライン（この端末に保存済み）");
+    return false;
+  }
 }
 async function syncPull() {
   try {
@@ -3835,8 +3903,12 @@ async function importDrinkRecipes(file) {
       if (existing) { Object.assign(existing, value); updated++; } else { db.drinkRecipes = [...(db.drinkRecipes || []), value]; added++; }
     }
     if (!added && !updated) throw new Error("取り込める作り方がありませんでした。商品名と作り方を確認してください。");
-    db.drinkRecipesUpdated = Date.now(); persistDb();
-    alert(`作り方の取り込みが完了しました。\n新規：${added}件／更新：${updated}件${skipped ? `／空欄スキップ：${skipped}行` : ""}`);
+    touchDrinkRecipes();
+    saveLocalDb();
+    clearTimeout(pushTimer);
+    const synced = await syncPush();
+    if (!synced) throw new Error("作り方データをクラウドへ保存できませんでした。通信状態とログイン状態を確認して、もう一度取り込んでください。");
+    alert(`作り方の取り込みが完了し、クラウドへ同期しました。\n新規：${added}件／更新：${updated}件${skipped ? `／空欄スキップ：${skipped}行` : ""}`);
     renderBarHome();
   } catch (error) { console.error("[作り方インポート失敗]", error); alert(`読み込みに失敗しました：${error.message}`); }
 }
@@ -4011,6 +4083,7 @@ function renderBarHome() {
     <div class="product-management">
       <div class="card-title">商品・価格の設定</div>
       <p class="sub-text">ここで登録したドリンクラインナップは、すべてのイベント回で共通して使われます。商品を削除・追加すると、他の回にも反映されます。販売済みの記録は残ります。</p>
+      <div class="member-import"><label>ドリンク商品をCSV／Excelから取り込む<input type="file" id="drinkProductFile" accept=".csv,.xlsx,.xls"></label><small>列名：ドリンク名（または商品名）／価格。取り込むと現在の商品一覧を置き換え、クラウド経由で全端末に同期します。</small></div>
       <div class="product-admin-list">
         ${b.products.map(p => `<div class="product-admin-row" data-product-row="${esc(p.id)}">
           <input type="text" value="${esc(p.name)}" aria-label="商品名" data-product-name="${esc(p.id)}">
@@ -4104,6 +4177,8 @@ function renderBarHome() {
   screen.querySelectorAll("[data-open-recipe]").forEach(btn => btn.onclick = () => showDrinkRecipe(btn.dataset.openRecipe));
   const recipeFileInput = $("drinkRecipeFile");
   if (recipeFileInput) recipeFileInput.onchange = async e => { await importDrinkRecipes(e.target.files?.[0]); e.target.value = ""; };
+  const drinkProductFileInput = $("drinkProductFile");
+  if (drinkProductFileInput) drinkProductFileInput.onchange = async e => { await importDrinkLineup(e.target.files?.[0]); e.target.value = ""; };
   if (selectedRecipeName && barPage === "recipes") showDrinkRecipe(selectedRecipeName);
   updateBackButton();
   const cartTotal = () => barCart.reduce((sum, x) => sum + x.price * x.qty, 0);
