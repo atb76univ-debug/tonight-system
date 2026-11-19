@@ -3588,6 +3588,81 @@ function memberStats(memberId) {
   return {attendance,dj,lastDate:lastDate||"—"};
 }
 let editingMemberId = null;
+
+async function cropMemberProfileImage(file) {
+  const objectUrl = URL.createObjectURL(file);
+  const image = new Image();
+  try {
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error("画像を読み込めませんでした。"));
+      image.src = objectUrl;
+    });
+    return await new Promise((resolve, reject) => {
+      const ratio = 16 / 10;
+      let zoom = 1, focusX = 0.5, focusY = 0.5, dragging = false, lastX = 0, lastY = 0;
+      const overlay = document.createElement("div");
+      overlay.className = "member-crop-overlay";
+      overlay.innerHTML = `
+        <section class="member-crop-dialog" role="dialog" aria-modal="true" aria-labelledby="memberCropTitle">
+          <button type="button" class="member-crop-close" aria-label="閉じる">×</button>
+          <h2 id="memberCropTitle">写真をトリミング</h2>
+          <p>枠内に表示したい範囲を調整してください。画像をドラッグして位置を変更できます。</p>
+          <div class="member-crop-frame"><canvas class="member-crop-canvas" width="960" height="600"></canvas></div>
+          <label class="member-crop-range"><span>拡大・縮小</span><input class="member-crop-zoom" type="range" min="1" max="3" step=".01" value="1"></label>
+          <div class="member-crop-actions">
+            <button type="button" class="btn btn-secondary member-crop-cancel">キャンセル</button>
+            <button type="button" class="btn btn-primary member-crop-apply">この範囲で使用</button>
+          </div>
+        </section>`;
+      document.body.appendChild(overlay);
+      const canvas = overlay.querySelector("canvas");
+      const ctx = canvas.getContext("2d");
+      const zoomInput = overlay.querySelector(".member-crop-zoom");
+      const cropW = Math.min(image.width, image.height * ratio);
+      const cropH = cropW / ratio;
+      function draw() {
+        const sw = cropW / zoom, sh = cropH / zoom;
+        const sx = Math.max(0, Math.min(image.width - sw, focusX * image.width - sw / 2));
+        const sy = Math.max(0, Math.min(image.height - sh, focusY * image.height - sh / 2));
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      }
+      const close = value => { overlay.remove(); resolve(value); };
+      overlay.querySelector(".member-crop-close").onclick = () => close(null);
+      overlay.querySelector(".member-crop-cancel").onclick = () => close(null);
+      overlay.addEventListener("click", e => { if (e.target === overlay) close(null); });
+      zoomInput.addEventListener("input", () => { zoom = Number(zoomInput.value); draw(); });
+      canvas.addEventListener("pointerdown", e => {
+        dragging = true; lastX = e.clientX; lastY = e.clientY; canvas.setPointerCapture(e.pointerId);
+      });
+      canvas.addEventListener("pointermove", e => {
+        if (!dragging) return;
+        const rect = canvas.getBoundingClientRect();
+        focusX = Math.max(0, Math.min(1, focusX - (e.clientX - lastX) / rect.width * (cropW / image.width) / zoom));
+        focusY = Math.max(0, Math.min(1, focusY - (e.clientY - lastY) / rect.height * (cropH / image.height) / zoom));
+        lastX = e.clientX; lastY = e.clientY; draw();
+      });
+      canvas.addEventListener("pointerup", () => { dragging = false; });
+      canvas.addEventListener("pointercancel", () => { dragging = false; });
+      overlay.querySelector(".member-crop-apply").onclick = () => {
+        const button = overlay.querySelector(".member-crop-apply");
+        button.disabled = true; button.textContent = "画像を準備中…";
+        const sw = cropW / zoom, sh = cropH / zoom;
+        const sx = Math.max(0, Math.min(image.width - sw, focusX * image.width - sw / 2));
+        const sy = Math.max(0, Math.min(image.height - sh, focusY * image.height - sh / 2));
+        const output = document.createElement("canvas");
+        output.width = 1200; output.height = 750;
+        output.getContext("2d").drawImage(image, sx, sy, sw, sh, 0, 0, output.width, output.height);
+        output.toBlob(blob => blob ? close(blob) : reject(new Error("画像の書き出しに失敗しました。")), "image/jpeg", .88);
+      };
+      draw();
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function renderMemberProfileEdit() {
   const member = (db.members || []).find(x => x.id === editingMemberId);
   if (!member) { alert("メンバーが見つかりませんでした。"); back(); return; }
@@ -3654,7 +3729,8 @@ function renderMemberProfileEdit() {
     const oldUrl = photoUrl;
     status.textContent = "画像を準備しています…";
     try {
-      const blob = await resizeGalleryImage(file, 900);
+      const blob = await cropMemberProfileImage(file);
+      if (!blob) { status.textContent = "画像の選択をキャンセルしました。"; return; }
       const response = await fetch(`/api/member-photo/${encodeURIComponent(member.id)}`, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: blob, credentials: "same-origin" });
       if (!response.ok) throw new Error(response.status === 413 ? "画像サイズが大きすぎます。" : "アップロードに失敗しました。");
       photoUrl = `/api/member-photo/${encodeURIComponent(member.id)}?v=${Date.now()}`;
