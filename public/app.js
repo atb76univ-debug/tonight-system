@@ -3443,7 +3443,40 @@ async function renderGlobalMessages() {
     document.addEventListener('selectionchange',()=>{const sel=window.getSelection();if(sel&&sel.anchorNode&&ed.contains(sel.anchorNode))refresh();});
     refresh();
   };
-  screen.innerHTML=`<div class="card"><div class="card-title">TMPからのお知らせ</div><p class="sub-text">投稿は来場者アプリ全体に表示されます。通知を許可したユーザーにはプッシュ通知も送信できます。</p>${editor()}<label class="check-row"><input id="announcementNotify" type="checkbox" checked> プッシュ通知も送信する</label><div class="form-row"><label for="announcementScheduleAt">投稿日時（予約投稿・空欄ならすぐ投稿）</label><input id="announcementScheduleAt" type="datetime-local"></div><button class="btn btn-primary" id="publishAnnouncement">投稿する</button></div><div class="card"><div class="card-title">投稿・予約一覧</div><div id="adminMessageList">読み込み中…</div></div><button class="btn btn-secondary" id="messagesBack">イベント一覧へ戻る</button>`;
+  screen.innerHTML=`<div class="card"><div class="card-title">TMPからのお知らせ</div><p class="sub-text">投稿は来場者アプリ全体に表示されます。通知を許可したユーザーにはプッシュ通知も送信できます。</p>${editor()}<label class="check-row"><input id="announcementNotify" type="checkbox" checked> 来場者アプリへプッシュ通知を送信する</label>
+    <section class="notification-recipient-counts" aria-live="polite">
+      <div class="notification-recipient-counts-head"><strong>通知をオンにしている端末</strong><button type="button" id="refreshNotificationCounts" class="btn btn-secondary btn-small">更新</button></div>
+      <div class="notification-recipient-count-grid">
+        <div class="notification-recipient-count"><span>来場者アプリ</span><strong id="visitorPushDeviceCount">— 台</strong></div>
+        <div class="notification-recipient-count"><span>管理アプリ</span><strong id="adminPushDeviceCount">— 台</strong></div>
+      </div>
+      <p id="notificationCountsUpdated" class="sub-text">登録端末数を確認しています…</p>
+    </section>
+    <div class="form-row"><label for="announcementScheduleAt">投稿日時（予約投稿・空欄ならすぐ投稿）</label><input id="announcementScheduleAt" type="datetime-local"></div><button class="btn btn-primary" id="publishAnnouncement">投稿する</button></div><div class="card"><div class="card-title">投稿・予約一覧</div><div id="adminMessageList">読み込み中…</div></div><button class="btn btn-secondary" id="messagesBack">イベント一覧へ戻る</button>`;
+  const loadNotificationCounts=async()=>{
+    const visitorEl=document.getElementById('visitorPushDeviceCount');
+    const adminEl=document.getElementById('adminPushDeviceCount');
+    const updatedEl=document.getElementById('notificationCountsUpdated');
+    const refreshBtn=document.getElementById('refreshNotificationCounts');
+    if(!visitorEl||!adminEl)return;
+    if(refreshBtn){refreshBtn.disabled=true;refreshBtn.textContent='取得中…';}
+    try{
+      const response=await fetch('/api/admin/notification-counts',{cache:'no-store',credentials:'same-origin'});
+      if(!response.ok)throw new Error(response.status===401?'管理者としてログインし直してください。':'通知登録数を取得できませんでした。');
+      const counts=await response.json();
+      visitorEl.textContent=`${Number(counts.visitor)||0} 台`;
+      adminEl.textContent=`${Number(counts.admin)||0} 台`;
+      if(updatedEl)updatedEl.textContent=`最終更新：${new Date(counts.updatedAt||Date.now()).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+    }catch(error){
+      visitorEl.textContent='取得失敗';
+      adminEl.textContent='取得失敗';
+      if(updatedEl)updatedEl.textContent=error.message||'通知登録数を取得できませんでした。';
+    }finally{
+      if(refreshBtn){refreshBtn.disabled=false;refreshBtn.textContent='更新';}
+    }
+  };
+  document.getElementById('refreshNotificationCounts')?.addEventListener('click',loadNotificationCounts);
+  loadNotificationCounts();
   wireEditor(screen,document.getElementById('announcementEditor'));
   const load=async()=>{
     const host=document.getElementById('adminMessageList');

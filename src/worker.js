@@ -659,6 +659,22 @@ export default {
       if(!await validSession(request,env)) return secureResponse(json({error:'unauthorized'},401),url);
       return secureResponse(json({publicKey:env.VAPID_PUBLIC_KEY||''}),url);
     }
+    if (url.pathname === '/api/admin/notification-counts' && request.method==='GET') {
+      if(!await validSession(request,env)) return secureResponse(json({error:'unauthorized'},401),url);
+      const stub=env.STORE.get(env.STORE.idFromName('main'));
+      const [visitorResponse,adminResponse]=await Promise.all([
+        stub.fetch('https://do/push-subscriptions'),
+        stub.fetch('https://do/admin-push-subscriptions')
+      ]);
+      if(!visitorResponse.ok||!adminResponse.ok) return secureResponse(json({error:'通知登録数を取得できませんでした。'},502),url);
+      const [visitorSubscriptions,adminSubscriptions]=await Promise.all([visitorResponse.json(),adminResponse.json()]);
+      const uniqueCount=list=>Array.isArray(list)?new Set(list.map(item=>String(item?.endpoint||'')).filter(Boolean)).size:0;
+      return secureResponse(json({
+        visitor:uniqueCount(visitorSubscriptions),
+        admin:uniqueCount(adminSubscriptions),
+        updatedAt:Date.now()
+      }),url,{headers:{'Cache-Control':'no-store'}});
+    }
     if (url.pathname === '/api/admin/notification-latest' && request.method==='GET') {
       if(!await validSession(request,env)) return secureResponse(json({error:'unauthorized'},401),url);
       const stub=env.STORE.get(env.STORE.idFromName('main'));

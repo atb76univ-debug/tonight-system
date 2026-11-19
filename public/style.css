@@ -5002,3 +5002,57 @@ input,select,textarea{
  max-width:calc(100vw - 32px);padding:10px 16px;border-radius:12px;
  background:#292929;color:white;font-size:12px;box-shadow:0 5px 22px #0003;
 }
+
+
+/* Push notification recipient counts in the announcement composer */
+.notification-recipient-counts{
+  margin:12px 0 18px;
+  padding:14px;
+  border:1px solid rgba(120,135,160,.18);
+  border-radius:16px;
+  background:rgba(245,247,251,.78);
+}
+.notification-recipient-counts-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+  color:#303846;
+  font-size:13px;
+}
+.notification-recipient-count-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+.notification-recipient-count{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  min-width:0;
+  padding:12px;
+  border-radius:12px;
+  background:rgba(255,255,255,.9);
+}
+.notification-recipient-count span{
+  color:#687386;
+  font-size:12px;
+  font-weight:600;
+}
+.notification-recipient-count strong{
+  color:#1d1d1f;
+  font-size:22px;
+  font-weight:800;
+  font-variant-numeric:tabular-nums;
+}
+.notification-recipient-counts > .sub-text{
+  margin:9px 0 0;
+  font-size:11px;
+}
+@media(max-width:480px){
+  .notification-recipient-counts{padding:11px}
+  .notification-recipient-count-grid{gap:7px}
+  .notification-recipient-count{padding:10px}
+  .notification-recipient-count strong{font-size:19px}
+}
