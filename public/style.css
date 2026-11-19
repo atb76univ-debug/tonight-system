@@ -4745,3 +4745,106 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
 
 /* Admin notification settings */
 .admin-notification-page{width:min(100%,860px);margin:0 auto;padding:22px 16px 40px}.admin-notification-heading{display:flex;align-items:flex-start;gap:18px;margin-bottom:18px}.admin-notification-heading h2{margin:0 0 5px;font-size:25px;letter-spacing:-.03em}.admin-notification-heading p{margin:0;color:var(--sub,#6b7280);font-size:13px;line-height:1.6}.admin-notification-card{padding:22px!important;border-radius:20px!important}.admin-notification-status-row{display:flex;align-items:center;gap:14px}.admin-notification-icon{width:52px;height:52px;display:grid;place-items:center;border-radius:16px;background:#f1f5fb;font-size:25px}.admin-notification-status-copy{display:flex;flex-direction:column;gap:5px}.admin-notification-status-copy strong{font-size:17px}.admin-notification-status{font-size:12px;font-weight:700}.admin-notification-status.is-enabled{color:#16834b}.admin-notification-status.is-disabled{color:#8a6b4d}.admin-notification-card>.sub-text{margin:16px 0;line-height:1.75}.admin-notification-actions{display:flex;justify-content:flex-start;gap:10px;margin-top:18px}.admin-notification-help{padding:12px 14px;border-radius:12px;background:#fff6e8;color:#79521d;font-size:13px;line-height:1.7}.admin-notification-error{color:#c62828;font-size:13px}.admin-notification-info{margin-top:14px;padding:20px!important;border-radius:18px!important}.admin-notification-info strong{font-size:14px}.admin-notification-info ul{margin:10px 0 0;padding-left:20px;color:var(--sub,#666);font-size:13px;line-height:1.9}@media(max-width:600px){.admin-notification-page{padding:16px 12px 32px}.admin-notification-heading{flex-direction:column;gap:14px}.admin-notification-heading h2{font-size:23px}.admin-notification-card{padding:17px!important}.admin-notification-actions .btn{width:100%}}
+
+
+/* v76: 管理者アプリのビジュアルを来場者アプリと統一（レイアウト・機能は維持） */
+:root{
+  --bg:#f5f5f7;
+  --card:rgba(255,255,255,.88);
+  --border:rgba(60,60,67,.12);
+  --text:#1d1d1f;
+  --sub:#6e6e73;
+  --primary:#0071e3;
+  --success:#18a058;
+  --danger:#ef4444;
+  --glass-white:rgba(255,255,255,.72);
+  --glass-edge:rgba(255,255,255,.88);
+  --glass-shadow:0 8px 28px rgba(31,42,68,.075),0 1px 2px rgba(31,42,68,.035),inset 0 1px 0 rgba(255,255,255,.92);
+}
+html,body{
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(177,211,255,.19),transparent 34rem),
+    radial-gradient(ellipse at 95% 24%,rgba(218,204,255,.17),transparent 30rem),
+    var(--bg);
+  color:var(--text);
+}
+.topbar{
+  background:rgba(250,250,252,.68)!important;
+  border-bottom:1px solid rgba(255,255,255,.82)!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.72) inset,0 5px 22px rgba(31,42,68,.035)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(150%);
+  backdrop-filter:blur(18px) saturate(150%);
+}
+.card,.admin-notification-card,.admin-notification-info{
+  background:rgba(255,255,255,.82)!important;
+  border:1px solid rgba(255,255,255,.9)!important;
+  box-shadow:var(--glass-shadow)!important;
+  -webkit-backdrop-filter:blur(16px);
+  backdrop-filter:blur(16px);
+}
+.btn-primary,.btn:not(.btn-secondary):not(.btn-danger){
+  background:#0071e3;
+  color:#fff;
+  box-shadow:0 5px 14px rgba(0,113,227,.16),inset 0 1px 0 rgba(255,255,255,.2);
+  transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s ease,background-color .18s ease;
+}
+.btn-secondary,.btn.btn-secondary{
+  background:rgba(255,255,255,.72);
+  color:#1d1d1f;
+  border:1px solid rgba(60,60,67,.12);
+}
+input,select,textarea{
+  border:1px solid rgba(60,60,67,.14);
+  border-radius:13px;
+  background:rgba(255,255,255,.88);
+  color:var(--text);
+}
+.icon-btn,.schedule-switch-btn,.event-home-btn,.admin-logout-btn,.pulse-control{
+  background:rgba(255,255,255,.66);
+  border:1px solid rgba(255,255,255,.94);
+  box-shadow:0 3px 12px rgba(31,42,68,.055),inset 0 1px 0 rgba(255,255,255,.95);
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+}
+.discount-card,.counter-row,.money-display,.stat,.stat-card,
+.discount-counts div,.admin-notification-help{
+  border-color:rgba(60,60,67,.09);
+}
+.admin-notification-icon{
+  background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(224,238,255,.74));
+  border:1px solid rgba(255,255,255,.98);
+  box-shadow:0 8px 24px rgba(0,113,227,.12),inset 0 1px 0 #fff;
+  color:#0071e3;
+}
+.admin-notification-help{
+  background:rgba(255,246,232,.78);
+  border:1px solid rgba(255,226,184,.72);
+  border-radius:15px;
+}
+.modal{
+  background:rgba(25,29,39,.25)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(125%);
+  backdrop-filter:blur(14px) saturate(125%);
+}
+.modal-box{
+  background:rgba(250,250,252,.86)!important;
+  border:1px solid rgba(255,255,255,.92)!important;
+  border-radius:24px!important;
+  box-shadow:0 22px 70px rgba(20,25,40,.2),inset 0 1px 0 rgba(255,255,255,.95)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(160%);
+  backdrop-filter:blur(30px) saturate(160%);
+}
+@media (hover:hover) and (pointer:fine){
+  .btn:not(:disabled):hover{
+    transform:translateY(-2px) scale(1.015);
+    box-shadow:0 9px 18px rgba(0,0,0,.12);
+  }
+}
+@media (prefers-reduced-transparency:reduce){
+  .topbar,.card,.admin-notification-card,.admin-notification-info,.modal-box{
+    -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  *{scroll-behavior:auto!important;transition:none!important}
+}
