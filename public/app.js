@@ -2988,6 +2988,55 @@ async function showAdminShiftNotificationPrompt() {
   });
 }
 
+async function renderAdminNotificationSettings() {
+  const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+  let permission = supported ? Notification.permission : 'unsupported';
+  let subscription = null;
+  let statusError = '';
+  if (supported) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      subscription = await registration.pushManager.getSubscription();
+    } catch (error) {
+      statusError = error.message || '通知状態を確認できませんでした。';
+    }
+  }
+  const enabled = !!subscription && permission === 'granted';
+  const statusLabel = !supported ? 'このブラウザは非対応' : permission === 'denied' ? 'ブラウザで通知がブロックされています' : enabled ? 'この端末で通知を受け取れます' : '通知はオフです';
+  const statusClass = enabled ? 'is-enabled' : 'is-disabled';
+  screen.innerHTML = `
+    <div class="admin-notification-page">
+      <div class="admin-notification-heading"><button type="button" class="btn btn-secondary" id="notificationSettingsBack">← イベント一覧</button><div><h2>通知設定</h2><p>管理用アプリで受け取る通知を設定できます。</p></div></div>
+      <section class="card admin-notification-card">
+        <div class="admin-notification-status-row"><div class="admin-notification-icon">${enabled ? '🔔' : '🔕'}</div><div class="admin-notification-status-copy"><strong>シフト開始通知</strong><span class="admin-notification-status ${statusClass}">${esc(statusLabel)}</span></div></div>
+        <p class="sub-text">担当シフトの開始時刻に、この端末へプッシュ通知を送ります。通知を受け取るには、ブラウザと端末の両方で通知を許可してください。</p>
+        ${permission === 'denied' ? '<div class="admin-notification-help">通知がブロックされています。ブラウザのアドレスバー横にあるサイト設定から、このサイトの通知を「許可」に変更してください。その後、この画面を再読み込みしてください。</div>' : ''}
+        ${statusError ? `<p class="admin-notification-error">${esc(statusError)}</p>` : ''}
+        <div class="admin-notification-actions">${enabled ? '<button type="button" class="btn btn-secondary" id="disableAdminPush">この端末の通知をオフにする</button>' : `<button type="button" class="btn btn-primary" id="enableAdminPush" ${!supported || permission === 'denied' ? 'disabled' : ''}>通知をオンにする</button>`}</div>
+      </section>
+      <section class="card admin-notification-info"><strong>通知が届かない場合</strong><ul><li>ブラウザのサイト通知が許可されているか確認してください。</li><li>端末の集中モード・おやすみモードを確認してください。</li><li>通知をオンにした端末・ブラウザで管理用アプリにログインしてください。</li><li>iPhone・iPadではホーム画面に追加したWebアプリから設定してください。</li></ul></section>
+    </div>`;
+  document.getElementById('notificationSettingsBack').onclick = () => navigate(renderEventList);
+  document.getElementById('enableAdminPush')?.addEventListener('click', async event => {
+    const button = event.currentTarget; button.disabled = true; button.textContent = '設定中…';
+    try { await configureAdminShiftNotifications(); sessionStorage.removeItem('adminShiftPushPromptLater'); await renderAdminNotificationSettings(); }
+    catch (error) { alert(error.message || '通知設定に失敗しました。'); button.disabled = false; button.textContent = 'もう一度試す'; }
+  });
+  document.getElementById('disableAdminPush')?.addEventListener('click', async event => {
+    const button = event.currentTarget; button.disabled = true; button.textContent = '解除中…';
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const current = await registration.pushManager.getSubscription();
+      if (current) {
+        const response = await fetch('/api/admin/push-subscription', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ endpoint: current.endpoint }) });
+        if (!response.ok) throw new Error('通知登録の解除に失敗しました。');
+        await current.unsubscribe();
+      }
+      await renderAdminNotificationSettings();
+    } catch (error) { alert(error.message || '通知をオフにできませんでした。'); button.disabled = false; button.textContent = 'もう一度試す'; }
+  });
+}
+
 function renderEventList() {
   const evs = db.events.filter(e => !e.deleted).sort((a, b) => b.date.localeCompare(a.date));
   const months = {};
@@ -2995,7 +3044,7 @@ function renderEventList() {
 
   let html = `<div class="event-list-toolbar">
     <div class="event-list-brand"><img class="event-list-logo" src="TMPlogo.png" alt="Tsukuba Music Project"><div><div class="list-heading">パーティ開始！</div></div></div>
-    <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-secondary" id="globalMessagesBtn">お知らせ・スレッド</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
+    <div class="event-list-actions"><button class="btn btn-secondary guide-open-btn" id="guideBtn">使い方</button><button class="btn btn-secondary" id="globalMessagesBtn">お知らせ・スレッド</button><button class="btn btn-secondary" id="adminNotificationSettingsBtn">通知設定</button><button class="btn btn-primary new-event-compact" id="newEventBtn">＋ 新しい回</button></div>
   </div>`;
   if (!evs.length) html += `<div class="card sub-text">まだ回がありません。「新しい回」から作成してください。</div>`;
 
@@ -3027,6 +3076,7 @@ function renderEventList() {
   document.getElementById("newEventBtn").onclick = () => navigate(renderEventNew);
   document.getElementById("guideBtn").onclick = () => navigate(renderGuide);
   document.getElementById("globalMessagesBtn").onclick = () => navigate(renderGlobalMessages);
+  document.getElementById("adminNotificationSettingsBtn").onclick = () => navigate(renderAdminNotificationSettings);
 
   screen.querySelectorAll(".event-card-flyer").forEach(img => img.addEventListener("error", () => {
     const card = img.closest(".event-card");
