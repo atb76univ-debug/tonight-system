@@ -55,19 +55,6 @@ npm run deploy
 - `src/worker.js`: Cloudflare Worker and Durable Object
 - `wrangler.jsonc`: Cloudflare deployment configuration
 
-## v75 design system
-
-The administrator and visitor surfaces use the same image-led, editorial visual
-system: a clean white canvas, high-contrast black structure, cobalt-blue accents,
-and responsive layouts that retain the existing information hierarchy.
-
-The reference typography was inspected before adoption. newjeans.jp loads **IBM
-Plex Sans JP** and **Inter**. This app requests those families from Google Fonts
-rather than copying font files from the reference site. They are available under
-the SIL Open Font License 1.1: [IBM Plex](https://github.com/IBM/plex) and
-[Inter](https://github.com/rsms/inter).
-No reference-site artwork, copy, or proprietary assets are included.
-
 
 ## v55 additions
 - Visitor RSVP identity is now issued and verified by the Worker using an HttpOnly signed cookie. Client-supplied visitor IDs are ignored.
