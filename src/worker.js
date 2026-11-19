@@ -279,7 +279,7 @@ export class Store {
           name: String(act.name || ''), memberIds: Array.isArray(act.memberIds) ? act.memberIds.map(String) : [] }));
         const referencedIds = new Set(acts.flatMap(act => act.memberIds));
         const publicMembers = members.filter(member => referencedIds.has(String(member.id))).map(member => ({ id: String(member.id),
-          name: String(member.name || ''), nickname: String(member.nickname || ''), bio: String(member.bio || member.profile || ''),
+          name: String(member.name || ''), nickname: String(member.nickname || ''), nicknameEn: String(member.nicknameEn || ''), bio: String(member.bio || member.profile || ''),
           instagram: String(member.instagram || ''), genre: String(member.genre || ''), favoriteArtists: String(member.favoriteArtists || ''),
           favorite: String(member.favorite || ''), photo: (/^https:\/\//i.test(String(member.photo || '')) || /^\/api\/member-photo\/[A-Za-z0-9_-]+$/.test(String(member.photo || ''))) ? String(member.photo) : '',
           photoCrop: { x: Math.max(0, Math.min(100, Number(member.photoCrop?.x ?? 50))), y: Math.max(0, Math.min(100, Number(member.photoCrop?.y ?? 50))), scale: Math.max(1, Math.min(3, Number(member.photoCrop?.scale ?? 1))) },

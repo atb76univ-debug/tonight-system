@@ -3681,6 +3681,7 @@ function renderMemberProfileEdit() {
             <label class="form-row"><span>本名・氏名 <b class="required-mark">必須</b></span><input id="profileName" required maxlength="80" value="${esc(member.name || "")}" placeholder="名前"></label>
             <label class="form-row"><span>学年</span><input id="profileGrade" maxlength="30" value="${esc(member.grade || "")}" placeholder="例：3年"></label>
             <label class="form-row profile-form-wide"><span>ニックネーム／DJネーム</span><input id="profileNickname" maxlength="80" value="${esc(member.nickname || "")}" placeholder="来場者に表示する名前"></label>
+            <label class="form-row profile-form-wide"><span>ニックネーム／DJネーム（英語表記）</span><input id="profileNicknameEn" maxlength="80" value="${esc(member.nicknameEn || "")}" placeholder="例：DJ Taro（英語表示で使用）"></label>
           </div>
         </section>
         <section class="profile-form-section">
@@ -3770,6 +3771,7 @@ function renderMemberProfileEdit() {
     member.name = name;
     member.grade = document.getElementById("profileGrade").value.trim();
     member.nickname = document.getElementById("profileNickname").value.trim();
+    member.nicknameEn = document.getElementById("profileNicknameEn").value.trim();
     member.instagram = instagram;
     member.favorite = document.getElementById("profileFavorite").value.trim();
     // 旧データとの互換性を保つため、既存の個別項目も空にせず保持する。

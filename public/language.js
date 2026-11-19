@@ -65,6 +65,7 @@
   function setLanguage(next) {
     language = next; localStorage.setItem(KEY, next);
     document.documentElement.lang = next === 'en' ? 'en' : 'ja';
+    window.dispatchEvent(new CustomEvent('tonight:languagechange', { detail: { language: next } }));
     const button = document.getElementById('tonightLanguageToggle');
     if (button) button.textContent = next === 'en' ? '日本語' : 'English';
     if (next === 'ja') restore(); else translate();

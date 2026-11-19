@@ -54,11 +54,13 @@
     if(!next && ev.date && ev.date < localDate(now))return {label:'終了',current:null,next:null};
     return {label:'開催予定',current:null,next};
   }
+  function isEnglishDisplay(){return localStorage.getItem('tonight_language_v1')==='en';}
+  function displayMemberName(member){return isEnglishDisplay()?(member.nicknameEn||member.nickname||member.name):(member.nickname||member.name);}
   function actNames(ev,act){
     const byId=new Map((ev.members||[]).map(m=>[String(m.id),m]));
     const ids=Array.isArray(act.memberIds)?act.memberIds:[];
     if(!ids.length)return String(act.name||'出演者未設定');
-    const known=ids.map(id=>{const m=byId.get(String(id));return m?(m.nickname||m.name):'';}).filter(Boolean);
+    const known=ids.map(id=>{const m=byId.get(String(id));return m?displayMemberName(m):'';}).filter(Boolean);
     const fallback=String(act.name||'').split('、').map(x=>x.trim()).filter(Boolean);
     return [...known,...fallback.slice(ids.length)].join('、')||'出演者未設定';
   }
@@ -412,10 +414,10 @@
     const all=performersFor(ev);
     const categories=['DJ','LIVE','VJ','その他'];
     const categoryFor=act=>{const t=String(act.type==='その他'?(act.customType||'その他'):(act.type||'DJ')).toUpperCase();if(t.includes('DJ'))return 'DJ';if(t.includes('LIVE')||t.includes('BAND')||t.includes('ライブ'))return 'LIVE';if(t.includes('VJ'))return 'VJ';return 'その他';};
-    const renderCard=(m,category)=>{const slots=actsFor(ev).filter(a=>categoryFor(a)===category&&(a.memberIds||[]).map(String).includes(String(m.id))).map(a=>({a,range:actRange(ev,a)})).filter(x=>x.range.start&&x.range.end);return `<article class="performer-profile-card">
-      <div class="performer-profile-cover">${m.photo?`<img src="${esc(m.photo)}" alt="${esc(m.nickname||m.name)}" loading="lazy" style="object-position:${Number(m.photoCrop?.x ?? 50)}% ${Number(m.photoCrop?.y ?? 50)}%;transform:scale(${Number(m.photoCrop?.scale ?? 1)})">`:`<div class="performer-profile-placeholder">tonight!</div>`}</div>
+    const renderCard=(m,category)=>{const slots=actsFor(ev).filter(a=>categoryFor(a)===category&&(a.memberIds||[]).map(String).includes(String(m.id))).map(a=>({a,range:actRange(ev,a)})).filter(x=>x.range.start&&x.range.end);const displayName=displayMemberName(m)||'出演者';return `<article class="performer-profile-card">
+      <div class="performer-profile-cover">${m.photo?`<img src="${esc(m.photo)}" alt="${esc(displayName)}" loading="lazy" style="object-position:${Number(m.photoCrop?.x ?? 50)}% ${Number(m.photoCrop?.y ?? 50)}%;transform:scale(${Number(m.photoCrop?.scale ?? 1)})">`:`<div class="performer-profile-placeholder">tonight!</div>`}</div>
       <div class="performer-profile-body">
-        <h2>${esc(m.nickname||m.name||'出演者')}</h2>
+        <h2 data-no-translate>${esc(displayName)}</h2>
         ${slots.length?`<div class="profile-line profile-set-times"><b>出演時間</b><span>${slots.map(x=>`${esc(timeText(ev,x.a))}`).join('<br>')}</span></div>`:''}
         ${m.bio?`<p class="performer-bio">${esc(m.bio)}</p>`:''}
         ${(m.favorite||[m.genre,m.favoriteArtists].filter(Boolean).join('、'))?`<div class="profile-line"><b>FAVORITE</b><span>${esc(m.favorite||[m.genre,m.favoriteArtists].filter(Boolean).join('、'))}</span></div>`:''}
@@ -541,6 +543,7 @@
       openPhotoViewer(images,current+step);
     }
   });
+  window.addEventListener('tonight:languagechange',()=>{if(page==='profiles'||page==='schedule')render();});
   window.addEventListener('hashchange',()=>{const match=location.hash.match(/event=([^&]+)/);if(match){selectedId=decodeURIComponent(match[1]);if(data.events.some(e=>e.id===selectedId)){page='home';render();}}});
   const hash=location.hash.match(/event=([^&]+)/);if(hash){selectedId=decodeURIComponent(hash[1]);page='home';}
   loadData();refreshTimer=setInterval(()=>{loadData(true);checkReminders();checkNowPlayingNotice();},30000);
