@@ -4848,3 +4848,73 @@ input,select,textarea{
 @media (prefers-reduced-motion:reduce){
   *{scroll-behavior:auto!important;transition:none!important}
 }
+
+
+/* v77: 管理者通知設定を来場者アプリと同じセンター型Liquid Glassモーダルに */
+.admin-notification-overlay{
+  position:fixed;inset:0;z-index:10000;display:grid;place-items:center;
+  padding:22px;background:rgba(24,29,40,.27);
+  -webkit-backdrop-filter:blur(15px) saturate(125%);backdrop-filter:blur(15px) saturate(125%);
+  animation:adminNoticeFade .2s ease both;
+}
+.admin-notification-dialog{
+  position:relative;width:min(100%,594px);padding:34px 25px 28px;
+  border-radius:30px;text-align:center;
+  background:rgba(250,250,252,.78);
+  border:1px solid rgba(255,255,255,.94);
+  box-shadow:0 24px 70px rgba(20,25,40,.22),inset 0 1px 0 rgba(255,255,255,.96);
+  -webkit-backdrop-filter:blur(30px) saturate(155%);backdrop-filter:blur(30px) saturate(155%);
+  color:#1d1d1f;
+}
+.admin-notification-dialog h2{
+  margin:0 36px 14px!important;padding:0 0 13px;
+  border-bottom:1px solid rgba(60,60,67,.12);
+  font-size:24px!important;font-weight:750;letter-spacing:-.035em;
+}
+.admin-notification-close{
+  position:absolute;right:23px;top:22px;width:36px;height:36px;border:0;border-radius:50%;
+  background:rgba(118,118,128,.13);color:#55565b;font-size:23px;line-height:1;cursor:pointer;
+}
+.admin-notification-setting-row{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:18px 0;text-align:left;border-bottom:1px solid rgba(60,60,67,.12);
+}
+.admin-notification-setting-row strong{display:block;font-size:16px;font-weight:720}
+.admin-notification-setting-row p{
+  margin:5px 0 0;color:#85858b;font-size:12px;line-height:1.55;
+}
+.admin-notification-pill{
+  flex:0 0 auto;min-width:57px;padding:6px 12px;border-radius:999px;
+  font-size:12px;font-weight:750;text-align:center;
+}
+.admin-notification-pill.is-on{background:#e6f5eb;color:#16834b}
+.admin-notification-pill.is-off{background:#ececf0;color:#77777d}
+.admin-notification-dialog-actions{display:grid;gap:8px;margin-top:24px}
+.admin-notification-dialog-actions .btn{
+  width:100%;min-height:54px;border-radius:17px!important;
+  background:rgba(255,255,255,.74)!important;color:#1d1d1f!important;
+  border:1px solid rgba(255,255,255,.95)!important;
+  box-shadow:0 7px 18px rgba(0,91,180,.13),inset 0 1px 0 #fff!important;
+}
+.admin-notification-dialog-actions .btn-primary{
+  background:rgba(255,255,255,.74)!important;color:#1d1d1f!important;
+}
+.admin-notification-dialog-actions .btn:disabled{opacity:.45}
+.admin-notification-dialog-footnote{
+  max-width:390px;margin:12px auto 0!important;color:#99999f!important;
+  font-size:11px!important;line-height:1.6!important;
+}
+.admin-notification-dialog .admin-notification-help{
+  margin-top:14px;padding:12px 14px;border-radius:13px;text-align:left;
+  background:rgba(255,246,232,.8);font-size:12px;line-height:1.6;
+}
+.admin-notification-dialog .admin-notification-error{color:#c33;font-size:12px}
+@keyframes adminNoticeFade{from{opacity:0}to{opacity:1}}
+@media(max-width:600px){
+ .admin-notification-dialog{padding:30px 20px 24px;border-radius:25px}
+ .admin-notification-dialog h2{font-size:21px!important}
+}
+@media(prefers-reduced-transparency:reduce){
+ .admin-notification-overlay{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(24,29,40,.42)}
+ .admin-notification-dialog{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(250,250,252,.97)}
+}

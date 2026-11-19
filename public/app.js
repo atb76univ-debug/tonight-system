@@ -3002,25 +3002,40 @@ async function renderAdminNotificationSettings() {
     }
   }
   const enabled = !!subscription && permission === 'granted';
-  const statusLabel = !supported ? 'このブラウザは非対応' : permission === 'denied' ? 'ブラウザで通知がブロックされています' : enabled ? 'この端末で通知を受け取れます' : '通知はオフです';
-  const statusClass = enabled ? 'is-enabled' : 'is-disabled';
-  screen.innerHTML = `
-    <div class="admin-notification-page">
-      <div class="admin-notification-heading"><button type="button" class="btn btn-secondary" id="notificationSettingsBack">← イベント一覧</button><div><h2>通知設定</h2><p>管理用アプリで受け取る通知を設定できます。</p></div></div>
-      <section class="card admin-notification-card">
-        <div class="admin-notification-status-row"><div class="admin-notification-icon">${enabled ? '🔔' : '🔕'}</div><div class="admin-notification-status-copy"><strong>シフト開始通知</strong><span class="admin-notification-status ${statusClass}">${esc(statusLabel)}</span></div></div>
-        <p class="sub-text">担当シフトの開始時刻に、この端末へプッシュ通知を送ります。通知を受け取るには、ブラウザと端末の両方で通知を許可してください。</p>
-        ${permission === 'denied' ? '<div class="admin-notification-help">通知がブロックされています。ブラウザのアドレスバー横にあるサイト設定から、このサイトの通知を「許可」に変更してください。その後、この画面を再読み込みしてください。</div>' : ''}
-        ${statusError ? `<p class="admin-notification-error">${esc(statusError)}</p>` : ''}
-        <div class="admin-notification-actions">${enabled ? '<button type="button" class="btn btn-secondary" id="disableAdminPush">この端末の通知をオフにする</button>' : `<button type="button" class="btn btn-primary" id="enableAdminPush" ${!supported || permission === 'denied' ? 'disabled' : ''}>通知をオンにする</button>`}</div>
-      </section>
-      <section class="card admin-notification-info"><strong>通知が届かない場合</strong><ul><li>ブラウザのサイト通知が許可されているか確認してください。</li><li>端末の集中モード・おやすみモードを確認してください。</li><li>通知をオンにした端末・ブラウザで管理用アプリにログインしてください。</li><li>iPhone・iPadではホーム画面に追加したWebアプリから設定してください。</li></ul></section>
-    </div>`;
-  document.getElementById('notificationSettingsBack').onclick = () => navigate(renderEventList);
+  const statusLabel = !supported ? '非対応' : permission === 'denied' ? 'ブロック中' : enabled ? 'オン' : 'オフ';
+  const overlay = document.createElement('div');
+  overlay.className = 'admin-notification-overlay';
+  overlay.innerHTML = `
+    <section class="admin-notification-dialog" role="dialog" aria-modal="true" aria-labelledby="adminNotificationTitle">
+      <button type="button" class="admin-notification-close" id="closeAdminNotification" aria-label="閉じる">×</button>
+      <h2 id="adminNotificationTitle">通知設定</h2>
+      <div class="admin-notification-setting-row">
+        <div><strong>プッシュ通知</strong><p>アプリを閉じているときも、担当シフトの開始時刻をお知らせします。</p></div>
+        <span class="admin-notification-pill ${enabled ? 'is-on' : 'is-off'}">${statusLabel}</span>
+      </div>
+      ${permission === 'denied' ? '<div class="admin-notification-help">ブラウザで通知がブロックされています。ブラウザのサイト設定から通知を「許可」に変更してください。</div>' : ''}
+      ${statusError ? `<p class="admin-notification-error">${esc(statusError)}</p>` : ''}
+      <div class="admin-notification-dialog-actions">
+        ${enabled
+          ? '<button type="button" class="btn btn-secondary" id="disableAdminPush">プッシュ通知をオフにする</button>'
+          : `<button type="button" class="btn btn-primary" id="enableAdminPush" ${!supported || permission === 'denied' ? 'disabled' : ''}>プッシュ通知をオンにする</button>`}
+      </div>
+      <p class="admin-notification-dialog-footnote">端末・ブラウザ自体の通知許可は、端末の設定から変更できます。</p>
+    </section>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  document.getElementById('closeAdminNotification').onclick = close;
+  overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+  const onKey = event => { if (event.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
   document.getElementById('enableAdminPush')?.addEventListener('click', async event => {
     const button = event.currentTarget; button.disabled = true; button.textContent = '設定中…';
-    try { await configureAdminShiftNotifications(); sessionStorage.removeItem('adminShiftPushPromptLater'); await renderAdminNotificationSettings(); }
-    catch (error) { alert(error.message || '通知設定に失敗しました。'); button.disabled = false; button.textContent = 'もう一度試す'; }
+    try {
+      await configureAdminShiftNotifications();
+      sessionStorage.removeItem('adminShiftPushPromptLater');
+      close();
+      await renderAdminNotificationSettings();
+    } catch (error) { alert(error.message || '通知設定に失敗しました。'); button.disabled = false; button.textContent = 'もう一度試す'; }
   });
   document.getElementById('disableAdminPush')?.addEventListener('click', async event => {
     const button = event.currentTarget; button.disabled = true; button.textContent = '解除中…';
@@ -3032,6 +3047,7 @@ async function renderAdminNotificationSettings() {
         if (!response.ok) throw new Error('通知登録の解除に失敗しました。');
         await current.unsubscribe();
       }
+      close();
       await renderAdminNotificationSettings();
     } catch (error) { alert(error.message || '通知をオフにできませんでした。'); button.disabled = false; button.textContent = 'もう一度試す'; }
   });
