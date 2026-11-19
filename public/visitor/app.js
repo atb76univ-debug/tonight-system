@@ -212,6 +212,13 @@
   function updateNotificationBadge(){
     const last=Number(localStorage.getItem(MESSAGE_READ_KEY)||0), unread=globalMessages.filter(m=>Number(m.createdAt||0)>last).length;
     const badge=$('#notificationBadge'); if(badge){badge.textContent=unread>99?'99+':String(unread);badge.hidden=!unread;}
+    // ホーム画面に追加したWebアプリのアイコンバッジ。未対応環境では何もしない。
+    try {
+      if ('setAppBadge' in navigator && 'clearAppBadge' in navigator) {
+        const task = unread > 0 ? navigator.setAppBadge(unread) : navigator.clearAppBadge();
+        if (task && typeof task.catch === 'function') task.catch(() => {});
+      }
+    } catch {}
   }
   function renderMessageCard(m,mode='full'){
     const emojis=['👍','❤️','🎉','👏','🔥'];

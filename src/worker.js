@@ -199,34 +199,44 @@ async function vapidAuthorization(endpoint, env) {
   return `vapid t=${unsigned}.${b64url(signature)}, k=${env.VAPID_PUBLIC_KEY}`;
 }
 async function sendPushNotifications(env, title, body) {
-  // Check the Worker secrets before looking for subscribers. Previously an empty
-  // subscription list returned {sent:0} without configured:true, which the admin
-  // UI incorrectly reported as missing VAPID configuration.
   if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) {
-    return { sent:0, configured:false, reason:'missing-secrets', subscribers:0 };
+    return { sent:0, configured:false, reason:'missing-secrets', subscribers:0, failed:0, failures:{} };
   }
-  let signingKey;
   try {
     const jwk = JSON.parse(env.VAPID_PRIVATE_JWK);
-    signingKey = await crypto.subtle.importKey('jwk', jwk, { name:'ECDSA', namedCurve:'P-256' }, false, ['sign']);
+    await crypto.subtle.importKey('jwk', jwk, { name:'ECDSA', namedCurve:'P-256' }, false, ['sign']);
     if (typeof env.VAPID_PUBLIC_KEY !== 'string' || !env.VAPID_PUBLIC_KEY.trim() || typeof env.VAPID_SUBJECT !== 'string' || !env.VAPID_SUBJECT.trim()) throw new Error('missing VAPID field');
   } catch {
-    return { sent:0, configured:false, reason:'invalid-secrets', subscribers:0 };
+    return { sent:0, configured:false, reason:'invalid-secrets', subscribers:0, failed:0, failures:{} };
   }
   const stub = env.STORE.get(env.STORE.idFromName('main'));
   const result = await stub.fetch('https://do/push-subscriptions');
-  const subscriptions = await result.json();
-  if (!Array.isArray(subscriptions) || !subscriptions.length) return { sent:0, configured:true, subscribers:0 };
-  let sent=0;
+  const subscriptions = result.ok ? await result.json() : [];
+  if (!Array.isArray(subscriptions)) return { sent:0, configured:true, reason:'invalid-subscription-store', subscribers:0, failed:0, failures:{} };
+  if (!subscriptions.length) return { sent:0, configured:true, subscribers:0, failed:0, failures:{}, removedExpired:0 };
+
+  let sent=0, removedExpired=0;
+  const failures={};
+  const recordFailure=key=>{failures[key]=(failures[key]||0)+1;};
   await Promise.all(subscriptions.map(async sub => {
     try {
       const authorization = await vapidAuthorization(sub.endpoint, env);
       const response = await fetch(sub.endpoint, { method:'POST', headers:{ Authorization:authorization, TTL:'120', Urgency:'normal' } });
-      if (response.ok || response.status===201) sent++;
-      else if (response.status===404 || response.status===410) await stub.fetch('https://do/push-subscription', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({endpoint:sub.endpoint}) });
-    } catch {}
+      if (response.ok || response.status===201) {
+        sent++;
+      } else {
+        recordFailure(`http_${response.status}`);
+        if (response.status===404 || response.status===410) {
+          const removed=await stub.fetch('https://do/push-subscription', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({endpoint:sub.endpoint}) });
+          if(removed.ok) removedExpired++;
+        }
+      }
+    } catch (error) {
+      recordFailure(error?.name==='TypeError'?'network_or_endpoint_error':'send_exception');
+    }
   }));
-  return { sent, configured:true, subscribers:subscriptions.length };
+  const failed=Object.values(failures).reduce((sum,count)=>sum+count,0);
+  return { sent, configured:true, subscribers:subscriptions.length, failed, failures, removedExpired };
 }
 
 async function sendAdminPushNotifications(env, title, body) {
