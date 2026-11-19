@@ -4735,3 +4735,9 @@ button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible
   line-height:1!important;font-variant-numeric:tabular-nums!important;
 }
 @media(max-width:560px){.product-tile-card .product-selection-qty .qty-btn{flex-basis:38px!important;width:38px!important;min-width:38px!important;max-width:38px!important;height:38px!important;min-height:38px!important;max-height:38px!important}}
+
+
+/* Direct profile photo upload */
+.profile-photo-upload-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0 14px}
+.profile-photo-upload-controls .btn{width:auto;min-width:150px}
+.profile-photo-upload-controls label{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}

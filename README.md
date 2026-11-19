@@ -33,6 +33,7 @@ npm run deploy
 - `GET /api/db` and `PUT /api/db`: require a valid administrator session.
 - `PUT /api/flyer/:eventId`: requires a valid administrator session.
 - `PUT` and `DELETE /api/gallery/:eventId/:imageId`: require a valid administrator session.
+- `PUT` and `DELETE /api/member-photo/:memberId`: require a valid administrator session. Public profile images are served with `GET /api/member-photo/:memberId`.
 - Admin login issues a signed, HttpOnly, Secure, SameSite=Strict cookie with a 12-hour lifetime.
 - Login attempts are rate-limited per client IP by the Durable Object (5 attempts per 15 minutes).
 - Public RSVP writes are rate-limited (25 operations per 10 minutes per IP) and require same-origin requests.
@@ -99,3 +100,9 @@ Set these using `npx wrangler secret put VAPID_PUBLIC_KEY`, `npx wrangler secret
 - イベント開催日とタイムテーブルの各出演開始時刻に、TMPからのお知らせへ自動投稿します。通知購読端末には同時にプッシュ通知します。
 - 自動投稿はイベントID・日付・出演IDをキーに重複防止します。タイムテーブルの時刻補正（offsetMinutes）も反映します。
 - Cron Triggerを有効にするため、既存プロジェクトの `wrangler.jsonc` もこのZIPの設定に置き換えてデプロイしてください。
+
+
+## Profile photo uploads
+- Member profile photos can be selected and uploaded directly in the admin profile editor.
+- Images are resized and converted to JPEG in the browser, then stored in the same Durable Object storage used by event gallery photos.
+- No additional storage provider, binding, or secret is required.

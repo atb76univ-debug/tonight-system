@@ -281,7 +281,7 @@ export class Store {
         const publicMembers = members.filter(member => referencedIds.has(String(member.id))).map(member => ({ id: String(member.id),
           name: String(member.name || ''), nickname: String(member.nickname || ''), bio: String(member.bio || member.profile || ''),
           instagram: String(member.instagram || ''), genre: String(member.genre || ''), favoriteArtists: String(member.favoriteArtists || ''),
-          favorite: String(member.favorite || ''), photo: /^https:\/\//i.test(String(member.photo || '')) ? String(member.photo) : '',
+          favorite: String(member.favorite || ''), photo: (/^https:\/\//i.test(String(member.photo || '')) || /^\/api\/member-photo\/[A-Za-z0-9_-]+$/.test(String(member.photo || ''))) ? String(member.photo) : '',
           spotifyPlaylist: /^https:\/\//i.test(String(member.spotifyPlaylist || '')) ? String(member.spotifyPlaylist) : '' }));
         const products = (Array.isArray(event.bar?.products) ? event.bar.products : (Array.isArray(current.drinkLineup) ? current.drinkLineup : []))
           .map(product => ({ id: String(product.id || ''), name: String(product.name || ''), price: Math.max(0, Number(product.price || 0)), soldOut: Boolean(product.soldOut) }));
@@ -446,6 +446,27 @@ export class Store {
         mergeInto(current, incoming); current.updated = Date.now(); await this.state.storage.put('db', current);
       } else if (req.method !== 'GET') return text('method not allowed', 405, { Allow: 'GET, PUT' });
       return json(current);
+    }
+    const memberPhotoMatch = path.match(/^\/member-photo\/([A-Za-z0-9_-]+)$/);
+    if (memberPhotoMatch) {
+      const memberId = memberPhotoMatch[1], key = `member-photo:${memberId}`;
+      if (req.method === 'PUT') {
+        const buffer = await req.arrayBuffer();
+        if (!buffer.byteLength || buffer.byteLength > 1500000) return text('too large', 413);
+        const type = req.headers.get('Content-Type') || '';
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(type.split(';')[0])) return text('unsupported media', 415);
+        const db = (await this.state.storage.get('db')) || { members: [] };
+        if (!(db.members || []).some(member => String(member.id) === memberId)) return text('member not found', 404);
+        await this.state.storage.put(key, buffer);
+        return json({ ok: true });
+      }
+      if (req.method === 'DELETE') { await this.state.storage.delete(key); return json({ ok: true }); }
+      if (req.method === 'GET') {
+        const buffer = await this.state.storage.get(key);
+        if (!buffer) return text('not found', 404);
+        return new Response(buffer, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff' } });
+      }
+      return text('method not allowed', 405, { Allow: 'GET, PUT, DELETE' });
     }
     const galleryMatch = path.match(/^\/gallery\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)$/);
     if (galleryMatch) {
@@ -711,8 +732,8 @@ export default {
       response = await stub.fetch(new Request('https://do/db', request));
       return secureResponse(response, url);
     }
-    const isFlyer = url.pathname.startsWith('/api/flyer/'), isGallery = url.pathname.startsWith('/api/gallery/');
-    if (isFlyer || isGallery) {
+    const isFlyer = url.pathname.startsWith('/api/flyer/'), isGallery = url.pathname.startsWith('/api/gallery/'), isMemberPhoto = url.pathname.startsWith('/api/member-photo/');
+    if (isFlyer || isGallery || isMemberPhoto) {
       const write = request.method !== 'GET';
       if (write) {
         if (await exceedsBodyLimit(request, 1_600_000)) return secureResponse(json({ error: 'file too large' }, 413), url);
@@ -720,7 +741,7 @@ export default {
         if (!sameOrigin(request)) return secureResponse(json({ error: 'origin rejected' }, 403), url);
       }
       if (isFlyer && !['GET', 'PUT'].includes(request.method)) return secureResponse(text('method not allowed', 405, { Allow: 'GET, PUT' }), url);
-      if (isGallery && !['GET', 'PUT', 'DELETE'].includes(request.method)) return secureResponse(text('method not allowed', 405, { Allow: 'GET, PUT, DELETE' }), url);
+      if ((isGallery || isMemberPhoto) && !['GET', 'PUT', 'DELETE'].includes(request.method)) return secureResponse(text('method not allowed', 405, { Allow: 'GET, PUT, DELETE' }), url);
       const stub = env.STORE.get(env.STORE.idFromName('main'));
       response = await stub.fetch(new Request('https://do' + url.pathname.replace('/api', ''), request));
       return secureResponse(response, url);

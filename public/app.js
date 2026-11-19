@@ -3544,9 +3544,13 @@ function renderMemberProfileEdit() {
         </section>
         <section class="profile-form-section">
           <h3>プロフィール写真</h3>
-          <label class="form-row"><span>写真URL</span><input id="profilePhoto" type="url" value="${esc(photo)}" placeholder="https://example.com/photo.jpg"></label>
-          <div class="profile-photo-preview-wrap"><img id="profilePhotoPreview" class="profile-photo-preview ${photo ? "" : "is-empty"}" src="${esc(photo)}" alt="プロフィール写真プレビュー" ${photo ? "" : "hidden"}><div id="profilePhotoEmpty" class="profile-photo-empty" ${photo ? "hidden" : ""}>写真URLを入力するとプレビューが表示されます</div></div>
-          <p class="sub-text">インターネット上からアクセスできる画像URLを指定してください。</p>
+          <div class="profile-photo-upload-controls">
+            <label class="btn btn-primary" for="profilePhotoFile">＋ 写真を選択してアップロード</label>
+            <input id="profilePhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+            <button type="button" class="btn btn-secondary" id="removeProfilePhoto" ${photo ? "" : "hidden"}>写真を削除</button>
+          </div>
+          <div class="profile-photo-preview-wrap"><img id="profilePhotoPreview" class="profile-photo-preview ${photo ? "" : "is-empty"}" src="${esc(photo)}" alt="プロフィール写真プレビュー" ${photo ? "" : "hidden"}><div id="profilePhotoEmpty" class="profile-photo-empty" ${photo ? "hidden" : ""}>写真を選択すると、ここにプレビューが表示されます</div></div>
+          <p class="sub-text" id="profilePhotoStatus" aria-live="polite">画像はイベント写真と同じ保存方式です。JPEG形式に変換してアップロードします。</p>
         </section>
         <section class="profile-form-section">
           <h3>SNS・音楽</h3>
@@ -3563,33 +3567,63 @@ function renderMemberProfileEdit() {
         <div class="profile-form-actions"><button type="button" class="btn btn-secondary" id="cancelMemberProfile">キャンセル</button><button type="submit" class="btn btn-primary">変更を保存</button></div>
       </form>
     </div>`;
-  const photoInput = document.getElementById("profilePhoto");
+  const photoInput = document.getElementById("profilePhotoFile");
   const preview = document.getElementById("profilePhotoPreview");
   const empty = document.getElementById("profilePhotoEmpty");
-  const updatePhotoPreview = () => {
-    const url = photoInput.value.trim();
-    if (!url) { preview.hidden = true; empty.hidden = false; return; }
-    preview.onload = () => { preview.hidden = false; empty.hidden = true; };
-    preview.onerror = () => { preview.hidden = true; empty.hidden = false; empty.textContent = "画像を読み込めません。URLを確認してください。"; };
-    preview.src = url;
+  const status = document.getElementById("profilePhotoStatus");
+  const removePhoto = document.getElementById("removeProfilePhoto");
+  let photoUrl = photo;
+  const showPhoto = url => {
+    photoUrl = url || "";
+    if (!photoUrl) { preview.hidden = true; preview.classList.add("is-empty"); preview.removeAttribute("src"); empty.hidden = false; removePhoto.hidden = true; return; }
+    preview.onload = () => { preview.hidden = false; preview.classList.remove("is-empty"); empty.hidden = true; removePhoto.hidden = false; };
+    preview.onerror = () => { preview.hidden = true; empty.hidden = false; empty.textContent = "画像を読み込めませんでした。"; };
+    preview.src = photoUrl;
   };
-  photoInput.addEventListener("input", updatePhotoPreview);
-  if (photo) updatePhotoPreview();
+  photoInput.addEventListener("change", async () => {
+    const file = photoInput.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { alert("JPEG・PNG・WebP形式の画像を選択してください。"); photoInput.value = ""; return; }
+    if (file.size > 12 * 1024 * 1024) { alert("画像は12MB以下のファイルを選択してください。"); photoInput.value = ""; return; }
+    const oldUrl = photoUrl;
+    status.textContent = "画像を準備しています…";
+    try {
+      const blob = await resizeGalleryImage(file, 900);
+      const response = await fetch(`/api/member-photo/${encodeURIComponent(member.id)}`, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: blob, credentials: "same-origin" });
+      if (!response.ok) throw new Error(response.status === 413 ? "画像サイズが大きすぎます。" : "アップロードに失敗しました。");
+      photoUrl = `/api/member-photo/${encodeURIComponent(member.id)}?v=${Date.now()}`;
+      showPhoto(photoUrl);
+      member.photo = `/api/member-photo/${encodeURIComponent(member.id)}`;
+      db.membersUpdated = Date.now(); persistDb();
+      status.textContent = "プロフィール写真をアップロードして保存しました。";
+    } catch (error) {
+      console.error(error); status.textContent = error.message || "アップロードに失敗しました。"; alert(status.textContent);
+      showPhoto(oldUrl);
+    } finally { photoInput.value = ""; }
+  });
+  removePhoto.onclick = async () => {
+    if (!photoUrl || !confirm("プロフィール写真を削除しますか？")) return;
+    try {
+      if (String(member.photo || "").startsWith("/api/member-photo/")) {
+        const response = await fetch(`/api/member-photo/${encodeURIComponent(member.id)}`, { method: "DELETE", credentials: "same-origin" });
+        if (!response.ok && response.status !== 404) throw new Error("写真を削除できませんでした。");
+      }
+      showPhoto(""); member.photo = ""; db.membersUpdated = Date.now(); persistDb();
+      status.textContent = "プロフィール写真を削除しました。";
+    } catch (error) { alert(error.message || "写真を削除できませんでした。"); }
+  };
+  if (photo) showPhoto(photo);
   document.getElementById("cancelMemberProfile").onclick = () => { editingMemberId = null; back(); };
   document.getElementById("memberProfileForm").onsubmit = event => {
     event.preventDefault();
     const name = document.getElementById("profileName").value.trim();
     if (!name) { alert("本名・氏名を入力してください。"); return; }
-    const photoUrl = photoInput.value.trim();
     const instagram = document.getElementById("profileInstagram").value.trim();
     const spotify = document.getElementById("profileSpotify").value.trim();
-    for (const [label, value] of [["プロフィール写真", photoUrl], ["Spotifyプレイリスト", spotify]]) {
-      if (value && !/^https:\/\//i.test(value)) { alert(`${label}は https:// から始まるURLを入力してください。`); return; }
-    }
+    if (spotify && !/^https:\/\//i.test(spotify)) { alert("Spotifyプレイリストは https:// から始まるURLを入力してください。"); return; }
     member.name = name;
     member.grade = document.getElementById("profileGrade").value.trim();
     member.nickname = document.getElementById("profileNickname").value.trim();
-    member.photo = photoUrl;
     member.instagram = instagram;
     member.favorite = document.getElementById("profileFavorite").value.trim();
     // 旧データとの互換性を保つため、既存の個別項目も空にせず保持する。
