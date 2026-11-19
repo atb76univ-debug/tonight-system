@@ -72,11 +72,15 @@
   function mount() {
     const header = document.querySelector('.topbar');
     if (!header || document.getElementById('tonightLanguageToggle')) return;
+    // Place the language control alongside the visitor header actions,
+    // rather than as a separate flex item at the far edge of the topbar.
+    const actionArea = header.querySelector('.top-actions') || header;
     const button = document.createElement('button');
     button.id = 'tonightLanguageToggle'; button.type='button'; button.className='language-toggle';
     button.setAttribute('aria-label','Switch language');
+    button.setAttribute('title','Switch language');
     button.onclick = () => setLanguage(language === 'ja' ? 'en' : 'ja');
-    header.appendChild(button); setLanguage(language);
+    actionArea.appendChild(button); setLanguage(language);
     observer = new MutationObserver(() => { if (language === 'en') translate(); });
     observer.observe(document.body,{childList:true,subtree:true});
   }

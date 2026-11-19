@@ -811,3 +811,28 @@ html,body{
  max-width:calc(100vw - 32px);padding:10px 16px;border-radius:12px;
  background:#292929;color:white;font-size:12px;box-shadow:0 5px 22px #0003;
 }
+
+
+/* Language switch: keep it inside the visitor header action cluster. */
+.top-actions .language-toggle{
+  min-width:64px;
+  min-height:40px;
+  margin:0;
+  padding:8px 10px;
+  border:1px solid rgba(20,90,210,.12);
+  border-radius:12px;
+  background:rgba(255,255,255,.82);
+  color:#1769d2;
+  font-size:12px;
+  font-weight:800;
+  white-space:nowrap;
+}
+@media (max-width:420px){
+  .top-actions{gap:5px}
+  .top-actions .language-toggle{
+    min-width:54px;
+    min-height:38px;
+    padding:7px 8px;
+    font-size:11px;
+  }
+}
