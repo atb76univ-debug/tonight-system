@@ -310,7 +310,10 @@
       </section>`);
       return;
     }
-    openPushSetupPrompt();
+    // The setup dialog is the existing help dialog with the opt-in action.
+    // Calling the current function here recursed into an undefined symbol and
+    // prevented the initial notification prompt from appearing.
+    openPushHelp();
   }
   async function subscribeForPush(){
     const keyRes=await fetch('/api/public/push-key',{cache:'no-store'});
