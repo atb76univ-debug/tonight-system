@@ -106,3 +106,8 @@ Set these using `npx wrangler secret put VAPID_PUBLIC_KEY`, `npx wrangler secret
 - Member profile photos can be selected and uploaded directly in the admin profile editor.
 - Images are resized and converted to JPEG in the browser, then stored in the same Durable Object storage used by event gallery photos.
 - No additional storage provider, binding, or secret is required.
+
+
+## English UI and automatic content translation
+
+Set the Cloudflare Worker secret `DEEPL_AUTH_KEY` to enable Japanese-to-English translation in both the admin and visitor apps. For a DeepL API Free key, the default endpoint is `https://api-free.deepl.com/v2/translate`. Optional `DEEPL_API_URL` can be configured as a Worker variable for a different DeepL endpoint. Add the secret with `npx wrangler secret put DEEPL_AUTH_KEY`, then deploy. Language selection is stored per browser. Translation text is cached locally; untranslated content remains in Japanese if translation is unavailable.

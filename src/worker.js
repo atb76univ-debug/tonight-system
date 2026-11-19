@@ -572,6 +572,28 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     let response;
+    if (url.pathname === '/api/translate/en' && request.method === 'POST') {
+      if (!sameOrigin(request)) return secureResponse(json({ error: 'origin rejected' }, 403), url);
+      if (!env.DEEPL_AUTH_KEY) return secureResponse(json({ error: 'translation_not_configured' }, 503), url);
+      let body;
+      try { body = await request.json(); } catch { return secureResponse(json({ error: 'invalid_json' }, 400), url); }
+      const texts = Array.isArray(body.texts) ? body.texts.map(x => String(x || '').slice(0, 5000)).filter(Boolean).slice(0, 40) : [];
+      if (!texts.length) return secureResponse(json({ translations: [] }), url);
+      if (texts.reduce((n, x) => n + x.length, 0) > 12000) return secureResponse(json({ error: 'payload_too_large' }, 413), url);
+      try {
+        const params = new URLSearchParams();
+        params.set('target_lang', 'EN-US');
+        params.set('preserve_formatting', '1');
+        for (const value of texts) params.append('text', value);
+        const api = env.DEEPL_API_URL || 'https://api-free.deepl.com/v2/translate';
+        const translated = await fetch(api, { method: 'POST', headers: { Authorization: `DeepL-Auth-Key ${env.DEEPL_AUTH_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: params });
+        if (!translated.ok) return secureResponse(json({ error: 'translation_failed', status: translated.status }, 502), url);
+        const result = await translated.json();
+        return secureResponse(json({ translations: (result.translations || []).map(x => x.text || '') }), url);
+      } catch {
+        return secureResponse(json({ error: 'translation_unavailable' }, 502), url);
+      }
+    }
     if (url.pathname === '/api/auth/session' && request.method === 'GET') {
       if (!configured(env)) response = json({ authenticated: false, configured: false, message: 'Admin secrets are not configured.' }, 503);
       else { const authenticated = await validSession(request, env); response = json({ authenticated }, authenticated ? 200 : 401); }
