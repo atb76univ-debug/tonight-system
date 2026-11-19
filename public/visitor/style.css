@@ -793,3 +793,7 @@ html,body{
   .bottom-nav button:hover{color:#0071e3!important}
 }
 @media (hover:none){.btn:hover,.quick:hover,.event-tile:hover,.event-select-card:hover{transform:none!important;box-shadow:var(--shadow)!important}}
+
+/* Profile image focal point is shared, while each responsive card keeps its own aspect ratio. */
+.performer-profile-cover{overflow:hidden}
+.performer-profile-cover img{width:100%;height:100%;object-fit:cover;object-position:50% 50%;transform-origin:center center}

@@ -282,6 +282,7 @@ export class Store {
           name: String(member.name || ''), nickname: String(member.nickname || ''), bio: String(member.bio || member.profile || ''),
           instagram: String(member.instagram || ''), genre: String(member.genre || ''), favoriteArtists: String(member.favoriteArtists || ''),
           favorite: String(member.favorite || ''), photo: (/^https:\/\//i.test(String(member.photo || '')) || /^\/api\/member-photo\/[A-Za-z0-9_-]+$/.test(String(member.photo || ''))) ? String(member.photo) : '',
+          photoCrop: { x: Math.max(0, Math.min(100, Number(member.photoCrop?.x ?? 50))), y: Math.max(0, Math.min(100, Number(member.photoCrop?.y ?? 50))), scale: Math.max(1, Math.min(3, Number(member.photoCrop?.scale ?? 1))) },
           spotifyPlaylist: /^https:\/\//i.test(String(member.spotifyPlaylist || '')) ? String(member.spotifyPlaylist) : '' }));
         const products = (Array.isArray(event.bar?.products) ? event.bar.products : (Array.isArray(current.drinkLineup) ? current.drinkLineup : []))
           .map(product => ({ id: String(product.id || ''), name: String(product.name || ''), price: Math.max(0, Number(product.price || 0)), soldOut: Boolean(product.soldOut) }));

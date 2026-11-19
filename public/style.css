@@ -4983,3 +4983,8 @@ input,select,textarea{
     word-break:normal!important;
   }
 }
+
+/* v79: profile photos retain the original image; each component crops responsively */
+.profile-photo-preview-wrap{overflow:hidden}
+.profile-photo-preview{object-fit:cover;transform-origin:center center;max-width:100%}
+.member-crop-frame{overflow:hidden}

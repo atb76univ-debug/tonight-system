@@ -413,7 +413,7 @@
     const categories=['DJ','LIVE','VJ','その他'];
     const categoryFor=act=>{const t=String(act.type==='その他'?(act.customType||'その他'):(act.type||'DJ')).toUpperCase();if(t.includes('DJ'))return 'DJ';if(t.includes('LIVE')||t.includes('BAND')||t.includes('ライブ'))return 'LIVE';if(t.includes('VJ'))return 'VJ';return 'その他';};
     const renderCard=(m,category)=>{const slots=actsFor(ev).filter(a=>categoryFor(a)===category&&(a.memberIds||[]).map(String).includes(String(m.id))).map(a=>({a,range:actRange(ev,a)})).filter(x=>x.range.start&&x.range.end);return `<article class="performer-profile-card">
-      <div class="performer-profile-cover">${m.photo?`<img src="${esc(m.photo)}" alt="${esc(m.nickname||m.name)}" loading="lazy">`:`<div class="performer-profile-placeholder">tonight!</div>`}</div>
+      <div class="performer-profile-cover">${m.photo?`<img src="${esc(m.photo)}" alt="${esc(m.nickname||m.name)}" loading="lazy" style="object-position:${Number(m.photoCrop?.x ?? 50)}% ${Number(m.photoCrop?.y ?? 50)}%;transform:scale(${Number(m.photoCrop?.scale ?? 1)})">`:`<div class="performer-profile-placeholder">tonight!</div>`}</div>
       <div class="performer-profile-body">
         <h2>${esc(m.nickname||m.name||'出演者')}</h2>
         ${slots.length?`<div class="profile-line profile-set-times"><b>出演時間</b><span>${slots.map(x=>`${esc(timeText(ev,x.a))}`).join('<br>')}</span></div>`:''}

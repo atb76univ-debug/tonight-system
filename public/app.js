@@ -3606,23 +3606,21 @@ async function cropMemberProfileImage(file) {
       overlay.innerHTML = `
         <section class="member-crop-dialog" role="dialog" aria-modal="true" aria-labelledby="memberCropTitle">
           <button type="button" class="member-crop-close" aria-label="閉じる">×</button>
-          <h2 id="memberCropTitle">写真をトリミング</h2>
-          <p>枠内に表示したい範囲を調整してください。画像をドラッグして位置を変更できます。</p>
+          <h2 id="memberCropTitle">写真の表示位置を調整</h2>
+          <p>元の写真は切り抜かずに保存します。画面ごとの表示比率に合わせて、見せたい位置を調整できます。</p>
           <div class="member-crop-frame"><canvas class="member-crop-canvas" width="960" height="600"></canvas></div>
           <label class="member-crop-range"><span>拡大・縮小</span><input class="member-crop-zoom" type="range" min="1" max="3" step=".01" value="1"></label>
           <div class="member-crop-actions">
             <button type="button" class="btn btn-secondary member-crop-cancel">キャンセル</button>
-            <button type="button" class="btn btn-primary member-crop-apply">この範囲で使用</button>
+            <button type="button" class="btn btn-primary member-crop-apply">この位置で保存</button>
           </div>
         </section>`;
       document.body.appendChild(overlay);
-      const canvas = overlay.querySelector("canvas");
-      const ctx = canvas.getContext("2d");
+      const canvas = overlay.querySelector("canvas"), ctx = canvas.getContext("2d");
       const zoomInput = overlay.querySelector(".member-crop-zoom");
-      const cropW = Math.min(image.width, image.height * ratio);
-      const cropH = cropW / ratio;
+      const baseW = Math.min(image.width, image.height * ratio), baseH = baseW / ratio;
       function draw() {
-        const sw = cropW / zoom, sh = cropH / zoom;
+        const sw = baseW / zoom, sh = baseH / zoom;
         const sx = Math.max(0, Math.min(image.width - sw, focusX * image.width - sw / 2));
         const sy = Math.max(0, Math.min(image.height - sh, focusY * image.height - sh / 2));
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -3639,34 +3637,36 @@ async function cropMemberProfileImage(file) {
       canvas.addEventListener("pointermove", e => {
         if (!dragging) return;
         const rect = canvas.getBoundingClientRect();
-        focusX = Math.max(0, Math.min(1, focusX - (e.clientX - lastX) / rect.width * (cropW / image.width) / zoom));
-        focusY = Math.max(0, Math.min(1, focusY - (e.clientY - lastY) / rect.height * (cropH / image.height) / zoom));
+        focusX = Math.max(0, Math.min(1, focusX - (e.clientX - lastX) / rect.width * (baseW / image.width) / zoom));
+        focusY = Math.max(0, Math.min(1, focusY - (e.clientY - lastY) / rect.height * (baseH / image.height) / zoom));
         lastX = e.clientX; lastY = e.clientY; draw();
       });
       canvas.addEventListener("pointerup", () => { dragging = false; });
       canvas.addEventListener("pointercancel", () => { dragging = false; });
-      overlay.querySelector(".member-crop-apply").onclick = () => {
+      overlay.querySelector(".member-crop-apply").onclick = async () => {
         const button = overlay.querySelector(".member-crop-apply");
-        button.disabled = true; button.textContent = "画像を準備中…";
-        const sw = cropW / zoom, sh = cropH / zoom;
-        const sx = Math.max(0, Math.min(image.width - sw, focusX * image.width - sw / 2));
-        const sy = Math.max(0, Math.min(image.height - sh, focusY * image.height - sh / 2));
-        const output = document.createElement("canvas");
-        output.width = 1200; output.height = 750;
-        output.getContext("2d").drawImage(image, sx, sy, sw, sh, 0, 0, output.width, output.height);
-        output.toBlob(blob => blob ? close(blob) : reject(new Error("画像の書き出しに失敗しました。")), "image/jpeg", .88);
+        button.disabled = true; button.textContent = "元画像を準備中…";
+        try {
+          const maxSide = 2200, scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+          const output = document.createElement("canvas");
+          output.width = Math.max(1, Math.round(image.width * scale));
+          output.height = Math.max(1, Math.round(image.height * scale));
+          output.getContext("2d").drawImage(image, 0, 0, output.width, output.height);
+          output.toBlob(blob => blob
+            ? close({ blob, crop: { x: Math.round(focusX * 1000) / 10, y: Math.round(focusY * 1000) / 10, scale: Math.round(zoom * 100) / 100 } })
+            : reject(new Error("画像の書き出しに失敗しました。")), "image/jpeg", .84);
+        } catch (error) { reject(error); overlay.remove(); }
       };
       draw();
     });
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+  } finally { URL.revokeObjectURL(objectUrl); }
 }
 
 function renderMemberProfileEdit() {
   const member = (db.members || []).find(x => x.id === editingMemberId);
   if (!member) { alert("メンバーが見つかりませんでした。"); back(); return; }
   const photo = String(member.photo || "");
+  const photoCrop = member.photoCrop || { x: 50, y: 50, scale: 1 };
   screen.innerHTML = `
     <div class="member-profile-editor">
       <div class="member-profile-editor-heading">
@@ -3690,7 +3690,7 @@ function renderMemberProfileEdit() {
             <input id="profilePhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
             <button type="button" class="btn btn-secondary" id="removeProfilePhoto" ${photo ? "" : "hidden"}>写真を削除</button>
           </div>
-          <div class="profile-photo-preview-wrap"><img id="profilePhotoPreview" class="profile-photo-preview ${photo ? "" : "is-empty"}" src="${esc(photo)}" alt="プロフィール写真プレビュー" ${photo ? "" : "hidden"}><div id="profilePhotoEmpty" class="profile-photo-empty" ${photo ? "hidden" : ""}>写真を選択すると、ここにプレビューが表示されます</div></div>
+          <div class="profile-photo-preview-wrap"><img id="profilePhotoPreview" class="profile-photo-preview ${photo ? "" : "is-empty"}" style="object-position:${Number(photoCrop.x ?? 50)}% ${Number(photoCrop.y ?? 50)}%;transform:scale(${Number(photoCrop.scale ?? 1)})" src="${esc(photo)}" alt="プロフィール写真プレビュー" ${photo ? "" : "hidden"}><div id="profilePhotoEmpty" class="profile-photo-empty" ${photo ? "hidden" : ""}>写真を選択すると、ここにプレビューが表示されます</div></div>
           <p class="sub-text" id="profilePhotoStatus" aria-live="polite">画像はイベント写真と同じ保存方式です。JPEG形式に変換してアップロードします。</p>
         </section>
         <section class="profile-form-section">
@@ -3716,6 +3716,8 @@ function renderMemberProfileEdit() {
   let photoUrl = photo;
   const showPhoto = url => {
     photoUrl = url || "";
+    preview.style.objectPosition = `${Number(member.photoCrop?.x ?? 50)}% ${Number(member.photoCrop?.y ?? 50)}%`;
+    preview.style.transform = `scale(${Number(member.photoCrop?.scale ?? 1)})`;
     if (!photoUrl) { preview.hidden = true; preview.classList.add("is-empty"); preview.removeAttribute("src"); empty.hidden = false; removePhoto.hidden = true; return; }
     preview.onload = () => { preview.hidden = false; preview.classList.remove("is-empty"); empty.hidden = true; removePhoto.hidden = false; };
     preview.onerror = () => { preview.hidden = true; empty.hidden = false; empty.textContent = "画像を読み込めませんでした。"; };
@@ -3729,13 +3731,15 @@ function renderMemberProfileEdit() {
     const oldUrl = photoUrl;
     status.textContent = "画像を準備しています…";
     try {
-      const blob = await cropMemberProfileImage(file);
-      if (!blob) { status.textContent = "画像の選択をキャンセルしました。"; return; }
-      const response = await fetch(`/api/member-photo/${encodeURIComponent(member.id)}`, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: blob, credentials: "same-origin" });
+      const prepared = await cropMemberProfileImage(file);
+      if (!prepared) { status.textContent = "画像の選択をキャンセルしました。"; return; }
+      if (prepared.blob.size > 1_500_000) throw new Error("画像サイズが大きすぎます。別の画像を選択してください。");
+      const response = await fetch(`/api/member-photo/${encodeURIComponent(member.id)}`, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: prepared.blob, credentials: "same-origin" });
       if (!response.ok) throw new Error(response.status === 413 ? "画像サイズが大きすぎます。" : "アップロードに失敗しました。");
       photoUrl = `/api/member-photo/${encodeURIComponent(member.id)}?v=${Date.now()}`;
       showPhoto(photoUrl);
       member.photo = `/api/member-photo/${encodeURIComponent(member.id)}`;
+      member.photoCrop = prepared.crop;
       db.membersUpdated = Date.now(); persistDb();
       status.textContent = "プロフィール写真をアップロードして保存しました。";
     } catch (error) {
@@ -3750,7 +3754,7 @@ function renderMemberProfileEdit() {
         const response = await fetch(`/api/member-photo/${encodeURIComponent(member.id)}`, { method: "DELETE", credentials: "same-origin" });
         if (!response.ok && response.status !== 404) throw new Error("写真を削除できませんでした。");
       }
-      showPhoto(""); member.photo = ""; db.membersUpdated = Date.now(); persistDb();
+      showPhoto(""); member.photo = ""; member.photoCrop = { x: 50, y: 50, scale: 1 }; db.membersUpdated = Date.now(); persistDb();
       status.textContent = "プロフィール写真を削除しました。";
     } catch (error) { alert(error.message || "写真を削除できませんでした。"); }
   };
