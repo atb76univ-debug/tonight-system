@@ -812,3 +812,21 @@ html,body{
  background:#292929;color:white;font-size:12px;box-shadow:0 5px 22px #0003;
 }
 
+
+
+/* v81: keep the visitor event selector button horizontal on narrow headers */
+.topbar > .brand{flex:0 0 auto;min-width:max-content}
+.topbar > .top-actions{flex:0 0 auto;min-width:max-content;white-space:nowrap}
+.topbar .event-switch-top{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  width:auto;
+  min-width:max-content;
+  white-space:nowrap;
+  word-break:keep-all;
+  overflow-wrap:normal;
+  writing-mode:horizontal-tb;
+  text-orientation:mixed;
+}
