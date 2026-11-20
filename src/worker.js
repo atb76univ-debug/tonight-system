@@ -198,6 +198,19 @@ async function vapidAuthorization(endpoint, env) {
   const signature = new Uint8Array(await crypto.subtle.sign({ name:'ECDSA', hash:'SHA-256' }, key, new TextEncoder().encode(unsigned)));
   return `vapid t=${unsigned}.${b64url(signature)}, k=${env.VAPID_PUBLIC_KEY}`;
 }
+function vapidKeyPairMatches(env) {
+  try {
+    const jwk = JSON.parse(env.VAPID_PRIVATE_JWK || '{}');
+    if (!jwk.x || !jwk.y || !env.VAPID_PUBLIC_KEY) return false;
+    const x = fromB64url(jwk.x), y = fromB64url(jwk.y);
+    const publicBytes = fromB64url(env.VAPID_PUBLIC_KEY);
+    if (x.length !== 32 || y.length !== 32 || publicBytes.length !== 65 || publicBytes[0] !== 4) return false;
+    for (let i = 0; i < 32; i++) {
+      if (publicBytes[i + 1] !== x[i] || publicBytes[i + 33] !== y[i]) return false;
+    }
+    return true;
+  } catch { return false; }
+}
 async function sendPushNotifications(env, title, body) {
   if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) {
     return { sent:0, configured:false, reason:'missing-secrets', subscribers:0, failed:0, failures:{} };
@@ -261,7 +274,7 @@ async function sendPushNotifications(env, title, body) {
     }
   }));
   const failed=Object.values(failures).reduce((sum,count)=>sum+count,0);
-  return { sent, configured:true, subscribers:subscriptions.length, failed, failures, removedExpired };
+  return { sent, configured:true, subscribers:subscriptions.length, failed, failures, removedExpired, vapidKeyPairMatch:vapidKeyPairMatches(env) };
 }
 
 async function sendAdminPushNotifications(env, title, body) {

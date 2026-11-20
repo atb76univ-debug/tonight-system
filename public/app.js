@@ -3507,6 +3507,7 @@ async function renderGlobalMessages() {
         `投稿しました。通知送信結果：成功 ${Number(push.sent)||0}台／失敗 ${Number(push.failed)||0}台／対象 ${Number(push.subscribers)||0}台`+
         (push.removedExpired?`\n期限切れ購読を${push.removedExpired}台分削除しました。`:'')+
         (failureSummary?`\n失敗内訳：${failureSummary}`:'')+
+        (push.vapidKeyPairMatch===false?'\nVAPID診断：公開鍵と秘密鍵のペアが一致していません。Cloudflare Secretsを確認してください。':push.vapidKeyPairMatch===true?'\nVAPID診断：公開鍵と秘密鍵のペアは一致しています。':'')+
         (push.failed?'\n失敗端末は次回以降も再確認します。':'')
       );await load();}catch(e){alert(e.message||'投稿に失敗しました。');}finally{btn.disabled=false;}};
   document.getElementById('messagesBack').onclick=()=>navigate(renderEventList);await load();
