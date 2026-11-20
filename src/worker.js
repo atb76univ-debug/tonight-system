@@ -217,22 +217,47 @@ async function sendPushNotifications(env, title, body) {
 
   let sent=0, removedExpired=0;
   const failures={};
-  const recordFailure=key=>{failures[key]=(failures[key]||0)+1;};
+  const providerFor = endpoint => {
+    try {
+      const host = new URL(endpoint).hostname.toLowerCase();
+      if (host === 'web.push.apple.com' || host.endsWith('.push.apple.com')) return 'apple';
+      if (host === 'fcm.googleapis.com' || host.endsWith('.fcm.googleapis.com')) return 'google';
+      if (host.endsWith('.push.services.mozilla.com')) return 'mozilla';
+      if (host.endsWith('.notify.windows.com')) return 'windows';
+    } catch {}
+    return 'other';
+  };
+  const recordFailure = key => { failures[key]=(failures[key]||0)+1; };
   await Promise.all(subscriptions.map(async sub => {
+    const provider = providerFor(sub.endpoint);
     try {
       const authorization = await vapidAuthorization(sub.endpoint, env);
-      const response = await fetch(sub.endpoint, { method:'POST', headers:{ Authorization:authorization, TTL:'120', Urgency:'normal' } });
+      const response = await fetch(sub.endpoint, {
+        method:'POST',
+        headers:{ Authorization:authorization, TTL:'120', Urgency:'normal' }
+      });
       if (response.ok || response.status===201) {
         sent++;
       } else {
-        recordFailure(`http_${response.status}`);
+        let reason = '';
+        let responseText = '';
+        try {
+          responseText = (await response.text()).slice(0, 500);
+          try { reason = String(JSON.parse(responseText)?.reason || ''); } catch {}
+        } catch {}
+        const detail = reason ? `http_${response.status}_${reason}` : `http_${response.status}`;
+        recordFailure(`${provider}_${detail}`);
         if (response.status===404 || response.status===410) {
-          const removed=await stub.fetch('https://do/push-subscription', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({endpoint:sub.endpoint}) });
+          const removed=await stub.fetch('https://do/push-subscription', {
+            method:'DELETE',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({endpoint:sub.endpoint})
+          });
           if(removed.ok) removedExpired++;
         }
       }
     } catch (error) {
-      recordFailure(error?.name==='TypeError'?'network_or_endpoint_error':'send_exception');
+      recordFailure(`${provider}_${error?.name==='TypeError'?'network_or_endpoint_error':'send_exception'}`);
     }
   }));
   const failed=Object.values(failures).reduce((sum,count)=>sum+count,0);

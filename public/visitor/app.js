@@ -327,10 +327,23 @@
     const keyData=await keyRes.json();
     if(!keyData.publicKey) throw new Error('push-not-configured');
     const registration=await navigator.serviceWorker.ready;
+    const encoded=keyData.publicKey.replace(/-/g,'+').replace(/_/g,'/');
+    const applicationServerKey=Uint8Array.from(atob(encoded+'='.repeat((4-encoded.length%4)%4)),c=>c.charCodeAt(0));
     let subscription=await registration.pushManager.getSubscription();
+    if(subscription){
+      // VAPID公開鍵がローテーションされていた場合、旧鍵で作成された購読を再利用しない。
+      let existingKey='';
+      try {
+        const raw=subscription.options?.applicationServerKey;
+        if(raw) existingKey= btoa(String.fromCharCode(...new Uint8Array(raw))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+      } catch {}
+      const expectedKey=keyData.publicKey.replace(/=+$/,'');
+      if(existingKey && existingKey!==expectedKey){
+        await subscription.unsubscribe();
+        subscription=null;
+      }
+    }
     if(!subscription){
-      const encoded=keyData.publicKey.replace(/-/g,'+').replace(/_/g,'/');
-      const applicationServerKey=Uint8Array.from(atob(encoded+'='.repeat((4-encoded.length%4)%4)),c=>c.charCodeAt(0));
       subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});
     }
     const res=await fetch('/api/public/push-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription),credentials:'same-origin'});
